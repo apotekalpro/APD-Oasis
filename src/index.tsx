@@ -544,9 +544,9 @@ app.delete('/api/warehouse/outlet/:outlet_code', authMiddleware, async (c) => {
     const user = c.get('user')
     const outlet_code = c.req.param('outlet_code')
     
-    // Only admin and warehouse roles can delete
-    if (!['admin', 'warehouse'].includes(user.role)) {
-      return c.json({ error: 'Forbidden' }, 403)
+    // Only admin and warehouse_supervisor roles can delete
+    if (!['admin', 'warehouse_supervisor'].includes(user.role)) {
+      return c.json({ error: 'Only supervisors and admins can delete records' }, 403)
     }
     
     // Delete all transfer_details for this outlet
@@ -572,9 +572,9 @@ app.delete('/api/warehouse/transfer/:transfer_id', authMiddleware, async (c) => 
     const user = c.get('user')
     const transfer_id = c.req.param('transfer_id')
     
-    // Only admin and warehouse roles can delete
-    if (!['admin', 'warehouse'].includes(user.role)) {
-      return c.json({ error: 'Forbidden' }, 403)
+    // Only admin and warehouse_supervisor roles can delete
+    if (!['admin', 'warehouse_supervisor'].includes(user.role)) {
+      return c.json({ error: 'Only supervisors and admins can delete records' }, 403)
     }
     
     // Get transfer details first to find parcel_id

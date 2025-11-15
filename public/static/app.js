@@ -14,6 +14,23 @@ const state = {
     errors: []
 }
 
+// Permission helper functions
+function canDelete() {
+    return state.user && ['admin', 'warehouse_supervisor'].includes(state.user.role)
+}
+
+function canAmend() {
+    return state.user && ['admin', 'warehouse_supervisor'].includes(state.user.role)
+}
+
+function isAdmin() {
+    return state.user && state.user.role === 'admin'
+}
+
+function isSupervisor() {
+    return state.user && state.user.role === 'warehouse_supervisor'
+}
+
 // ============ API Configuration ============
 const API_BASE = window.location.origin
 axios.defaults.baseURL = API_BASE
@@ -700,6 +717,15 @@ function renderWarehouse() {
                             </p>
                         </div>
                         
+                        ${!canDelete() ? `
+                            <div class="bg-yellow-50 border-l-4 border-yellow-500 p-3 mb-4">
+                                <p class="text-sm text-yellow-800">
+                                    <i class="fas fa-lock mr-2"></i>
+                                    <strong>Note:</strong> Only supervisors and admins can delete transfers. Contact your supervisor if you need to remove records.
+                                </p>
+                            </div>
+                        ` : ''}
+                        
                         <button onclick="handleWarehouseScan()" 
                             class="w-full bg-blue-500 hover:bg-blue-600 text-white font-semibold py-3 rounded-lg mb-4">
                             <i class="fas fa-barcode mr-2"></i>Scan Transfer Number
@@ -801,13 +827,15 @@ async function loadWarehouseData() {
                     </div>
                     <div class="mt-3 flex space-x-2">
                         <button onclick="showOutletDetails('${outlet.code}')" 
-                            class="flex-1 bg-blue-500 hover:bg-blue-600 text-white px-3 py-2 rounded text-sm">
+                            class="${canDelete() ? 'flex-1' : 'w-full'} bg-blue-500 hover:bg-blue-600 text-white px-3 py-2 rounded text-sm">
                             <i class="fas fa-list mr-1"></i>Details
                         </button>
-                        <button onclick="confirmDeleteOutlet('${outlet.code}')" 
-                            class="flex-1 bg-red-500 hover:bg-red-600 text-white px-3 py-2 rounded text-sm">
-                            <i class="fas fa-trash mr-1"></i>Delete All
-                        </button>
+                        ${canDelete() ? `
+                            <button onclick="confirmDeleteOutlet('${outlet.code}')" 
+                                class="flex-1 bg-red-500 hover:bg-red-600 text-white px-3 py-2 rounded text-sm">
+                                <i class="fas fa-trash mr-1"></i>Delete All
+                            </button>
+                        ` : ''}
                     </div>
                 </div>
             `
@@ -994,10 +1022,12 @@ async function showOutletDetails(outletCode) {
                                             </p>
                                         ` : ''}
                                     </div>
-                                    <button onclick="confirmDeleteTransfer('${transfer.id}', '${transfer.transfer_number}', '${outletCode}')" 
-                                        class="ml-4 bg-red-500 hover:bg-red-600 text-white px-3 py-2 rounded text-sm">
-                                        <i class="fas fa-trash"></i>
-                                    </button>
+                                    ${canDelete() ? `
+                                        <button onclick="confirmDeleteTransfer('${transfer.id}', '${transfer.transfer_number}', '${outletCode}')" 
+                                            class="ml-4 bg-red-500 hover:bg-red-600 text-white px-3 py-2 rounded text-sm">
+                                            <i class="fas fa-trash"></i>
+                                        </button>
+                                    ` : ''}
                                 </div>
                             </div>
                         `).join('')}
@@ -1006,12 +1036,14 @@ async function showOutletDetails(outletCode) {
                 
                 <div class="p-6 border-t bg-gray-50">
                     <div class="flex space-x-3">
-                        <button onclick="confirmDeleteOutlet('${outletCode}')" 
-                            class="flex-1 bg-red-500 hover:bg-red-600 text-white px-4 py-3 rounded-lg font-semibold">
-                            <i class="fas fa-trash mr-2"></i>Delete All Transfers (${outletTransfers.length})
-                        </button>
+                        ${canDelete() ? `
+                            <button onclick="confirmDeleteOutlet('${outletCode}')" 
+                                class="flex-1 bg-red-500 hover:bg-red-600 text-white px-4 py-3 rounded-lg font-semibold">
+                                <i class="fas fa-trash mr-2"></i>Delete All Transfers (${outletTransfers.length})
+                            </button>
+                        ` : ''}
                         <button onclick="this.closest('.fixed').remove()" 
-                            class="flex-1 bg-gray-300 hover:bg-gray-400 px-4 py-3 rounded-lg font-semibold">
+                            class="${canDelete() ? 'flex-1' : 'w-full'} bg-gray-300 hover:bg-gray-400 px-4 py-3 rounded-lg font-semibold">
                             <i class="fas fa-times mr-2"></i>Close
                         </button>
                     </div>
