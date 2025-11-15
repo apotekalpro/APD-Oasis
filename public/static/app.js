@@ -770,24 +770,33 @@ function renderWarehouse() {
 
 async function loadWarehouseData() {
     try {
-        const response = await axios.get('/api/warehouse/transfers')
-        state.transfers = response.data.transfers
+        const response = await axios.get('/api/warehouse/parcels')
+        state.parcels = response.data.parcels
         
-        // Group by outlet
+        // Group by outlet - using parcels instead of transfers for accurate pallet counting
         const outletMap = new Map()
-        state.transfers.forEach(transfer => {
-            if (!outletMap.has(transfer.outlet_code)) {
-                outletMap.set(transfer.outlet_code, {
-                    code: transfer.outlet_code,
-                    code_short: transfer.outlet_code_short || transfer.outlet_code,
-                    name: transfer.outlet_name,
+        state.parcels.forEach(parcel => {
+            // Skip header rows or invalid outlets
+            if (!parcel.outlet_code || 
+                parcel.outlet_code.toUpperCase() === 'STORE CODE' ||
+                parcel.outlet_name.toUpperCase() === 'STORE NAME' ||
+                parcel.outlet_name.toUpperCase().includes('STORE CODE') ||
+                parcel.outlet_name.toUpperCase().includes('STORE NAME')) {
+                return // Skip this parcel
+            }
+            
+            if (!outletMap.has(parcel.outlet_code)) {
+                outletMap.set(parcel.outlet_code, {
+                    code: parcel.outlet_code,
+                    code_short: parcel.outlet_code_short || parcel.outlet_code,
+                    name: parcel.outlet_name,
                     total: 0,
                     scanned: 0
                 })
             }
-            const outlet = outletMap.get(transfer.outlet_code)
+            const outlet = outletMap.get(parcel.outlet_code)
             outlet.total++
-            if (transfer.is_scanned_loading) {
+            if (parcel.status === 'loaded' || parcel.status === 'delivered') {
                 outlet.scanned++
             }
         })

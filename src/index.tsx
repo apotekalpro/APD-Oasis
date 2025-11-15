@@ -257,6 +257,19 @@ app.post('/api/import', authMiddleware, async (c) => {
     const parcelMap = new Map()
     
     data.forEach((row: any) => {
+      // Skip header rows or invalid data
+      const outletCode = String(row.outlet_code || '').trim().toUpperCase()
+      const outletName = String(row.outlet_name || '').trim().toUpperCase()
+      
+      if (!row.pallet_id || 
+          !row.transfer_number ||
+          outletCode === 'STORE CODE' ||
+          outletName === 'STORE NAME' ||
+          outletName.includes('STORE CODE') ||
+          outletName.includes('STORE NAME')) {
+        return // Skip this row
+      }
+      
       const palletId = row.pallet_id
       if (!parcelMap.has(palletId)) {
         parcelMap.set(palletId, {
