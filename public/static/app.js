@@ -670,6 +670,16 @@ function handleFileSelect(event) {
 async function confirmImport() {
     if (importData.length === 0) return
     
+    // Show loading indicator
+    showToast('Importing data, please wait...', 'info')
+    
+    // Disable confirm button to prevent double-clicks
+    const confirmBtn = document.querySelector('[onclick="confirmImport()"]')
+    if (confirmBtn) {
+        confirmBtn.disabled = true
+        confirmBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Importing...'
+    }
+    
     try {
         const response = await axios.post('/api/import', {
             data: importData,
@@ -681,6 +691,12 @@ async function confirmImport() {
         navigateTo('warehouse')
     } catch (error) {
         showToast(error.response?.data?.error || 'Import failed', 'error')
+        
+        // Re-enable button on error
+        if (confirmBtn) {
+            confirmBtn.disabled = false
+            confirmBtn.innerHTML = '<i class="fas fa-check mr-2"></i>Confirm Import'
+        }
     }
 }
 
