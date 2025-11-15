@@ -2068,12 +2068,14 @@ function renderOutlet() {
                                 <i class="fas fa-barcode mr-2"></i>Scan Pallet
                             </button>
                             
-                            ${state.scannedItems.length > 0 ? `
-                                <button onclick="showOutletCompletionModal()" 
-                                    class="w-full bg-green-500 hover:bg-green-600 text-white font-bold py-3 rounded-lg">
-                                    <i class="fas fa-check-circle mr-2"></i>Complete Receipt (${state.scannedItems.length} pallets)
-                                </button>
-                            ` : ''}
+                            <div id="outletCompleteButton">
+                                ${state.scannedItems.length > 0 ? `
+                                    <button onclick="showOutletCompletionModal()" 
+                                        class="w-full bg-green-500 hover:bg-green-600 text-white font-bold py-3 rounded-lg">
+                                        <i class="fas fa-check-circle mr-2"></i>Complete Receipt (${state.scannedItems.length} pallets)
+                                    </button>
+                                ` : ''}
+                            </div>
                             
                             <!-- Scanned Items -->
                             <div class="mt-6">
@@ -2231,6 +2233,7 @@ async function handleOutletScanPallet() {
             
             showToast(`✓ Pallet ${palletId} scanned (${response.data.transfer_count} transfers)`, 'success')
             updateOutletScannedList()
+            updateOutletCompleteButton() // Update the complete button visibility
         } else {
             playBeep(false)
             showToast(`✗ ${response.data.error}`, 'error')
@@ -2280,6 +2283,22 @@ function updateOutletScannedList() {
             </div>
         </div>
     `}).join('')
+}
+
+function updateOutletCompleteButton() {
+    const buttonContainer = document.getElementById('outletCompleteButton')
+    if (!buttonContainer) return
+    
+    if (state.scannedItems.length > 0) {
+        buttonContainer.innerHTML = `
+            <button onclick="showOutletCompletionModal()" 
+                class="w-full bg-green-500 hover:bg-green-600 text-white font-bold py-3 rounded-lg">
+                <i class="fas fa-check-circle mr-2"></i>Complete Receipt (${state.scannedItems.length} pallets)
+            </button>
+        `
+    } else {
+        buttonContainer.innerHTML = ''
+    }
 }
 
 // NEW: Show completion modal after scanning all pallets (like warehouse)
