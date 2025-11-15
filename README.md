@@ -19,7 +19,8 @@ A comprehensive full-stack web application for logistics tracking and warehouse 
 - ✅ **Delete Scanned Items** - Admin/supervisor can remove items from scanning session
 - ✅ **Multi-Day Dashboard** - Yesterday/Today/Tomorrow tabs with delivery date filtering
 - ✅ **Delivery Date Planning** - Import tonight for tomorrow, view scheduled deliveries
-- ✅ **Password Management** - Users can change own password, admin can reset to default (NEW!)
+- ✅ **Password Management** - Users can change own password, admin can reset to default
+- ✅ **User Search** - Real-time search by username, name, role, or outlet code (NEW!)
 - ✅ **Admin Configuration** - User and outlet management system
 - ✅ **Error Tracking** - Comprehensive error logging for unmatched parcels
 - ✅ **Reports & Analytics** - Delivery reports with Excel export functionality
@@ -214,14 +215,18 @@ Parcel (grouped by Pallet ID)
 ### 7️⃣ Admin Configuration (Admin Only)
 
 1. Navigate to **Admin** page
-2. Manage users:
-   - Add new users (warehouse, driver, outlet, admin)
-   - **Edit user details** with optional password update (NEW!)
-   - **Reset any user's password** to "Alpro@123" (NEW!)
+2. **Search for users** (NEW!):
+   - Real-time search by username, full name, role, or outlet code
+   - Instant filtering as you type
+   - Clear search to show all users
+3. Manage users:
+   - Add new users (admin, warehouse supervisor, warehouse staff, driver, outlet)
+   - **Edit user details** with optional password update
+   - **Reset any user's password** to "Alpro@123"
    - Assign outlet codes to outlet users
    - Activate/deactivate accounts
    - Delete users
-3. Manage outlets:
+4. Manage outlets:
    - Add new outlet locations
    - Update outlet information
 
@@ -403,7 +408,9 @@ wrangler pages secret put JWT_SECRET
 | `PERMISSIONS_AND_CLEANUP_SUMMARY.md` | Supervisor role and auto-cleanup guide |
 | `DUPLICATE_SCAN_PREVENTION.md` | Multi-layer duplicate detection system |
 | `DELETE_SCANNED_ITEMS.md` | Delete scanned items feature guide |
-| `PASSWORD_MANAGEMENT_TESTING.md` | **NEW!** Password management testing guide |
+| `PASSWORD_MANAGEMENT_TESTING.md` | Password management testing guide |
+| `VERSION_1.8.0_SUMMARY.md` | Password management release notes |
+| `VERSION_1.8.1_SUMMARY.md` | **NEW!** User search & role fixes release notes |
 | `ADD_DELIVERY_DATE_COLUMN.sql` | Multi-day dashboard migration (REQUIRED!) |
 | `URGENT_DATABASE_MIGRATION_REQUIRED.md` | Migration instructions |
 | `SAMPLE_IMPORT_TEMPLATE.md` | Excel import format guide |
@@ -421,5 +428,5 @@ For support and feature requests, contact your system administrator.
 ---
 
 **Last Updated**: November 15, 2025  
-**Version**: 1.8.0 (with Password Management)  
-**Status**: ✅ Development Ready | ⚠️ **MIGRATION REQUIRED** (ADD_DELIVERY_DATE_COLUMN.sql) | 🏪 205 Outlets Imported | 📦 Pallet Scanning Active | 🛡️ Duplicate Prevention Active | 🗑️ Session Delete Active | 📊 Multi-Day Dashboard Active | ✍️ Bulk Receipt Completion Active | 📅 Delivery Date Planning Active | 🔐 Password Management Active
+**Version**: 1.8.1 (with User Search & Role Fixes)  
+**Status**: ✅ Development Ready | ⚠️ **MIGRATION REQUIRED** (ADD_DELIVERY_DATE_COLUMN.sql) | 🏪 205 Outlets Imported | 📦 Pallet Scanning Active | 🛡️ Duplicate Prevention Active | 🗑️ Session Delete Active | 📊 Multi-Day Dashboard Active | ✍️ Bulk Receipt Completion Active | 📅 Delivery Date Planning Active | 🔐 Password Management Active | 🔍 User Search Active
