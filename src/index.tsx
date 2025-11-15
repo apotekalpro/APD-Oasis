@@ -256,9 +256,27 @@ app.post('/api/import', authMiddleware, async (c) => {
     // Group by Pallet ID
     const parcelMap = new Map()
     
-    data.forEach((row: any) => {
+    console.log('=== BACKEND IMPORT ===')
+    console.log('Received rows:', data.length)
+    if (data[0]) {
+      console.log('First row sample:', {
+        outlet_code: data[0].outlet_code,
+        outlet_code_short: data[0].outlet_code_short,
+        outlet_name: data[0].outlet_name,
+        pallet_id: data[0].pallet_id,
+        transfer_number: data[0].transfer_number
+      })
+    }
+    
+    data.forEach((row: any, index: number) => {
       // Skip rows with missing required data
       if (!row.pallet_id || !row.transfer_number || !row.outlet_code || !row.outlet_name) {
+        console.log(`Row ${index}: SKIPPED - Missing data:`, {
+          pallet_id: !!row.pallet_id,
+          transfer_number: !!row.transfer_number,
+          outlet_code: !!row.outlet_code,
+          outlet_name: !!row.outlet_name
+        })
         return // Skip this row
       }
       
@@ -286,9 +304,22 @@ app.post('/api/import', authMiddleware, async (c) => {
     
     // Insert parcels and transfer details
     const parcels = Array.from(parcelMap.values())
+    console.log('\n=== PARCELS TO INSERT ===')
+    console.log('Total parcels:', parcels.length)
+    parcels.forEach((p, i) => {
+      console.log(`Parcel ${i+1}:`, {
+        outlet_code: p.outlet_code,
+        outlet_code_short: p.outlet_code_short,
+        outlet_name: p.outlet_name,
+        pallet_id: p.pallet_id,
+        transfer_count: p.transfer_numbers.length
+      })
+    })
+    
     let totalCreated = 0
     
     for (const parcel of parcels) {
+      console.log(`\nInserting parcel: ${parcel.pallet_id}...`)
       const parcelResponse = await supabaseRequest(c, 'parcels', {
         method: 'POST',
         body: JSON.stringify({
@@ -303,8 +334,17 @@ app.post('/api/import', authMiddleware, async (c) => {
         })
       })
       
+      console.log(`  Response status: ${parcelResponse.status}`)
       const parcelRecord = await parcelResponse.json()
+      console.log(`  Response body:`, parcelRecord)
+      
+      if (parcelRecord.error || parcelRecord.message) {
+        console.error(`  ❌ ERROR inserting parcel:`, parcelRecord)
+        throw new Error(`Failed to insert parcel: ${parcelRecord.error || parcelRecord.message}`)
+      }
+      
       const parcelId = Array.isArray(parcelRecord) ? parcelRecord[0].id : parcelRecord.id
+      console.log(`  Parcel ID: ${parcelId}`)
       
       // Insert transfer details
       const transferDetails = parcel.transfer_numbers.map((tn: string) => ({
@@ -323,7 +363,11 @@ app.post('/api/import', authMiddleware, async (c) => {
       })
       
       totalCreated++
+      console.log(`  ✓ Parcel inserted successfully`)
     }
+    
+    console.log(`\n=== IMPORT COMPLETE ===`)
+    console.log(`Total parcels created: ${totalCreated}`)
     
     // Update import record
     await supabaseRequest(c, `imports?id=eq.${importId}`, {
@@ -709,28 +753,29 @@ app.post('/api/outlet/find-pallets', authMiddleware, async (c) => {
     const user = c.get('user')
     const { outlet_code_short } = await c.req.json()
     
-    // Find outlet by short code
-    const outletResponse = await supabaseRequest(c, `outlets?outlet_code_short=eq.${outlet_code_short}&select=*`)
-    const outlets = await outletResponse.json()
+    console.log(`Finding pallets for outlet: ${outlet_code_short}`)
     
-    if (!outlets || outlets.length === 0) {
+    // Get all loaded (ready for unloading) parcels for this outlet using outlet_code_short
+    const parcelsResponse = await supabaseRequest(c, `parcels?outlet_code_short=eq.${outlet_code_short}&status=eq.loaded&select=*&order=pallet_id.asc`)
+    const parcels = await parcelsResponse.json()
+    
+    console.log(`Found ${parcels.length} loaded parcels`)
+    
+    if (!parcels || parcels.length === 0) {
       return c.json({ 
         success: false, 
-        error: 'Outlet code not found' 
+        error: 'No loaded pallets found for this outlet' 
       })
     }
     
-    const outlet = outlets[0]
-    
-    // Get all loaded (ready for unloading) parcels for this outlet
-    const parcelsResponse = await supabaseRequest(c, `parcels?outlet_code=eq.${outlet.outlet_code}&status=eq.loaded&select=*&order=pallet_id.asc`)
-    const parcels = await parcelsResponse.json()
+    // Get outlet info from first parcel
+    const firstParcel = parcels[0]
     
     return c.json({
       success: true,
-      outlet_code: outlet.outlet_code,
-      outlet_code_short: outlet.outlet_code_short,
-      outlet_name: outlet.outlet_name,
+      outlet_code: firstParcel.outlet_code,
+      outlet_code_short: firstParcel.outlet_code_short,
+      outlet_name: firstParcel.outlet_name,
       pallets: parcels.map((p: any) => ({
         id: p.id,
         pallet_id: p.pallet_id,
@@ -750,22 +795,13 @@ app.post('/api/outlet/scan-pallet', authMiddleware, async (c) => {
     const user = c.get('user')
     const { outlet_code_short, pallet_id } = await c.req.json()
     
-    // Find outlet by short code
-    const outletResponse = await supabaseRequest(c, `outlets?outlet_code_short=eq.${outlet_code_short}&select=*`)
-    const outlets = await outletResponse.json()
+    console.log(`Scanning pallet ${pallet_id} for outlet ${outlet_code_short}`)
     
-    if (!outlets || outlets.length === 0) {
-      return c.json({ 
-        success: false, 
-        error: 'Outlet code not found' 
-      })
-    }
-    
-    const outlet = outlets[0]
-    
-    // First check if pallet exists for this outlet (any status)
-    const allParcelsResponse = await supabaseRequest(c, `parcels?pallet_id=eq.${pallet_id}&outlet_code=eq.${outlet.outlet_code}&select=*`)
+    // First check if pallet exists for this outlet using outlet_code_short (any status)
+    const allParcelsResponse = await supabaseRequest(c, `parcels?pallet_id=eq.${pallet_id}&outlet_code_short=eq.${outlet_code_short}&select=*`)
     const allParcels = await allParcelsResponse.json()
+    
+    console.log(`Found ${allParcels.length} parcels for this pallet+outlet combination`)
     
     if (!allParcels || allParcels.length === 0) {
       // Log error - pallet not found
@@ -777,7 +813,7 @@ app.post('/api/outlet/scan-pallet', authMiddleware, async (c) => {
           scanned_by_name: user.full_name,
           error_type: 'not_found',
           error_message: `Pallet ID not found for outlet ${outlet_code_short}`,
-          outlet_code: outlet.outlet_code
+          outlet_code: outlet_code_short
         })
       })
       
@@ -800,7 +836,7 @@ app.post('/api/outlet/scan-pallet', authMiddleware, async (c) => {
           scanned_by_name: user.full_name,
           error_type: 'already_scanned',
           error_message: `Pallet already delivered at ${existingParcel.delivered_at || 'earlier'}`,
-          outlet_code: outlet.outlet_code
+          outlet_code: existingParcel.outlet_code
         })
       })
       

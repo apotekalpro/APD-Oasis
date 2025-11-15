@@ -577,9 +577,22 @@ function handleFileSelect(event) {
             
             // Parse data (header at row 15, data starts at row 16)
             // In array: row 15 = index 14 (header), row 16 = index 15 (first data)
+            console.log('=== EXCEL PARSING DEBUG ===')
+            console.log('Total rows in Excel:', jsonData.length)
+            console.log('Header row (index 14):', jsonData[14])
+            console.log('First data row (index 15):', jsonData[15])
+            console.log('Columns to extract: E(4), F(5), G(6), V(21)')
+            
             importData = []
             for (let i = 15; i < jsonData.length; i++) {  // Start from index 15 (row 16)
                 const row = jsonData[i]
+                console.log(`\nProcessing row ${i}:`, {
+                    'E(4)': row[4],
+                    'F(5)': row[5],
+                    'G(6)': row[6],
+                    'V(21)': row[21]
+                })
+                
                 if (row[4] && row[6] && row[21]) { // Check if required columns exist (E, G, V)
                     // Column E: Numeric outlet code (e.g., "0001")
                     let outletCode = String(row[4]).trim()
@@ -669,6 +682,19 @@ function handleFileSelect(event) {
 
 async function confirmImport() {
     if (importData.length === 0) return
+    
+    // DEBUG: Log what we're sending
+    console.log('=== FRONTEND IMPORT DATA ===')
+    console.log('Total rows to import:', importData.length)
+    console.log('Sample rows:', importData.slice(0, 3))
+    console.log('\nDetailed first row:')
+    if (importData[0]) {
+        console.log('  outlet_code:', importData[0].outlet_code)
+        console.log('  outlet_code_short:', importData[0].outlet_code_short)
+        console.log('  outlet_name:', importData[0].outlet_name)
+        console.log('  pallet_id:', importData[0].pallet_id)
+        console.log('  transfer_number:', importData[0].transfer_number)
+    }
     
     // Show loading indicator
     showToast('Importing data, please wait...', 'info')
