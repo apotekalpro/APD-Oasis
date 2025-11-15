@@ -9,8 +9,11 @@ A comprehensive full-stack web application for logistics tracking and warehouse 
 ### Main Features
 
 - ✅ **Pick & Pack Report Import** - Excel file import with automatic parcel grouping by Pallet ID
-- ✅ **Warehouse Loading Process** - Real-time scanning and validation for outbound parcels
-- ✅ **Outlet Unloading Process** - Delivery confirmation and signature collection
+- ✅ **Pallet ID Scanning** - Scan entire pallet to process multiple transfers at once (NEW!)
+- ✅ **Outlet Code Mapping** - Automatic mapping between numeric codes and short codes (NEW!)
+- ✅ **Warehouse Loading Process** - Real-time pallet scanning with validation
+- ✅ **Outlet Two-Step Unloading** - Scan outlet code first, then scan pallet IDs (NEW!)
+- ✅ **Warehouse Management** - View outlet details, delete transfers (NEW!)
 - ✅ **Admin Configuration** - User and outlet management system
 - ✅ **Error Tracking** - Comprehensive error logging for unmatched parcels
 - ✅ **Reports & Analytics** - Delivery reports with Excel export functionality
@@ -47,18 +50,33 @@ A comprehensive full-stack web application for logistics tracking and warehouse 
 
 **Main Tables:**
 - `users` - User authentication and role management
-- `outlets` - Outlet/store information
+- `outlets` - Outlet/store information (with numeric and short codes)
 - `imports` - Import session tracking
-- `parcels` - Parcel records grouped by Pallet ID
-- `transfer_details` - Individual transfer number tracking
+- `parcels` - Parcel records grouped by Pallet ID (with both outlet codes)
+- `transfer_details` - Individual transfer number tracking (with both outlet codes)
 - `error_parcels` - Error and mismatch tracking
 - `audit_logs` - System activity logging
+
+**Outlet Code Mapping:**
+```
+Outlet Record
+├── outlet_code: "0001" (Numeric - from Excel Column E)
+├── outlet_code_short: "JKJSTT1" (Short - from Excel Column F)
+└── outlet_name: "APOTEK ALPRO TEBET TIMUR"
+
+Used for:
+- Database integrity (numeric code)
+- User display (short code)
+- Login username (short code)
+```
 
 **Data Models:**
 ```
 Parcel (grouped by Pallet ID)
+├── Pallet ID (scanned identifier)
 ├── Multiple Transfer Numbers
-├── Outlet Code & Name
+├── Outlet Code (numeric) & Short Code (display)
+├── Outlet Name
 ├── Loading Status (pending → loaded → delivered)
 ├── Timestamps (created, loaded, delivered)
 └── Signatures (loaded_by, received_by)
@@ -75,44 +93,54 @@ Parcel (grouped by Pallet ID)
 ### 1️⃣ Import Pick & Pack Report (Admin/Warehouse)
 
 1. Navigate to **Import** page
-2. Select Excel file with pick and pack data
+2. Select Excel file with pick and pack data (DC Pick & Pack Report format)
 3. Required columns:
-   - **Column E**: Store Code
-   - **Column F**: Store Name
+   - **Column E**: Store Code (Numeric: e.g., "0001", "0002")
+   - **Column F**: Store Name (Format: "SHORTCODE - FULL NAME", e.g., "JKJSTT1 - APOTEK ALPRO TEBET TIMUR")
    - **Column G**: Pallet ID (items with same ID are grouped)
    - **Column V**: Transfer Number
-4. Preview data and confirm import
+4. System automatically extracts:
+   - Numeric code from Column E (for database)
+   - Short code from Column F (for display to users)
+5. Preview data and confirm import
 
-### 2️⃣ Warehouse Loading Process (Warehouse/Driver)
+### 2️⃣ Warehouse Loading Process (Warehouse/Driver) - NEW PALLET SCANNING!
 
 1. Navigate to **Warehouse** page
-2. View all outlets with pending parcels
-3. Scan transfer numbers using barcode scanner or manual input
-4. System validates and tracks progress per outlet
-5. Complete loading process with signature
-6. System records outbound team name and timestamp
+2. View all outlets with pending pallets (displayed with short codes like "JKJSTT1", "MKC")
+3. **Scan Pallet ID** using barcode scanner or manual input
+4. System marks ALL transfers in that pallet as loaded at once
+5. View outlet details to see all transfers and delete if needed
+6. Complete loading process with signature
 
-**Features:**
-- All outlets displayed on single page for efficiency
-- Auto-detection of outlet when scanning transfer number
-- Real-time progress tracking
+**NEW Features:**
+- **Pallet ID scanning** - One scan = multiple transfers loaded automatically
+- **Outlet short codes** - See familiar codes (MKC, JBB) instead of numbers
+- **Outlet details view** - Click "Details" to see all transfers for each outlet
+- **Delete management** - Delete individual transfers or entire outlet's transfers
+- Real-time progress tracking with pallet counts
 - Audio feedback for successful/failed scans
-- Visual flash indicators
 
-### 3️⃣ Outlet Unloading Process (Outlet/Driver)
+### 3️⃣ Outlet Unloading Process (Outlet/Driver) - NEW TWO-STEP PROCESS!
 
+**Step 1: Identify Your Outlet**
 1. Navigate to **Outlet** page
-2. Select destination outlet
-3. View parcels assigned to that outlet
-4. Scan transfer numbers during unloading
-5. Complete unloading with outlet receiver signature
-6. System validates outlet match and records delivery
+2. Scan or enter your **Outlet Short Code** (e.g., "MKC", "JKJSTT1")
+3. System finds and displays all available pallets for your outlet
 
-**Features:**
-- Outlet-specific view for focused scanning
-- Prevents wrong-outlet deliveries
-- Real-time remaining count
-- Completion tracking
+**Step 2: Scan Pallets**
+4. View list of pending pallet IDs with transfer counts
+5. **Scan each Pallet ID** to confirm receipt
+6. System marks ALL transfers in that pallet as delivered at once
+7. Repeat for all pallets
+
+**NEW Features:**
+- **Two-step scanning** - Find outlet first, then scan pallets
+- **Pallet-level unloading** - One scan = multiple transfers received
+- **Visual pallet list** - See all your deliveries before scanning
+- **Short code lookup** - Use familiar codes (MKC, JBB) not numbers
+- Real-time remaining pallet count
+- Auto-matching prevents wrong outlet errors
 
 ### 4️⃣ Reports & Analytics (All Roles)
 
@@ -178,8 +206,10 @@ The application is fully responsive and optimized for mobile devices:
 1. Log in to your Supabase project: https://ptfnmivvowgiqzwyznmu.supabase.co
 2. Navigate to SQL Editor
 3. Copy and execute the entire `supabase-schema.sql` file
-4. Verify tables are created successfully
-5. Default admin user will be created automatically
+4. **IMPORTANT**: Also execute `migration-add-short-codes.sql` for outlet code mapping
+5. Verify tables are created successfully
+6. Default admin user will be created automatically
+7. Import outlets using `import-outlets.py` to populate outlet codes
 
 ### Local Development
 
@@ -241,15 +271,18 @@ wrangler pages secret put JWT_SECRET
 ### ✅ Completed Features
 
 - ✅ Full authentication system with JWT
-- ✅ Excel import with Pallet ID grouping
-- ✅ Warehouse loading with scanning
-- ✅ Outlet unloading with validation
+- ✅ Excel import with Pallet ID grouping and outlet code mapping
+- ✅ Pallet ID scanning for warehouse (scan once = load multiple transfers)
+- ✅ Two-step outlet unloading (scan outlet code → scan pallet IDs)
+- ✅ Outlet code auto-matching (numeric ↔ short code)
+- ✅ Warehouse management (view details, delete transfers)
 - ✅ Admin panel for user/outlet management
 - ✅ Error tracking and logging
 - ✅ Delivery reports with Excel export
 - ✅ Mobile-responsive design
 - ✅ Real-time progress tracking
 - ✅ Audio/visual feedback system
+- ✅ 205 outlets imported and configured
 
 ### 🔄 Recommended Next Steps
 
@@ -290,11 +323,14 @@ wrangler pages secret put JWT_SECRET
 | `README.md` | Main project documentation (this file) |
 | `QUICK_START.md` | 5-minute testing guide |
 | `DEPLOYMENT_GUIDE.md` | Production deployment steps |
+| `SCANNING_CHANGES.md` | **NEW!** Pallet ID scanning system guide |
+| `WAREHOUSE_DELETE_FEATURE.md` | **NEW!** Delete functionality documentation |
 | `SAMPLE_IMPORT_TEMPLATE.md` | Excel import format guide |
 | `PROJECT_SUMMARY.md` | Complete handover document |
-| `OUTLET_IMPORT_GUIDE.md` | Import 2,370 outlets guide |
+| `OUTLET_IMPORT_GUIDE.md` | Import 205 outlets guide |
 | `OUTLET_LOGIN_INFO.md` | Outlet login quick reference |
 | `supabase-schema.sql` | Database schema (CRITICAL!) |
+| `migration-add-short-codes.sql` | **NEW!** Outlet code mapping migration |
 
 ## 📞 Contact
 
@@ -303,5 +339,5 @@ For support and feature requests, contact your system administrator.
 ---
 
 **Last Updated**: November 15, 2025  
-**Version**: 1.1.0 (with Outlet System)  
-**Status**: ✅ Development Ready | ⏳ Database Setup Required | 🏪 2,370 Outlets Ready
+**Version**: 1.2.0 (with Pallet ID Scanning & Outlet Code Mapping)  
+**Status**: ✅ Development Ready | ⏳ Database Migration Required | 🏪 205 Outlets Imported | 📦 Pallet Scanning Active
