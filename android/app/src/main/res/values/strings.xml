@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">APD Oasis</string>
+    <string name="title_activity_main">APD Oasis</string>
+    <string name="package_name">com.apotekalpro.apdoasis</string>
+    <string name="custom_url_scheme">com.apotekalpro.apdoasis</string>
+</resources>

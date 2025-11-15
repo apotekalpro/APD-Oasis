@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#2563eb">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>APD Oasis - Warehouse Logistics</title>
+    
+    <!-- TailwindCSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- FontAwesome -->
+    <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+    
+    <!-- Axios -->
+    <script src="https://cdn.jsdelivr.net/npm/axios@1.6.0/dist/axios.min.js"></script>
+    
+    <!-- SheetJS for Excel Export -->
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    
+    <style>
+        /* Mobile-optimized styles */
+        * {
+            -webkit-tap-highlight-color: transparent;
+        }
+        
+        body {
+            overscroll-behavior: contain;
+            -webkit-overflow-scrolling: touch;
+        }
+        
+        /* Prevent zoom on input focus */
+        input, select, textarea {
+            font-size: 16px !important;
+        }
+        
+        /* Better touch targets */
+        button, a {
+            min-height: 44px;
+            min-width: 44px;
+        }
+        
+        /* Smooth scrolling */
+        .scroll-container {
+            -webkit-overflow-scrolling: touch;
+            overflow-y: auto;
+        }
+    </style>
+</head>
+<body class="bg-gray-50">
+    <div id="app"></div>
+    
+    <!-- Load application script -->
+    <script src="/static/app.js"></script>
+</body>
+</html>
