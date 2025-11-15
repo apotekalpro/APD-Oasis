@@ -848,19 +848,18 @@ app.post('/api/outlet/scan-pallet', authMiddleware, async (c) => {
       })
     }
     
-    // Find loaded (ready for unloading) parcel
-    const parcelResponse = await supabaseRequest(c, `parcels?pallet_id=eq.${pallet_id}&outlet_code=eq.${outlet.outlet_code}&status=eq.loaded&select=*`)
-    const parcels = await parcelResponse.json()
-    
-    if (!parcels || parcels.length === 0) {
+    // Check if pallet is in "loaded" status (ready for unloading)
+    if (existingParcel.status !== 'loaded') {
       return c.json({ 
         success: false, 
-        error: 'Pallet not ready for unloading or already delivered',
+        error: existingParcel.status === 'pending' ? 
+          'Pallet not yet loaded at warehouse' : 
+          'Pallet already delivered',
         pallet_id 
       })
     }
     
-    const parcel = parcels[0]
+    const parcel = existingParcel
     
     // Get all transfer details for this pallet
     const transfersResponse = await supabaseRequest(c, `transfer_details?parcel_id=eq.${parcel.id}&select=*`)

@@ -62,11 +62,12 @@ function getDefaultPage() {
     if (!state.user) return 'login'
     
     switch(state.user.role) {
-        case 'admin': return 'admin'
-        case 'warehouse': return 'warehouse'
-        case 'driver': return 'warehouse'
+        case 'admin': return 'dashboard'
+        case 'warehouse': return 'dashboard'
+        case 'warehouse_supervisor': return 'dashboard'
+        case 'driver': return 'dashboard'
         case 'outlet': return 'outlet'
-        default: return 'warehouse'
+        default: return 'dashboard'
     }
 }
 
@@ -77,11 +78,32 @@ function formatDate(dateString) {
 }
 
 function playBeep(success = true) {
-    const audio = new Audio(success ? 
-        'data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBg==' :
-        'data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAAB/dnN3ZHZzi5Ccmpygn56cm5qYl5WTkY+NioiGhIF+fHp4dnV0dHV3eXt9f4GDhYeJi42Pj4+Pjo6Ojo6OjY2Mi4qJh4WDgX99e3l2dHJwbm1tbm9xc3V3eXt9f4GDhYeJiomJiYmIiIiHhoaFhIOCgH99fHt6eXh4eHh5eXp6e3x9fn+AgYGCgoKCgoGBgYCAfn59fXx7e3p6eXl4eHh4eHl5enp7e3x9fX5+f3+AgICAgICAgICAgH9/fn59fXx8fHx8fHx9fX5+f3+AgIGBgoKDg4SEhYWGhoeHiIiJiYqKi4uLi4uLi4uLi4uLi4uKioqKiYmJiIiIh4eHhoaGhYWEhIODgoKBgYCAgH9/fn59fXx8e3t6enp5eXl5eXl5eXp6enp7e3t8fHx9fX5+fn+AgICBgYGCgoKDg4ODhISEhISEhISEhISEg4ODgoKCgYGBgICAgH9/fn59fX19fH19fH19fH19fX19fX19fX19fX1+fn5+fn5+fn5+fn5+f39/f39/f39/f39/f39+fn5+fn5+fn5+fn5+fn5+fn5+fn5+fn5+fn5+fn5+fn5+fn5+fn5+fn5+fn5+fn5+fn5+fn5+fn5+fn5+fn5+fn5+fn5+fn5+fn5+fn5+fn5+fn5+fn5+fn5+fn5+fn5+fn5+fn5+fn5+fn5+fn5+fn5+fn5+fn5+fn5+fn5+fn5+fn5+fn5+fn5+fn5+fn5+fn5+fn5+fn5+fn5+fn5+fn5+fn5+fn5+fn5+fn5+fn5+fn5+fn5+fn5+fn5+fn5+fn5+fn5+fn5+fn5+fn5+fn5+fn5+fn5+fn5+fn5+fn5+fn5+fn5+fn5+fn5+fn5+fn5+fn5+fn5+fn5+fn5+fn5+fn5+fn5+fn5+fn5+fn5+f39/f39/f39/f4CAgICAgICAgICAgICAgICAgICAgH9/f39/f39/f39/f39/f3+AgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgA==' 
-    )
-    audio.play().catch(() => {})
+    if (success) {
+        // Success beep - pleasant tone
+        const audio = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBg==')
+        audio.play().catch(() => {})
+    } else {
+        // Error sound - three short alert beeps
+        const context = new (window.AudioContext || window.webkitAudioContext)()
+        const beeps = [0, 0.15, 0.3] // Three beeps at 0ms, 150ms, 300ms
+        
+        beeps.forEach(time => {
+            const oscillator = context.createOscillator()
+            const gainNode = context.createGain()
+            
+            oscillator.connect(gainNode)
+            gainNode.connect(context.destination)
+            
+            oscillator.frequency.value = 800 // Higher pitch for alert
+            oscillator.type = 'square' // Harsher sound
+            
+            gainNode.gain.setValueAtTime(0.3, context.currentTime + time)
+            gainNode.gain.exponentialRampToValueAtTime(0.01, context.currentTime + time + 0.1)
+            
+            oscillator.start(context.currentTime + time)
+            oscillator.stop(context.currentTime + time + 0.1)
+        })
+    }
 }
 
 function showToast(message, type = 'success') {
@@ -2147,11 +2169,8 @@ function render() {
                 loadWarehouseData()
                 break
             case 'outlet':
-                if (!state.selectedOutlet) {
-                    loadOutletsForSelection()
-                } else {
-                    loadOutletData()
-                }
+                // Outlet page uses manual two-step process: find outlet, then scan pallets
+                // No auto-load needed
                 break
         }
     }, 100)
