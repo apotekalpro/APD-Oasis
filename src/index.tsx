@@ -859,7 +859,38 @@ app.post('/api/outlet/scan-pallet', authMiddleware, async (c) => {
       })
     }
     
-    const parcel = existingParcel
+    // Just validate - don't update yet (wait for signature confirmation)
+    return c.json({ 
+      success: true, 
+      pallet_id,
+      transfer_count: existingParcel.total_count
+    })
+  } catch (error) {
+    console.error('Scan pallet error:', error)
+    return c.json({ error: 'Scan failed' }, 500)
+  }
+})
+
+// NEW: Confirm receipt with signature
+app.post('/api/outlet/confirm-receipt', authMiddleware, async (c) => {
+  try {
+    const user = c.get('user')
+    const { pallet_id, outlet_code_short, receiver_name } = await c.req.json()
+    
+    console.log(`Confirming receipt: ${pallet_id} by ${receiver_name} for outlet ${outlet_code_short}`)
+    
+    // Find the pallet
+    const parcelsResponse = await supabaseRequest(c, `parcels?pallet_id=eq.${pallet_id}&outlet_code_short=eq.${outlet_code_short}&status=eq.loaded&select=*`)
+    const parcels = await parcelsResponse.json()
+    
+    if (!parcels || parcels.length === 0) {
+      return c.json({ 
+        success: false, 
+        error: 'Pallet not found or already delivered' 
+      })
+    }
+    
+    const parcel = parcels[0]
     
     // Get all transfer details for this pallet
     const transfersResponse = await supabaseRequest(c, `transfer_details?parcel_id=eq.${parcel.id}&select=*`)
@@ -878,25 +909,29 @@ app.post('/api/outlet/scan-pallet', authMiddleware, async (c) => {
       })
     }
     
-    // Update parcel as delivered
+    // Update parcel as delivered with receiver name
     await supabaseRequest(c, `parcels?id=eq.${parcel.id}`, {
       method: 'PATCH',
       body: JSON.stringify({
         status: 'delivered',
         delivered_at: new Date().toISOString(),
         delivered_by: user.id,
-        delivered_by_name: user.full_name
+        delivered_by_name: user.full_name,
+        received_by_name: receiver_name  // Store receiver signature
       })
     })
+    
+    console.log(`✓ Pallet ${pallet_id} confirmed as delivered by ${receiver_name}`)
     
     return c.json({ 
       success: true, 
       pallet_id,
+      receiver_name,
       transfer_count: parcel.total_count
     })
   } catch (error) {
-    console.error('Scan pallet error:', error)
-    return c.json({ error: 'Scan failed' }, 500)
+    console.error('Confirm receipt error:', error)
+    return c.json({ error: 'Failed to confirm receipt' }, 500)
   }
 })
 

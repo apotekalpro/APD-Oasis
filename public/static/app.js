@@ -1825,17 +1825,16 @@ async function handleOutletScanPallet() {
         
         if (response.data.success) {
             playBeep(true)
-            showToast(`✓ Pallet ${palletId} received (${response.data.transfer_count} transfers)`, 'success')
             
-            // Add to scanned items
-            state.scannedItems.push({
+            // Store scan result temporarily
+            state.pendingScan = {
                 pallet_id: palletId,
                 transfer_count: response.data.transfer_count,
-                time: new Date().toLocaleTimeString()
-            })
+                outlet_code_short: state.selectedOutlet.code_short
+            }
             
-            updateOutletScannedList()
-            loadOutletPallets()
+            // Show signature modal
+            showOutletSignatureModal()
         } else {
             playBeep(false)
             showToast(`✗ ${response.data.error}`, 'error')
@@ -1870,6 +1869,7 @@ function updateOutletScannedList() {
                         <i class="fas fa-pallet mr-1 text-green-600"></i>${item.pallet_id}
                     </p>
                     <p class="text-xs text-gray-600">${item.transfer_count} transfers</p>
+                    ${item.receiver_name ? `<p class="text-xs text-gray-600"><i class="fas fa-user mr-1"></i>Received by: ${item.receiver_name}</p>` : ''}
                 </div>
                 <div class="flex items-start space-x-2">
                     <span class="text-sm text-gray-500">${item.time}</span>
@@ -1884,6 +1884,109 @@ function updateOutletScannedList() {
             </div>
         </div>
     `}).join('')
+}
+
+function showOutletSignatureModal() {
+    const modal = document.createElement('div')
+    modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50'
+    modal.innerHTML = `
+        <div class="bg-white rounded-lg p-6 w-full max-w-md">
+            <h3 class="text-xl font-bold mb-4 text-green-600">
+                <i class="fas fa-pallet mr-2"></i>Confirm Pallet Receipt
+            </h3>
+            <form onsubmit="handleConfirmOutletReceipt(event)">
+                <div class="mb-4 bg-green-50 border border-green-200 rounded-lg p-4">
+                    <p class="text-sm text-gray-600 mb-1">Pallet ID</p>
+                    <p class="text-lg font-bold text-green-700">${state.pendingScan.pallet_id}</p>
+                    <p class="text-sm text-gray-500">${state.pendingScan.transfer_count} transfers</p>
+                </div>
+                
+                <div class="mb-4">
+                    <label class="block text-sm font-medium mb-2">Outlet Code (Verification)</label>
+                    <input type="text" id="outlet_code_confirm" required 
+                        class="w-full px-3 py-2 border rounded-lg"
+                        placeholder="Enter your outlet code"
+                        value="${state.pendingScan.outlet_code_short}"
+                        readonly>
+                    <p class="text-xs text-gray-500 mt-1">Pre-filled for verification</p>
+                </div>
+                
+                <div class="mb-4">
+                    <label class="block text-sm font-medium mb-2">Receiver Name/Signature <span class="text-red-500">*</span></label>
+                    <input type="text" id="receiver_name" required 
+                        class="w-full px-3 py-2 border rounded-lg"
+                        placeholder="Enter receiver name"
+                        autofocus>
+                    <p class="text-xs text-gray-500 mt-1">Who is receiving this pallet?</p>
+                </div>
+                
+                <div class="flex space-x-3">
+                    <button type="submit" class="flex-1 bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg">
+                        <i class="fas fa-check mr-2"></i>Confirm Receipt
+                    </button>
+                    <button type="button" onclick="cancelOutletReceipt()" 
+                        class="flex-1 bg-gray-300 hover:bg-gray-400 px-4 py-2 rounded-lg">
+                        Cancel
+                    </button>
+                </div>
+            </form>
+        </div>
+    `
+    document.body.appendChild(modal)
+}
+
+async function handleConfirmOutletReceipt(event) {
+    event.preventDefault()
+    
+    const receiverName = document.getElementById('receiver_name').value.trim()
+    const outletCode = document.getElementById('outlet_code_confirm').value.trim()
+    
+    if (!receiverName) {
+        showToast('Please enter receiver name', 'error')
+        return
+    }
+    
+    try {
+        // Update the backend with receiver info
+        await axios.post('/api/outlet/confirm-receipt', {
+            pallet_id: state.pendingScan.pallet_id,
+            outlet_code_short: outletCode,
+            receiver_name: receiverName
+        })
+        
+        // Add to scanned items
+        state.scannedItems.push({
+            pallet_id: state.pendingScan.pallet_id,
+            transfer_count: state.pendingScan.transfer_count,
+            receiver_name: receiverName,
+            time: new Date().toLocaleTimeString()
+        })
+        
+        showToast(`✓ Pallet ${state.pendingScan.pallet_id} received by ${receiverName}`, 'success')
+        
+        // Close modal
+        document.querySelector('.fixed').remove()
+        
+        // Clear pending scan
+        state.pendingScan = null
+        
+        // Update UI
+        updateOutletScannedList()
+        loadOutletPallets()
+        
+        // Focus back to scan input
+        document.getElementById('palletScanInput').value = ''
+        document.getElementById('palletScanInput').focus()
+    } catch (error) {
+        showToast(error.response?.data?.error || 'Failed to confirm receipt', 'error')
+    }
+}
+
+function cancelOutletReceipt() {
+    document.querySelector('.fixed').remove()
+    state.pendingScan = null
+    document.getElementById('palletScanInput').value = ''
+    document.getElementById('palletScanInput').focus()
 }
 
 function showCompleteUnloadingModal() {
