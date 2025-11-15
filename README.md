@@ -17,7 +17,7 @@ A comprehensive full-stack web application for logistics tracking and warehouse 
 - ✅ **Advanced Permissions** - Warehouse_supervisor role with enhanced delete/amend rights (NEW!)
 - ✅ **Duplicate Scan Prevention** - Multi-layer detection to prevent duplicate pallet scans (NEW!)
 - ✅ **Delete Scanned Items** - Admin/supervisor can remove items from scanning session (NEW!)
-- ✅ **Live Dashboard** - Real-time statistics showing outlets, pallets, loaded/delivered counts (NEW!)
+- ✅ **Live Dashboard** - Real-time statistics with delivery timestamps and receiver names (NEW!)
 - ✅ **Admin Configuration** - User and outlet management system
 - ✅ **Error Tracking** - Comprehensive error logging for unmatched parcels
 - ✅ **Reports & Analytics** - Delivery reports with Excel export functionality
@@ -160,6 +160,9 @@ Parcel (grouped by Pallet ID)
 4. Check outlet status table:
    - Individual outlet progress
    - Pallets pending/loaded/delivered per outlet
+   - **Last Delivered** - Timestamp when outlet completed delivery
+   - **Receiver** - Name of person who signed for delivery
+   - Completed outlets remain visible with delivery information
    - Auto-refreshes every 30 seconds
 
 ### 5️⃣ Reports & Analytics (All Roles)
@@ -309,7 +312,7 @@ wrangler pages secret put JWT_SECRET
 - ✅ Mobile-responsive design
 - ✅ Real-time progress tracking
 - ✅ Audio/visual feedback system
-- ✅ Live dashboard with auto-refresh (30s intervals)
+- ✅ Live dashboard with auto-refresh showing delivery timestamps and receivers
 - ✅ 205 outlets imported and configured
 
 ### 🔄 Recommended Next Steps
@@ -371,5 +374,5 @@ For support and feature requests, contact your system administrator.
 ---
 
 **Last Updated**: November 15, 2025  
-**Version**: 1.4.0 (with Live Dashboard & Fixed Header Filtering)  
-**Status**: ✅ Development Ready | ⏳ Database Migrations Required | 🏪 205 Outlets Imported | 📦 Pallet Scanning Active | 🛡️ Duplicate Prevention Active | 🗑️ Session Delete Active | 📊 Live Dashboard Active
+**Version**: 1.5.0 (with Dashboard Delivery Info & Outlet Signatures)  
+**Status**: ✅ Development Ready | ⏳ Database Migrations Required | 🏪 205 Outlets Imported | 📦 Pallet Scanning Active | 🛡️ Duplicate Prevention Active | 🗑️ Session Delete Active | 📊 Dashboard with Delivery Tracking Active | ✍️ Outlet Receipt Signatures Active

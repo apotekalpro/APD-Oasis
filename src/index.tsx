@@ -406,6 +406,19 @@ app.get('/api/warehouse/parcels', authMiddleware, async (c) => {
   }
 })
 
+// Get ALL parcels for dashboard view (including delivered)
+app.get('/api/dashboard/parcels', authMiddleware, async (c) => {
+  try {
+    // Get all parcels including delivered ones, ordered by outlet
+    const response = await supabaseRequest(c, 'parcels?select=*&order=outlet_code.asc')
+    const parcels = await response.json()
+    return c.json({ parcels })
+  } catch (error) {
+    console.error('Dashboard parcels error:', error)
+    return c.json({ error: 'Failed to fetch dashboard parcels' }, 500)
+  }
+})
+
 // Get transfer details for warehouse scanning
 app.get('/api/warehouse/transfers', authMiddleware, async (c) => {
   try {

@@ -860,11 +860,13 @@ function renderDashboard() {
                                 <th class="px-4 py-2 text-center">Loaded</th>
                                 <th class="px-4 py-2 text-center">Delivered</th>
                                 <th class="px-4 py-2 text-center">Status</th>
+                                <th class="px-4 py-2 text-center">Last Delivered</th>
+                                <th class="px-4 py-2 text-left">Receiver</th>
                             </tr>
                         </thead>
                         <tbody id="dash-outlet-table">
                             <tr>
-                                <td colspan="6" class="text-center py-4 text-gray-500">Loading...</td>
+                                <td colspan="8" class="text-center py-4 text-gray-500">Loading...</td>
                             </tr>
                         </tbody>
                     </table>
@@ -876,7 +878,8 @@ function renderDashboard() {
 
 async function loadDashboardData() {
     try {
-        const response = await axios.get('/api/warehouse/parcels')
+        // Fetch ALL parcels including delivered ones for dashboard
+        const response = await axios.get('/api/dashboard/parcels')
         const parcels = response.data.parcels || []
         
         // Group by outlet
@@ -902,13 +905,22 @@ async function loadDashboardData() {
                     name: parcel.outlet_name,
                     total: 0,
                     loaded: 0,
-                    delivered: 0
+                    delivered: 0,
+                    last_delivered_at: null,
+                    last_receiver: null
                 })
             }
             const outlet = outletMap.get(parcel.outlet_code)
             outlet.total++
             if (parcel.status === 'loaded') outlet.loaded++
-            if (parcel.status === 'delivered') outlet.delivered++
+            if (parcel.status === 'delivered') {
+                outlet.delivered++
+                // Store latest delivery info
+                if (!outlet.last_delivered_at || parcel.delivered_at > outlet.last_delivered_at) {
+                    outlet.last_delivered_at = parcel.delivered_at
+                    outlet.last_receiver = parcel.received_by_name
+                }
+            }
         })
         
         // Update statistics
@@ -932,7 +944,7 @@ async function loadDashboardData() {
         // Update outlet table
         const tableBody = document.getElementById('dash-outlet-table')
         if (outletMap.size === 0) {
-            tableBody.innerHTML = '<tr><td colspan="6" class="text-center py-4 text-gray-500">No data available</td></tr>'
+            tableBody.innerHTML = '<tr><td colspan="8" class="text-center py-4 text-gray-500">No data available</td></tr>'
             return
         }
         
@@ -953,6 +965,19 @@ async function loadDashboardData() {
                 statusClass = 'bg-yellow-200 text-yellow-800'
             }
             
+            // Format delivery timestamp
+            let deliveryTimeStr = '-'
+            if (outlet.last_delivered_at) {
+                const deliveryDate = new Date(outlet.last_delivered_at)
+                deliveryTimeStr = deliveryDate.toLocaleTimeString('en-US', { 
+                    hour: '2-digit', 
+                    minute: '2-digit',
+                    hour12: true 
+                })
+            }
+            
+            const receiverStr = outlet.last_receiver || '-'
+            
             return `
                 <tr class="border-b hover:bg-gray-50">
                     <td class="px-4 py-3 font-mono">${outlet.code_short}</td>
@@ -970,6 +995,12 @@ async function loadDashboardData() {
                         <span class="px-3 py-1 rounded-full text-xs font-semibold ${statusClass}">
                             ${status}
                         </span>
+                    </td>
+                    <td class="px-4 py-3 text-center text-sm ${outlet.last_delivered_at ? 'text-green-600 font-medium' : 'text-gray-400'}">
+                        ${deliveryTimeStr}
+                    </td>
+                    <td class="px-4 py-3 text-sm ${outlet.last_receiver ? 'text-gray-700' : 'text-gray-400'}">
+                        ${receiverStr}
                     </td>
                 </tr>
             `
