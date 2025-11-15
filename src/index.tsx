@@ -479,7 +479,13 @@ app.post('/api/warehouse/complete', authMiddleware, async (c) => {
 // Get parcels for specific outlet
 app.get('/api/outlet/parcels/:outlet_code', authMiddleware, async (c) => {
   try {
-    const outlet_code = c.req.param('outlet_code')
+    const user = c.get('user')
+    let outlet_code = c.req.param('outlet_code')
+    
+    // If user is outlet role, force use their outlet_code
+    if (user.role === 'outlet' && user.outlet_code) {
+      outlet_code = user.outlet_code
+    }
     
     const response = await supabaseRequest(c, `parcels?outlet_code=eq.${outlet_code}&status=eq.loaded&select=*`)
     const parcels = await response.json()
@@ -492,7 +498,13 @@ app.get('/api/outlet/parcels/:outlet_code', authMiddleware, async (c) => {
 // Get transfer details for outlet
 app.get('/api/outlet/transfers/:outlet_code', authMiddleware, async (c) => {
   try {
-    const outlet_code = c.req.param('outlet_code')
+    const user = c.get('user')
+    let outlet_code = c.req.param('outlet_code')
+    
+    // If user is outlet role, force use their outlet_code
+    if (user.role === 'outlet' && user.outlet_code) {
+      outlet_code = user.outlet_code
+    }
     
     const response = await supabaseRequest(c, `transfer_details?outlet_code=eq.${outlet_code}&status=eq.loaded&select=*`)
     const transfers = await response.json()
@@ -618,18 +630,23 @@ app.post('/api/outlet/complete', authMiddleware, async (c) => {
 // Get delivery reports
 app.get('/api/reports/deliveries', authMiddleware, async (c) => {
   try {
+    const user = c.get('user')
     const { start_date, end_date, outlet_code } = c.req.query()
     
     let query = 'parcels?select=*&order=delivered_at.desc'
+    
+    // If user is outlet role, filter by their outlet_code
+    if (user.role === 'outlet' && user.outlet_code) {
+      query += `&outlet_code=eq.${user.outlet_code}`
+    } else if (outlet_code) {
+      query += `&outlet_code=eq.${outlet_code}`
+    }
     
     if (start_date) {
       query += `&delivered_at=gte.${start_date}`
     }
     if (end_date) {
       query += `&delivered_at=lte.${end_date}`
-    }
-    if (outlet_code) {
-      query += `&outlet_code=eq.${outlet_code}`
     }
     
     const response = await supabaseRequest(c, query)
@@ -643,7 +660,16 @@ app.get('/api/reports/deliveries', authMiddleware, async (c) => {
 // Get error parcels
 app.get('/api/reports/errors', authMiddleware, async (c) => {
   try {
-    const response = await supabaseRequest(c, 'error_parcels?select=*&order=created_at.desc')
+    const user = c.get('user')
+    
+    let query = 'error_parcels?select=*&order=created_at.desc'
+    
+    // If user is outlet role, filter by their outlet_code
+    if (user.role === 'outlet' && user.outlet_code) {
+      query += `&outlet_code=eq.${user.outlet_code}`
+    }
+    
+    const response = await supabaseRequest(c, query)
     const errors = await response.json()
     return c.json({ errors })
   } catch (error) {

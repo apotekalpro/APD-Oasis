@@ -885,6 +885,14 @@ async function handleCompleteLoading(event) {
 
 // ============ Outlet Page ============
 function renderOutlet() {
+    // Auto-select outlet for outlet role users
+    if (state.user && state.user.role === 'outlet' && state.user.outlet_code && !state.selectedOutlet) {
+        state.selectedOutlet = { 
+            code: state.user.outlet_code, 
+            name: state.user.full_name 
+        }
+    }
+    
     return `
         <div class="container mx-auto px-4 py-6">
             <h2 class="text-3xl font-bold mb-6 text-gray-800">
@@ -903,10 +911,12 @@ function renderOutlet() {
                     <div>
                         <h3 class="text-2xl font-bold">${state.selectedOutlet.code} - ${state.selectedOutlet.name}</h3>
                     </div>
-                    <button onclick="state.selectedOutlet = null; render()" 
-                        class="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-lg">
-                        <i class="fas fa-arrow-left mr-2"></i>Change Outlet
-                    </button>
+                    ${state.user && state.user.role !== 'outlet' ? `
+                        <button onclick="state.selectedOutlet = null; render()" 
+                            class="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-lg">
+                            <i class="fas fa-arrow-left mr-2"></i>Change Outlet
+                        </button>
+                    ` : ''}
                 </div>
                 
                 <div class="grid lg:grid-cols-3 gap-6">
