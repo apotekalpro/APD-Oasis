@@ -411,8 +411,11 @@ wrangler pages secret put JWT_SECRET
 | `PASSWORD_MANAGEMENT_TESTING.md` | Password management testing guide |
 | `VERSION_1.8.0_SUMMARY.md` | Password management release notes |
 | `VERSION_1.8.1_SUMMARY.md` | User search & role fixes release notes |
-| `VERSION_1.8.2_HOTFIX.md` | **NEW!** Critical login fixes (IMPORTANT!) |
+| `VERSION_1.8.2_HOTFIX.md` | Critical login fixes (IMPORTANT!) |
+| `VERSION_1.8.3_FEATURE.md` | **NEW!** Delivered outlets visibility feature |
 | `ADD_DELIVERY_DATE_COLUMN.sql` | Multi-day dashboard migration (REQUIRED!) |
+| `FIX_WAREHOUSE_SUPERVISOR_ROLE.sql` | **REQUIRED!** Fix warehouse_supervisor role constraint |
+| `URGENT_FIX_REQUIRED.md` | **MUST READ!** Database fix instructions for roles |
 | `URGENT_DATABASE_MIGRATION_REQUIRED.md` | Migration instructions |
 | `SAMPLE_IMPORT_TEMPLATE.md` | Excel import format guide |
 | `PROJECT_SUMMARY.md` | Complete handover document |
@@ -429,5 +432,5 @@ For support and feature requests, contact your system administrator.
 ---
 
 **Last Updated**: November 15, 2025  
-**Version**: 1.8.2 (Login Fixes)  
-**Status**: ✅ Production Ready | ⚠️ **MIGRATION REQUIRED** (ADD_DELIVERY_DATE_COLUMN.sql) | 🏪 205 Outlets Imported | 📦 Pallet Scanning Active | 🛡️ Duplicate Prevention Active | 🗑️ Session Delete Active | 📊 Multi-Day Dashboard Active | ✍️ Bulk Receipt Completion Active | 📅 Delivery Date Planning Active | 🔐 Password Management Active | 🔍 User Search Active | ✅ All Roles Login Working
+**Version**: 1.8.3 (Delivered Outlets Visibility)  
+**Status**: ✅ Production Ready | ⚠️ **MIGRATION REQUIRED** (ADD_DELIVERY_DATE_COLUMN.sql + FIX_WAREHOUSE_SUPERVISOR_ROLE.sql) | 🏪 205 Outlets Imported | 📦 Pallet Scanning Active | 🛡️ Duplicate Prevention Active | 🗑️ Session Delete Active | 📊 Multi-Day Dashboard Active | ✍️ Bulk Receipt Completion Active | 📅 Delivery Date Planning Active | 🔐 Password Management Active | 🔍 User Search Active | ✅ All Roles Login Working | 📋 Delivered Outlets Visible
