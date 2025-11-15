@@ -474,6 +474,97 @@ app.post('/api/warehouse/complete', authMiddleware, async (c) => {
   }
 })
 
+// Delete all transfers for an outlet
+app.delete('/api/warehouse/outlet/:outlet_code', authMiddleware, async (c) => {
+  try {
+    const user = c.get('user')
+    const outlet_code = c.req.param('outlet_code')
+    
+    // Only admin and warehouse roles can delete
+    if (!['admin', 'warehouse'].includes(user.role)) {
+      return c.json({ error: 'Forbidden' }, 403)
+    }
+    
+    // Delete all transfer_details for this outlet
+    await supabaseRequest(c, `transfer_details?outlet_code=eq.${outlet_code}`, {
+      method: 'DELETE'
+    })
+    
+    // Delete all parcels for this outlet
+    await supabaseRequest(c, `parcels?outlet_code=eq.${outlet_code}`, {
+      method: 'DELETE'
+    })
+    
+    return c.json({ success: true, message: `All transfers for outlet ${outlet_code} deleted` })
+  } catch (error) {
+    console.error('Delete outlet transfers error:', error)
+    return c.json({ error: 'Failed to delete outlet transfers' }, 500)
+  }
+})
+
+// Delete single transfer
+app.delete('/api/warehouse/transfer/:transfer_id', authMiddleware, async (c) => {
+  try {
+    const user = c.get('user')
+    const transfer_id = c.req.param('transfer_id')
+    
+    // Only admin and warehouse roles can delete
+    if (!['admin', 'warehouse'].includes(user.role)) {
+      return c.json({ error: 'Forbidden' }, 403)
+    }
+    
+    // Get transfer details first to find parcel_id
+    const transferResponse = await supabaseRequest(c, `transfer_details?id=eq.${transfer_id}&select=*`)
+    const transfers = await transferResponse.json()
+    
+    if (!transfers || transfers.length === 0) {
+      return c.json({ error: 'Transfer not found' }, 404)
+    }
+    
+    const transfer = transfers[0]
+    const parcel_id = transfer.parcel_id
+    
+    // Delete the transfer detail
+    await supabaseRequest(c, `transfer_details?id=eq.${transfer_id}`, {
+      method: 'DELETE'
+    })
+    
+    // Check if parcel still has other transfers
+    const remainingResponse = await supabaseRequest(c, `transfer_details?parcel_id=eq.${parcel_id}&select=count`)
+    const remainingText = await remainingResponse.text()
+    
+    // If no transfers remain for this parcel, delete the parcel
+    try {
+      const remainingData = JSON.parse(remainingText)
+      if (Array.isArray(remainingData) && remainingData.length === 0) {
+        await supabaseRequest(c, `parcels?id=eq.${parcel_id}`, {
+          method: 'DELETE'
+        })
+      } else {
+        // Update parcel counts
+        const allTransfersResponse = await supabaseRequest(c, `transfer_details?parcel_id=eq.${parcel_id}&select=*`)
+        const allTransfers = await allTransfersResponse.json()
+        
+        await supabaseRequest(c, `parcels?id=eq.${parcel_id}`, {
+          method: 'PATCH',
+          body: JSON.stringify({
+            total_count: allTransfers.length,
+            scanned_count: allTransfers.filter((t: any) => t.is_scanned_loading).length
+          })
+        })
+      }
+    } catch (e) {
+      // If parsing fails, just continue
+      console.log('Could not parse remaining count, continuing...')
+    }
+    
+    return c.json({ success: true, message: 'Transfer deleted' })
+  } catch (error) {
+    console.error('Delete transfer error:', error)
+    return c.json({ error: 'Failed to delete transfer' }, 500)
+  }
+})
+
 // ============ Outlet Routes ============
 
 // Get parcels for specific outlet

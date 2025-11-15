@@ -772,11 +772,13 @@ async function loadWarehouseData() {
             return `
                 <div class="border-2 ${isComplete ? 'border-green-500 bg-green-50' : 'border-gray-300'} rounded-lg p-4">
                     <div class="flex justify-between items-center mb-2">
-                        <div>
+                        <div class="flex-1">
                             <p class="font-bold">${outlet.code}</p>
                             <p class="text-sm text-gray-600">${outlet.name}</p>
                         </div>
-                        ${isComplete ? '<i class="fas fa-check-circle text-green-500 text-2xl"></i>' : ''}
+                        <div class="flex items-center space-x-2">
+                            ${isComplete ? '<i class="fas fa-check-circle text-green-500 text-2xl"></i>' : ''}
+                        </div>
                     </div>
                     <div class="mt-2">
                         <div class="flex justify-between text-sm mb-1">
@@ -786,6 +788,16 @@ async function loadWarehouseData() {
                         <div class="w-full bg-gray-200 rounded-full h-2">
                             <div class="bg-blue-500 h-2 rounded-full" style="width: ${percentage}%"></div>
                         </div>
+                    </div>
+                    <div class="mt-3 flex space-x-2">
+                        <button onclick="showOutletDetails('${outlet.code}')" 
+                            class="flex-1 bg-blue-500 hover:bg-blue-600 text-white px-3 py-2 rounded text-sm">
+                            <i class="fas fa-list mr-1"></i>Details
+                        </button>
+                        <button onclick="confirmDeleteOutlet('${outlet.code}')" 
+                            class="flex-1 bg-red-500 hover:bg-red-600 text-white px-3 py-2 rounded text-sm">
+                            <i class="fas fa-trash mr-1"></i>Delete All
+                        </button>
                     </div>
                 </div>
             `
@@ -903,6 +915,207 @@ async function handleCompleteLoading(event) {
         loadWarehouseData()
     } catch (error) {
         showToast('Failed to complete loading', 'error')
+    }
+}
+
+// Show outlet details modal with all transfers
+async function showOutletDetails(outletCode) {
+    try {
+        // Get all transfers for this outlet
+        const outletTransfers = state.transfers.filter(t => t.outlet_code === outletCode)
+        
+        if (outletTransfers.length === 0) {
+            showToast('No transfers found for this outlet', 'error')
+            return
+        }
+        
+        const outletName = outletTransfers[0].outlet_name
+        const scannedCount = outletTransfers.filter(t => t.is_scanned_loading).length
+        
+        const modal = document.createElement('div')
+        modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4'
+        modal.innerHTML = `
+            <div class="bg-white rounded-lg w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
+                <div class="p-6 border-b">
+                    <div class="flex justify-between items-center">
+                        <div>
+                            <h3 class="text-2xl font-bold">${outletCode} - ${outletName}</h3>
+                            <p class="text-sm text-gray-600 mt-1">
+                                Scanned: ${scannedCount} / ${outletTransfers.length} transfers
+                            </p>
+                        </div>
+                        <button onclick="this.closest('.fixed').remove()" 
+                            class="text-gray-500 hover:text-gray-700">
+                            <i class="fas fa-times text-2xl"></i>
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="flex-1 overflow-y-auto p-6">
+                    <div class="space-y-2">
+                        ${outletTransfers.map((transfer, index) => `
+                            <div class="border rounded-lg p-4 ${transfer.is_scanned_loading ? 'bg-green-50 border-green-500' : 'bg-white border-gray-300'}">
+                                <div class="flex justify-between items-start">
+                                    <div class="flex-1">
+                                        <div class="flex items-center space-x-2 mb-2">
+                                            <span class="font-mono font-bold text-lg">${transfer.transfer_number}</span>
+                                            ${transfer.is_scanned_loading ? 
+                                                '<span class="px-2 py-1 bg-green-500 text-white text-xs rounded">SCANNED</span>' : 
+                                                '<span class="px-2 py-1 bg-gray-300 text-gray-700 text-xs rounded">PENDING</span>'
+                                            }
+                                        </div>
+                                        <p class="text-sm text-gray-600">
+                                            <i class="fas fa-pallet mr-1"></i>Pallet: ${transfer.pallet_id}
+                                        </p>
+                                        ${transfer.is_scanned_loading ? `
+                                            <p class="text-xs text-gray-500 mt-1">
+                                                <i class="fas fa-clock mr-1"></i>Scanned: ${formatDate(transfer.scanned_loading_at)}
+                                            </p>
+                                        ` : ''}
+                                    </div>
+                                    <button onclick="confirmDeleteTransfer('${transfer.id}', '${transfer.transfer_number}', '${outletCode}')" 
+                                        class="ml-4 bg-red-500 hover:bg-red-600 text-white px-3 py-2 rounded text-sm">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+                
+                <div class="p-6 border-t bg-gray-50">
+                    <div class="flex space-x-3">
+                        <button onclick="confirmDeleteOutlet('${outletCode}')" 
+                            class="flex-1 bg-red-500 hover:bg-red-600 text-white px-4 py-3 rounded-lg font-semibold">
+                            <i class="fas fa-trash mr-2"></i>Delete All Transfers (${outletTransfers.length})
+                        </button>
+                        <button onclick="this.closest('.fixed').remove()" 
+                            class="flex-1 bg-gray-300 hover:bg-gray-400 px-4 py-3 rounded-lg font-semibold">
+                            <i class="fas fa-times mr-2"></i>Close
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `
+        
+        document.body.appendChild(modal)
+    } catch (error) {
+        console.error('Error showing outlet details:', error)
+        showToast('Failed to load outlet details', 'error')
+    }
+}
+
+// Confirm delete entire outlet
+function confirmDeleteOutlet(outletCode) {
+    const outletTransfers = state.transfers.filter(t => t.outlet_code === outletCode)
+    
+    if (outletTransfers.length === 0) {
+        showToast('No transfers to delete', 'error')
+        return
+    }
+    
+    const modal = document.createElement('div')
+    modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50'
+    modal.innerHTML = `
+        <div class="bg-white rounded-lg p-6 w-full max-w-md">
+            <h3 class="text-xl font-bold mb-4 text-red-600">
+                <i class="fas fa-exclamation-triangle mr-2"></i>Confirm Delete
+            </h3>
+            <p class="mb-4">
+                Are you sure you want to delete <strong>ALL ${outletTransfers.length} transfers</strong> for outlet <strong>${outletCode}</strong>?
+            </p>
+            <p class="text-sm text-red-600 mb-4">
+                <i class="fas fa-info-circle mr-1"></i>This action cannot be undone!
+            </p>
+            <div class="flex space-x-3">
+                <button onclick="deleteOutletTransfers('${outletCode}')" 
+                    class="flex-1 bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg font-semibold">
+                    <i class="fas fa-trash mr-2"></i>Yes, Delete All
+                </button>
+                <button onclick="this.closest('.fixed').remove()" 
+                    class="flex-1 bg-gray-300 hover:bg-gray-400 px-4 py-2 rounded-lg font-semibold">
+                    Cancel
+                </button>
+            </div>
+        </div>
+    `
+    
+    document.body.appendChild(modal)
+}
+
+// Delete all transfers for an outlet
+async function deleteOutletTransfers(outletCode) {
+    try {
+        await axios.delete(`/api/warehouse/outlet/${outletCode}`)
+        
+        showToast(`All transfers for ${outletCode} deleted successfully`, 'success')
+        
+        // Close all modals
+        document.querySelectorAll('.fixed').forEach(modal => modal.remove())
+        
+        // Reload data
+        await loadWarehouseData()
+    } catch (error) {
+        showToast(error.response?.data?.error || 'Failed to delete transfers', 'error')
+    }
+}
+
+// Confirm delete single transfer
+function confirmDeleteTransfer(transferId, transferNumber, outletCode) {
+    const modal = document.createElement('div')
+    modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50'
+    modal.innerHTML = `
+        <div class="bg-white rounded-lg p-6 w-full max-w-md">
+            <h3 class="text-xl font-bold mb-4 text-red-600">
+                <i class="fas fa-exclamation-triangle mr-2"></i>Confirm Delete
+            </h3>
+            <p class="mb-4">
+                Are you sure you want to delete transfer <strong>${transferNumber}</strong>?
+            </p>
+            <p class="text-sm text-gray-600 mb-4">
+                Outlet: ${outletCode}
+            </p>
+            <div class="flex space-x-3">
+                <button onclick="deleteTransfer('${transferId}', '${outletCode}')" 
+                    class="flex-1 bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg font-semibold">
+                    <i class="fas fa-trash mr-2"></i>Yes, Delete
+                </button>
+                <button onclick="this.closest('.fixed').remove()" 
+                    class="flex-1 bg-gray-300 hover:bg-gray-400 px-4 py-2 rounded-lg font-semibold">
+                    Cancel
+                </button>
+            </div>
+        </div>
+    `
+    
+    document.body.appendChild(modal)
+}
+
+// Delete single transfer
+async function deleteTransfer(transferId, outletCode) {
+    try {
+        await axios.delete(`/api/warehouse/transfer/${transferId}`)
+        
+        showToast('Transfer deleted successfully', 'success')
+        
+        // Close confirmation modal
+        document.querySelectorAll('.fixed').forEach(modal => {
+            if (modal.querySelector('h3').textContent.includes('Confirm Delete')) {
+                modal.remove()
+            }
+        })
+        
+        // Reload data
+        await loadWarehouseData()
+        
+        // Refresh outlet details if modal is open
+        const detailsModal = document.querySelector('.max-w-4xl')
+        if (detailsModal) {
+            document.querySelectorAll('.fixed').forEach(modal => modal.remove())
+            showOutletDetails(outletCode)
+        }
+    } catch (error) {
+        showToast(error.response?.data?.error || 'Failed to delete transfer', 'error')
     }
 }
 
