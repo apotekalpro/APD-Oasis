@@ -560,25 +560,24 @@ function handleFileSelect(event) {
             for (let i = 15; i < jsonData.length; i++) {  // Start from index 15 (row 16)
                 const row = jsonData[i]
                 if (row[4] && row[6] && row[21]) { // Check if required columns exist (E, G, V)
-                    // Extract store code from store name if needed
+                    // Column E: Numeric outlet code (e.g., "0001")
                     let outletCode = String(row[4]).trim()
-                    let outletName = String(row[5] || '').trim()
+                    // Column F: Format "SHORTCODE - FULL NAME" (e.g., "JKJSTT1 - APOTEK ALPRO TEBET TIMUR")
+                    let fullStoreName = String(row[5] || '').trim()
+                    let outletCodeShort = ''
+                    let outletName = fullStoreName
                     
-                    // Handle format like "JKJBJR1 - APOTEK ALPRO..."
-                    // Extract just the short code before the dash
-                    if (outletName.includes(' - ')) {
-                        const parts = outletName.split(' - ')
-                        const shortCode = parts[0].trim()
-                        outletName = parts[1] ? parts[1].trim() : outletName
-                        // Use short code if outlet code is just numbers
-                        if (/^\d+$/.test(outletCode)) {
-                            // Keep the numeric code as is, but note the short name
-                        }
+                    // Extract short code from Column F (before " - ")
+                    if (fullStoreName.includes(' - ')) {
+                        const parts = fullStoreName.split(' - ')
+                        outletCodeShort = parts[0].trim()  // Short code (e.g., "JKJSTT1")
+                        outletName = parts[1] ? parts[1].trim() : fullStoreName  // Full name
                     }
                     
                     importData.push({
-                        outlet_code: outletCode, // Column E
-                        outlet_name: outletName, // Column F
+                        outlet_code: outletCode, // Column E - Numeric (e.g., "0001")
+                        outlet_code_short: outletCodeShort, // From Column F - Short (e.g., "JKJSTT1")
+                        outlet_name: outletName, // From Column F - Full name
                         pallet_id: String(row[6]).trim(), // Column G
                         transfer_number: String(row[21]).trim() // Column V
                     })
@@ -612,7 +611,7 @@ function handleFileSelect(event) {
             table.innerHTML = `
                 <thead class="bg-gray-100">
                     <tr>
-                        <th class="border px-4 py-2">Outlet Code</th>
+                        <th class="border px-4 py-2">Outlet Short Code</th>
                         <th class="border px-4 py-2">Outlet Name</th>
                         <th class="border px-4 py-2">Pallet ID</th>
                         <th class="border px-4 py-2">Transfer Count</th>
@@ -621,9 +620,9 @@ function handleFileSelect(event) {
                 <tbody>
                     ${previewData.map(item => `
                         <tr>
-                            <td class="border px-4 py-2">${item.outlet_code}</td>
+                            <td class="border px-4 py-2 font-semibold">${item.outlet_code_short || item.outlet_code}</td>
                             <td class="border px-4 py-2">${item.outlet_name}</td>
-                            <td class="border px-4 py-2">${item.pallet_id}</td>
+                            <td class="border px-4 py-2 font-mono">${item.pallet_id}</td>
                             <td class="border px-4 py-2 text-center">${item.transfer_count}</td>
                         </tr>
                     `).join('')}
@@ -682,14 +681,23 @@ function renderWarehouse() {
                 <!-- Scanning Panel -->
                 <div class="lg:col-span-2">
                     <div class="bg-white rounded-lg shadow-lg p-6">
-                        <h3 class="text-xl font-bold mb-4">Scan Transfer Number</h3>
+                        <h3 class="text-xl font-bold mb-4">
+                            <i class="fas fa-pallet mr-2 text-blue-600"></i>Scan Pallet ID
+                        </h3>
                         
                         <div class="mb-4">
                             <input type="text" id="warehouseScanInput" 
                                 class="w-full px-4 py-3 border-4 border-blue-500 rounded-lg text-lg scan-input"
-                                placeholder="Scan or enter Transfer Number..."
+                                placeholder="Scan or enter Pallet ID..."
                                 autofocus
                                 onkeypress="if(event.key==='Enter') handleWarehouseScan()">
+                        </div>
+                        
+                        <div class="bg-blue-50 border-l-4 border-blue-500 p-3 mb-4">
+                            <p class="text-sm text-blue-800">
+                                <i class="fas fa-info-circle mr-2"></i>
+                                <strong>New!</strong> Scan Pallet ID to mark all transfers in that pallet as loaded at once.
+                            </p>
                         </div>
                         
                         <button onclick="handleWarehouseScan()" 
@@ -745,6 +753,7 @@ async function loadWarehouseData() {
             if (!outletMap.has(transfer.outlet_code)) {
                 outletMap.set(transfer.outlet_code, {
                     code: transfer.outlet_code,
+                    code_short: transfer.outlet_code_short || transfer.outlet_code,
                     name: transfer.outlet_name,
                     total: 0,
                     scanned: 0
@@ -773,8 +782,9 @@ async function loadWarehouseData() {
                 <div class="border-2 ${isComplete ? 'border-green-500 bg-green-50' : 'border-gray-300'} rounded-lg p-4">
                     <div class="flex justify-between items-center mb-2">
                         <div class="flex-1">
-                            <p class="font-bold">${outlet.code}</p>
+                            <p class="font-bold text-lg">${outlet.code_short}</p>
                             <p class="text-sm text-gray-600">${outlet.name}</p>
+                            <p class="text-xs text-gray-500">Code: ${outlet.code}</p>
                         </div>
                         <div class="flex items-center space-x-2">
                             ${isComplete ? '<i class="fas fa-check-circle text-green-500 text-2xl"></i>' : ''}
@@ -809,22 +819,26 @@ async function loadWarehouseData() {
 
 async function handleWarehouseScan() {
     const input = document.getElementById('warehouseScanInput')
-    const transferNumber = input.value.trim()
+    const palletId = input.value.trim()
     
-    if (!transferNumber) return
+    if (!palletId) return
     
     try {
-        const response = await axios.post('/api/warehouse/scan', { transfer_number: transferNumber })
+        // NEW: Scan pallet ID (scans entire pallet at once)
+        const response = await axios.post('/api/warehouse/scan-pallet', { pallet_id: palletId })
         
         if (response.data.success) {
             playBeep(true)
-            showToast(`✓ ${transferNumber} scanned for ${response.data.outlet_code}`, 'success')
+            const outletDisplay = response.data.outlet_code_short || response.data.outlet_code
+            showToast(`✓ Pallet ${palletId} loaded - ${outletDisplay} (${response.data.transfer_count} transfers)`, 'success')
             
             // Add to scanned items
             state.scannedItems.push({
-                transfer_number: transferNumber,
+                pallet_id: palletId,
                 outlet_code: response.data.outlet_code,
+                outlet_code_short: response.data.outlet_code_short,
                 outlet_name: response.data.outlet_name,
+                transfer_count: response.data.transfer_count,
                 time: new Date().toLocaleTimeString()
             })
             
@@ -856,8 +870,15 @@ function updateScannedItemsList() {
         <div class="border-l-4 border-green-500 bg-green-50 p-3 rounded">
             <div class="flex justify-between">
                 <div>
-                    <p class="font-semibold">${item.transfer_number}</p>
-                    <p class="text-sm text-gray-600">${item.outlet_code} - ${item.outlet_name}</p>
+                    <p class="font-semibold">
+                        <i class="fas fa-pallet mr-1 text-green-600"></i>${item.pallet_id}
+                    </p>
+                    <p class="text-sm text-gray-600">
+                        ${item.outlet_code_short || item.outlet_code} - ${item.outlet_name}
+                    </p>
+                    <p class="text-xs text-gray-500">
+                        ${item.transfer_count} transfers
+                    </p>
                 </div>
                 <span class="text-sm text-gray-500">${item.time}</span>
             </div>
@@ -1121,14 +1142,6 @@ async function deleteTransfer(transferId, outletCode) {
 
 // ============ Outlet Page ============
 function renderOutlet() {
-    // Auto-select outlet for outlet role users
-    if (state.user && state.user.role === 'outlet' && state.user.outlet_code && !state.selectedOutlet) {
-        state.selectedOutlet = { 
-            code: state.user.outlet_code, 
-            name: state.user.full_name 
-        }
-    }
-    
     return `
         <div class="container mx-auto px-4 py-6">
             <h2 class="text-3xl font-bold mb-6 text-gray-800">
@@ -1136,71 +1149,100 @@ function renderOutlet() {
             </h2>
             
             ${!state.selectedOutlet ? `
-                <div class="bg-white rounded-lg shadow-lg p-6 max-w-2xl mx-auto">
-                    <h3 class="text-xl font-bold mb-4">Select Outlet</h3>
-                    <div id="outletsSelect" class="grid gap-4">
-                        <p class="text-gray-500 text-center py-4">Loading outlets...</p>
+                <!-- Step 1: Scan Outlet Code -->
+                <div class="bg-white rounded-lg shadow-lg p-8 max-w-2xl mx-auto">
+                    <div class="text-center mb-6">
+                        <div class="bg-blue-100 rounded-full w-20 h-20 flex items-center justify-center mx-auto mb-4">
+                            <i class="fas fa-store text-4xl text-blue-600"></i>
+                        </div>
+                        <h3 class="text-2xl font-bold mb-2">Step 1: Identify Your Outlet</h3>
+                        <p class="text-gray-600">Scan or enter your outlet short code</p>
+                    </div>
+                    
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">
+                            Outlet Short Code (e.g., MKC, JBB, JKJSTT1)
+                        </label>
+                        <input type="text" id="outletCodeInput" 
+                            class="w-full px-4 py-3 border-4 border-blue-500 rounded-lg text-lg scan-input"
+                            placeholder="Scan or enter outlet code..."
+                            autofocus
+                            onkeypress="if(event.key==='Enter') handleFindOutletPallets()">
+                    </div>
+                    
+                    <button onclick="handleFindOutletPallets()" 
+                        class="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-4 rounded-lg text-lg">
+                        <i class="fas fa-search mr-2"></i>Find My Pallets
+                    </button>
+                    
+                    <div class="mt-6 bg-blue-50 border-l-4 border-blue-500 p-4">
+                        <p class="text-sm text-blue-800">
+                            <i class="fas fa-info-circle mr-2"></i>
+                            <strong>Tip:</strong> Your outlet code is the short name before the dash in your store name (e.g., if your store is "MKC - Central Store", enter "MKC")
+                        </p>
                     </div>
                 </div>
             ` : `
-                <div class="mb-4 flex justify-between items-center">
-                    <div>
-                        <h3 class="text-2xl font-bold">${state.selectedOutlet.code} - ${state.selectedOutlet.name}</h3>
-                    </div>
-                    ${state.user && state.user.role !== 'outlet' ? `
-                        <button onclick="state.selectedOutlet = null; render()" 
+                <!-- Step 2: Scan Pallet IDs -->
+                <div class="mb-6 bg-white rounded-lg shadow p-6">
+                    <div class="flex justify-between items-center">
+                        <div>
+                            <h3 class="text-2xl font-bold text-gray-800">
+                                ${state.selectedOutlet.code_short} - ${state.selectedOutlet.name}
+                            </h3>
+                            <p class="text-sm text-gray-600">Outlet Code: ${state.selectedOutlet.code}</p>
+                        </div>
+                        <button onclick="clearOutletSelection()" 
                             class="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-lg">
                             <i class="fas fa-arrow-left mr-2"></i>Change Outlet
                         </button>
-                    ` : ''}
+                    </div>
                 </div>
                 
                 <div class="grid lg:grid-cols-3 gap-6">
                     <!-- Scanning Panel -->
                     <div class="lg:col-span-2">
                         <div class="bg-white rounded-lg shadow-lg p-6">
-                            <h3 class="text-xl font-bold mb-4">Scan Transfer Number</h3>
-                            
-                            <div class="mb-4">
-                                <input type="text" id="outletScanInput" 
-                                    class="w-full px-4 py-3 border-4 border-blue-500 rounded-lg text-lg scan-input"
-                                    placeholder="Scan or enter Transfer Number..."
-                                    autofocus
-                                    onkeypress="if(event.key==='Enter') handleOutletScan()">
+                            <div class="text-center mb-6">
+                                <div class="bg-green-100 rounded-full w-16 h-16 flex items-center justify-center mx-auto mb-3">
+                                    <i class="fas fa-pallet text-3xl text-green-600"></i>
+                                </div>
+                                <h3 class="text-xl font-bold">Step 2: Scan Pallet IDs</h3>
+                                <p class="text-gray-600 text-sm">Scan each pallet to confirm receipt</p>
                             </div>
                             
-                            <button onclick="handleOutletScan()" 
-                                class="w-full bg-blue-500 hover:bg-blue-600 text-white font-semibold py-3 rounded-lg mb-4">
-                                <i class="fas fa-barcode mr-2"></i>Scan Transfer Number
+                            <div class="mb-4">
+                                <input type="text" id="palletScanInput" 
+                                    class="w-full px-4 py-3 border-4 border-green-500 rounded-lg text-lg scan-input"
+                                    placeholder="Scan or enter Pallet ID..."
+                                    autofocus
+                                    onkeypress="if(event.key==='Enter') handleOutletScanPallet()">
+                            </div>
+                            
+                            <button onclick="handleOutletScanPallet()" 
+                                class="w-full bg-green-500 hover:bg-green-600 text-white font-bold py-3 rounded-lg mb-4">
+                                <i class="fas fa-check mr-2"></i>Confirm Pallet Receipt
                             </button>
                             
                             <!-- Scanned Items -->
                             <div class="mt-6">
-                                <h4 class="font-semibold mb-3">Scanned Items (${state.scannedItems.length})</h4>
+                                <h4 class="font-semibold mb-3">Received Pallets (${state.scannedItems.length})</h4>
                                 <div id="outletScannedList" class="space-y-2 max-h-96 overflow-y-auto">
-                                    <p class="text-gray-500 text-center py-4">No items scanned yet</p>
+                                    <p class="text-gray-500 text-center py-4">No pallets received yet</p>
                                 </div>
-                            </div>
-                            
-                            <!-- Complete Unloading Button -->
-                            <div class="mt-6">
-                                <button onclick="showCompleteUnloadingModal()" 
-                                    class="w-full bg-green-500 hover:bg-green-600 text-white font-bold py-3 rounded-lg">
-                                    <i class="fas fa-check-circle mr-2"></i>Complete Unloading
-                                </button>
                             </div>
                         </div>
                     </div>
                     
-                    <!-- Parcels Summary -->
+                    <!-- Available Pallets -->
                     <div class="lg:col-span-1">
                         <div class="bg-white rounded-lg shadow-lg p-6">
-                            <h3 class="text-xl font-bold mb-4">Parcels Summary</h3>
-                            <div id="parcelsSummary" class="space-y-3">
+                            <h3 class="text-xl font-bold mb-4">Your Deliveries</h3>
+                            <div id="availablePallets" class="space-y-3">
                                 <p class="text-gray-500 text-center py-4">Loading...</p>
                             </div>
                             
-                            <button onclick="loadOutletData()" 
+                            <button onclick="loadOutletPallets()" 
                                 class="w-full mt-4 bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg">
                                 <i class="fas fa-sync mr-2"></i>Refresh
                             </button>
@@ -1212,103 +1254,122 @@ function renderOutlet() {
     `
 }
 
-async function loadOutletsForSelection() {
+// NEW: Step 1 - Find pallets for outlet by short code
+async function handleFindOutletPallets() {
+    const input = document.getElementById('outletCodeInput')
+    const outletCodeShort = input.value.trim().toUpperCase()
+    
+    if (!outletCodeShort) {
+        showToast('Please enter outlet code', 'error')
+        return
+    }
+    
     try {
-        const response = await axios.get('/api/admin/outlets')
-        state.outlets = response.data.outlets
+        const response = await axios.post('/api/outlet/find-pallets', { 
+            outlet_code_short: outletCodeShort 
+        })
         
-        const outletsSelect = document.getElementById('outletsSelect')
-        if (!outletsSelect) return
-        
-        outletsSelect.innerHTML = state.outlets.map(outlet => `
-            <button onclick="selectOutlet('${outlet.outlet_code}', '${outlet.outlet_name}')" 
-                class="border-2 border-gray-300 hover:border-blue-500 rounded-lg p-6 text-left transition">
-                <p class="text-xl font-bold">${outlet.outlet_code}</p>
-                <p class="text-gray-600">${outlet.outlet_name}</p>
-            </button>
-        `).join('')
+        if (response.data.success) {
+            state.selectedOutlet = {
+                code: response.data.outlet_code,
+                code_short: response.data.outlet_code_short,
+                name: response.data.outlet_name
+            }
+            state.availablePallets = response.data.pallets
+            state.scannedItems = []
+            
+            showToast(`Found ${response.data.pallets.length} pallet(s) for ${outletCodeShort}`, 'success')
+            render()
+            setTimeout(() => loadOutletPallets(), 100)
+        } else {
+            showToast(response.data.error || 'Outlet not found', 'error')
+        }
     } catch (error) {
-        console.error('Error loading outlets:', error)
+        console.error('Error finding pallets:', error)
+        showToast(error.response?.data?.error || 'Failed to find outlet', 'error')
     }
 }
 
-function selectOutlet(code, name) {
-    state.selectedOutlet = { code, name }
-    state.scannedItems = []
-    render()
-    setTimeout(() => loadOutletData(), 100)
-}
-
-async function loadOutletData() {
+// Load and display available pallets for outlet
+async function loadOutletPallets() {
     if (!state.selectedOutlet) return
     
     try {
-        const response = await axios.get(`/api/outlet/transfers/${state.selectedOutlet.code}`)
-        state.transfers = response.data.transfers
+        const response = await axios.post('/api/outlet/find-pallets', { 
+            outlet_code_short: state.selectedOutlet.code_short 
+        })
         
-        const summary = document.getElementById('parcelsSummary')
-        if (!summary) return
-        
-        const total = state.transfers.length
-        const scanned = state.transfers.filter(t => t.is_scanned_unloading).length
-        const remaining = total - scanned
-        const percentage = total > 0 ? Math.round((scanned / total) * 100) : 0
-        
-        summary.innerHTML = `
-            <div class="bg-blue-50 border-2 border-blue-500 rounded-lg p-4">
-                <p class="text-sm text-gray-600">Total Transfers</p>
-                <p class="text-3xl font-bold text-blue-600">${total}</p>
-            </div>
+        if (response.data.success) {
+            state.availablePallets = response.data.pallets
             
-            <div class="bg-green-50 border-2 border-green-500 rounded-lg p-4">
-                <p class="text-sm text-gray-600">Scanned</p>
-                <p class="text-3xl font-bold text-green-600">${scanned}</p>
-            </div>
+            const palletsDiv = document.getElementById('availablePallets')
+            if (!palletsDiv) return
             
-            <div class="bg-orange-50 border-2 border-orange-500 rounded-lg p-4">
-                <p class="text-sm text-gray-600">Remaining</p>
-                <p class="text-3xl font-bold text-orange-600">${remaining}</p>
-            </div>
+            if (state.availablePallets.length === 0) {
+                palletsDiv.innerHTML = `
+                    <div class="text-center py-8">
+                        <i class="fas fa-check-circle text-6xl text-green-500 mb-3"></i>
+                        <p class="text-lg font-semibold text-green-600">All Deliveries Received!</p>
+                        <p class="text-sm text-gray-600">No pending pallets</p>
+                    </div>
+                `
+                return
+            }
             
-            <div class="mt-4">
-                <div class="flex justify-between text-sm mb-1">
-                    <span>Progress</span>
-                    <span>${percentage}%</span>
+            palletsDiv.innerHTML = state.availablePallets.map(pallet => `
+                <div class="border-2 border-blue-300 rounded-lg p-4 bg-blue-50">
+                    <div class="flex items-center justify-between mb-2">
+                        <p class="font-bold text-lg">
+                            <i class="fas fa-pallet mr-2 text-blue-600"></i>${pallet.pallet_id}
+                        </p>
+                        <span class="px-2 py-1 bg-blue-500 text-white text-xs rounded font-semibold">
+                            ${pallet.status.toUpperCase()}
+                        </span>
+                    </div>
+                    <p class="text-sm text-gray-600">
+                        <i class="fas fa-box mr-1"></i>${pallet.transfer_count} transfers
+                    </p>
                 </div>
-                <div class="w-full bg-gray-200 rounded-full h-3">
-                    <div class="bg-blue-500 h-3 rounded-full transition-all" style="width: ${percentage}%"></div>
-                </div>
-            </div>
-        `
+            `).join('')
+        }
     } catch (error) {
-        console.error('Error loading outlet data:', error)
+        console.error('Error loading pallets:', error)
     }
 }
 
-async function handleOutletScan() {
-    const input = document.getElementById('outletScanInput')
-    const transferNumber = input.value.trim()
+function clearOutletSelection() {
+    state.selectedOutlet = null
+    state.availablePallets = []
+    state.scannedItems = []
+    render()
+}
+
+// NEW: Step 2 - Scan pallet ID to confirm receipt
+async function handleOutletScanPallet() {
+    const input = document.getElementById('palletScanInput')
+    const palletId = input.value.trim()
     
-    if (!transferNumber || !state.selectedOutlet) return
+    if (!palletId || !state.selectedOutlet) return
     
     try {
-        const response = await axios.post('/api/outlet/scan', { 
-            transfer_number: transferNumber,
-            outlet_code: state.selectedOutlet.code
+        const response = await axios.post('/api/outlet/scan-pallet', { 
+            outlet_code_short: state.selectedOutlet.code_short,
+            pallet_id: palletId
         })
         
         if (response.data.success) {
             playBeep(true)
-            showToast(`✓ ${transferNumber} received`, 'success')
+            showToast(`✓ Pallet ${palletId} received (${response.data.transfer_count} transfers)`, 'success')
             
             // Add to scanned items
             state.scannedItems.push({
-                transfer_number: transferNumber,
+                pallet_id: palletId,
+                transfer_count: response.data.transfer_count,
                 time: new Date().toLocaleTimeString()
             })
             
             updateOutletScannedList()
-            loadOutletData()
+            loadOutletPallets()
         } else {
             playBeep(false)
             showToast(`✗ ${response.data.error}`, 'error')
@@ -1327,14 +1388,19 @@ function updateOutletScannedList() {
     if (!list) return
     
     if (state.scannedItems.length === 0) {
-        list.innerHTML = '<p class="text-gray-500 text-center py-4">No items scanned yet</p>'
+        list.innerHTML = '<p class="text-gray-500 text-center py-4">No pallets received yet</p>'
         return
     }
     
     list.innerHTML = state.scannedItems.slice().reverse().map(item => `
         <div class="border-l-4 border-green-500 bg-green-50 p-3 rounded">
-            <div class="flex justify-between">
-                <p class="font-semibold">${item.transfer_number}</p>
+            <div class="flex justify-between items-start">
+                <div>
+                    <p class="font-semibold">
+                        <i class="fas fa-pallet mr-1 text-green-600"></i>${item.pallet_id}
+                    </p>
+                    <p class="text-xs text-gray-600">${item.transfer_count} transfers</p>
+                </div>
                 <span class="text-sm text-gray-500">${item.time}</span>
             </div>
         </div>

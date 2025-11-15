@@ -260,7 +260,8 @@ app.post('/api/import', authMiddleware, async (c) => {
       const palletId = row.pallet_id
       if (!parcelMap.has(palletId)) {
         parcelMap.set(palletId, {
-          outlet_code: row.outlet_code,
+          outlet_code: row.outlet_code,  // Numeric code
+          outlet_code_short: row.outlet_code_short,  // Short code for display
           outlet_name: row.outlet_name,
           pallet_id: palletId,
           transfer_numbers: []
@@ -279,6 +280,7 @@ app.post('/api/import', authMiddleware, async (c) => {
         body: JSON.stringify({
           import_id: importId,
           outlet_code: parcel.outlet_code,
+          outlet_code_short: parcel.outlet_code_short,
           outlet_name: parcel.outlet_name,
           pallet_id: parcel.pallet_id,
           transfer_numbers: parcel.transfer_numbers,
@@ -295,6 +297,7 @@ app.post('/api/import', authMiddleware, async (c) => {
         parcel_id: parcelId,
         transfer_number: tn,
         outlet_code: parcel.outlet_code,
+        outlet_code_short: parcel.outlet_code_short,
         outlet_name: parcel.outlet_name,
         pallet_id: parcel.pallet_id,
         status: 'pending'
@@ -356,7 +359,67 @@ app.get('/api/warehouse/transfers', authMiddleware, async (c) => {
   }
 })
 
-// Scan transfer number during loading
+// Scan pallet ID during loading (NEW APPROACH - scans entire pallet at once)
+app.post('/api/warehouse/scan-pallet', authMiddleware, async (c) => {
+  try {
+    const user = c.get('user')
+    const { pallet_id } = await c.req.json()
+    
+    // Find parcel by pallet ID
+    const parcelResponse = await supabaseRequest(c, `parcels?pallet_id=eq.${pallet_id}&status=eq.pending&select=*`)
+    const parcels = await parcelResponse.json()
+    
+    if (!parcels || parcels.length === 0) {
+      return c.json({ 
+        success: false, 
+        error: 'Pallet ID not found or already scanned',
+        pallet_id 
+      })
+    }
+    
+    const parcel = parcels[0]
+    
+    // Get all transfer details for this pallet
+    const transfersResponse = await supabaseRequest(c, `transfer_details?parcel_id=eq.${parcel.id}&select=*`)
+    const transfers = await transfersResponse.json()
+    
+    // Update all transfers as scanned
+    for (const transfer of transfers) {
+      await supabaseRequest(c, `transfer_details?id=eq.${transfer.id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({
+          is_scanned_loading: true,
+          scanned_loading_at: new Date().toISOString(),
+          scanned_loading_by: user.id,
+          status: 'loaded'
+        })
+      })
+    }
+    
+    // Update parcel as fully loaded
+    await supabaseRequest(c, `parcels?id=eq.${parcel.id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({
+        status: 'loaded',
+        scanned_count: parcel.total_count
+      })
+    })
+    
+    return c.json({ 
+      success: true, 
+      pallet_id,
+      outlet_code: parcel.outlet_code,
+      outlet_code_short: parcel.outlet_code_short,
+      outlet_name: parcel.outlet_name,
+      transfer_count: parcel.total_count
+    })
+  } catch (error) {
+    console.error('Scan pallet error:', error)
+    return c.json({ error: 'Scan failed' }, 500)
+  }
+})
+
+// OLD: Scan transfer number during loading (DEPRECATED - keeping for backward compatibility)
 app.post('/api/warehouse/scan', authMiddleware, async (c) => {
   try {
     const user = c.get('user')
@@ -442,6 +505,7 @@ app.post('/api/warehouse/scan', authMiddleware, async (c) => {
       success: true, 
       transfer_number,
       outlet_code: transfer.outlet_code,
+      outlet_code_short: transfer.outlet_code_short,
       outlet_name: transfer.outlet_name,
       scanned_count: newScannedCount,
       total_count: parcel.total_count
@@ -566,6 +630,119 @@ app.delete('/api/warehouse/transfer/:transfer_id', authMiddleware, async (c) => 
 })
 
 // ============ Outlet Routes ============
+
+// NEW: Find available pallets for an outlet by short code
+app.post('/api/outlet/find-pallets', authMiddleware, async (c) => {
+  try {
+    const user = c.get('user')
+    const { outlet_code_short } = await c.req.json()
+    
+    // Find outlet by short code
+    const outletResponse = await supabaseRequest(c, `outlets?outlet_code_short=eq.${outlet_code_short}&select=*`)
+    const outlets = await outletResponse.json()
+    
+    if (!outlets || outlets.length === 0) {
+      return c.json({ 
+        success: false, 
+        error: 'Outlet code not found' 
+      })
+    }
+    
+    const outlet = outlets[0]
+    
+    // Get all loaded (ready for unloading) parcels for this outlet
+    const parcelsResponse = await supabaseRequest(c, `parcels?outlet_code=eq.${outlet.outlet_code}&status=eq.loaded&select=*&order=pallet_id.asc`)
+    const parcels = await parcelsResponse.json()
+    
+    return c.json({
+      success: true,
+      outlet_code: outlet.outlet_code,
+      outlet_code_short: outlet.outlet_code_short,
+      outlet_name: outlet.outlet_name,
+      pallets: parcels.map((p: any) => ({
+        id: p.id,
+        pallet_id: p.pallet_id,
+        transfer_count: p.total_count,
+        status: p.status
+      }))
+    })
+  } catch (error) {
+    console.error('Find pallets error:', error)
+    return c.json({ error: 'Failed to find pallets' }, 500)
+  }
+})
+
+// NEW: Scan pallet ID during unloading (scan entire pallet at once)
+app.post('/api/outlet/scan-pallet', authMiddleware, async (c) => {
+  try {
+    const user = c.get('user')
+    const { outlet_code_short, pallet_id } = await c.req.json()
+    
+    // Find outlet by short code
+    const outletResponse = await supabaseRequest(c, `outlets?outlet_code_short=eq.${outlet_code_short}&select=*`)
+    const outlets = await outletResponse.json()
+    
+    if (!outlets || outlets.length === 0) {
+      return c.json({ 
+        success: false, 
+        error: 'Outlet code not found' 
+      })
+    }
+    
+    const outlet = outlets[0]
+    
+    // Find parcel by pallet ID and outlet code
+    const parcelResponse = await supabaseRequest(c, `parcels?pallet_id=eq.${pallet_id}&outlet_code=eq.${outlet.outlet_code}&status=eq.loaded&select=*`)
+    const parcels = await parcelResponse.json()
+    
+    if (!parcels || parcels.length === 0) {
+      return c.json({ 
+        success: false, 
+        error: 'Pallet not found or already delivered',
+        pallet_id 
+      })
+    }
+    
+    const parcel = parcels[0]
+    
+    // Get all transfer details for this pallet
+    const transfersResponse = await supabaseRequest(c, `transfer_details?parcel_id=eq.${parcel.id}&select=*`)
+    const transfers = await transfersResponse.json()
+    
+    // Update all transfers as delivered
+    for (const transfer of transfers) {
+      await supabaseRequest(c, `transfer_details?id=eq.${transfer.id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({
+          is_scanned_unloading: true,
+          scanned_unloading_at: new Date().toISOString(),
+          scanned_unloading_by: user.id,
+          status: 'delivered'
+        })
+      })
+    }
+    
+    // Update parcel as delivered
+    await supabaseRequest(c, `parcels?id=eq.${parcel.id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({
+        status: 'delivered',
+        delivered_at: new Date().toISOString(),
+        delivered_by: user.id,
+        delivered_by_name: user.full_name
+      })
+    })
+    
+    return c.json({ 
+      success: true, 
+      pallet_id,
+      transfer_count: parcel.total_count
+    })
+  } catch (error) {
+    console.error('Scan pallet error:', error)
+    return c.json({ error: 'Scan failed' }, 500)
+  }
+})
 
 // Get parcels for specific outlet
 app.get('/api/outlet/parcels/:outlet_code', authMiddleware, async (c) => {

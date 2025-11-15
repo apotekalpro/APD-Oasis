@@ -45,7 +45,8 @@ def load_outlets_from_excel(filename):
 def create_outlet(outlet):
     """Create outlet in database"""
     data = {
-        'outlet_code': outlet['store_code'],
+        'outlet_code': outlet['store_code'],  # Numeric code (e.g., "0001")
+        'outlet_code_short': outlet['short_name'],  # Short code (e.g., "JKJSTT1")
         'outlet_name': outlet['store_name'],
         'address': '',
         'is_active': True
