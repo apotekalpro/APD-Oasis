@@ -9,16 +9,19 @@ A comprehensive full-stack web application for logistics tracking and warehouse 
 ### Main Features
 
 - ✅ **Pick & Pack Report Import** - Excel file import with automatic parcel grouping by Pallet ID
-- ✅ **Pallet ID Scanning** - Scan entire pallet to process multiple transfers at once (NEW!)
-- ✅ **Outlet Code Mapping** - Automatic mapping between numeric codes and short codes (NEW!)
+- ✅ **Pallet ID Scanning** - Scan entire pallet to process multiple transfers at once
+- ✅ **Outlet Code Mapping** - Automatic mapping between numeric codes and short codes
 - ✅ **Warehouse Loading Process** - Real-time pallet scanning with validation
-- ✅ **Outlet Two-Step Unloading** - Scan outlet code first, then scan pallet IDs (NEW!)
-- ✅ **Warehouse Management** - View outlet details, delete transfers (NEW!)
+- ✅ **Outlet Two-Step Unloading** - Scan outlet code first, then scan pallet IDs
+- ✅ **Warehouse Management** - View outlet details, delete transfers
+- ✅ **Advanced Permissions** - Warehouse_supervisor role with enhanced delete/amend rights (NEW!)
+- ✅ **Duplicate Scan Prevention** - Multi-layer detection to prevent duplicate pallet scans (NEW!)
+- ✅ **Delete Scanned Items** - Admin/supervisor can remove items from scanning session (NEW!)
 - ✅ **Admin Configuration** - User and outlet management system
 - ✅ **Error Tracking** - Comprehensive error logging for unmatched parcels
 - ✅ **Reports & Analytics** - Delivery reports with Excel export functionality
 - ✅ **Mobile-Friendly UI** - Responsive design optimized for mobile devices (APK-ready)
-- ✅ **Role-Based Access Control** - Admin, Warehouse, Driver, and Outlet user roles
+- ✅ **Role-Based Access Control** - Five user roles with granular permissions
 
 ## 🌐 URLs
 
@@ -162,14 +165,21 @@ Parcel (grouped by Pallet ID)
    - Add new outlet locations
    - Update outlet information
 
-## 🔐 User Roles
+## 🔐 User Roles & Permissions (UPDATED!)
 
-| Role | Permissions |
-|------|-------------|
-| **Admin** | Full access - user management, outlet management, all reports |
-| **Warehouse** | Import data, loading process, reports |
-| **Driver** | Loading and unloading process, view reports |
-| **Outlet** | Unloading process for assigned outlet, view reports |
+| Role | Import | Scan | View Reports | Delete Records | Amend Records | User Mgmt | Outlet Mgmt |
+|------|--------|------|--------------|----------------|---------------|-----------|-------------|
+| **Admin** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| **Warehouse Supervisor** | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ | ❌ |
+| **Warehouse** | ✅ | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ |
+| **Driver** | ❌ | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ |
+| **Outlet** | ❌ | ✅ (own outlet) | ✅ (own outlet) | ❌ | ❌ | ❌ | ❌ |
+
+**NEW Features:**
+- **Warehouse Supervisor Role** - Can delete/amend records but cannot manage users/outlets
+- **Delete Scanned Items** - Only admin and supervisors can delete from scanning session
+- **Permission Helpers** - Frontend functions: `canDelete()`, `canAmend()`, `isAdmin()`, `isSupervisor()`
+- **Auto-Cleanup** - Database function to delete records older than 3 months (see `PERMISSIONS_AND_CLEANUP_SUMMARY.md`)
 
 ## 💻 Technical Stack
 
@@ -323,14 +333,18 @@ wrangler pages secret put JWT_SECRET
 | `README.md` | Main project documentation (this file) |
 | `QUICK_START.md` | 5-minute testing guide |
 | `DEPLOYMENT_GUIDE.md` | Production deployment steps |
-| `SCANNING_CHANGES.md` | **NEW!** Pallet ID scanning system guide |
-| `WAREHOUSE_DELETE_FEATURE.md` | **NEW!** Delete functionality documentation |
+| `SCANNING_CHANGES.md` | Pallet ID scanning system guide |
+| `WAREHOUSE_DELETE_FEATURE.md` | Delete functionality documentation |
+| `PERMISSIONS_AND_CLEANUP_SUMMARY.md` | **NEW!** Supervisor role and auto-cleanup guide |
+| `DUPLICATE_SCAN_PREVENTION.md` | **NEW!** Multi-layer duplicate detection system |
+| `DELETE_SCANNED_ITEMS.md` | **NEW!** Delete scanned items feature guide |
 | `SAMPLE_IMPORT_TEMPLATE.md` | Excel import format guide |
 | `PROJECT_SUMMARY.md` | Complete handover document |
 | `OUTLET_IMPORT_GUIDE.md` | Import 205 outlets guide |
 | `OUTLET_LOGIN_INFO.md` | Outlet login quick reference |
 | `supabase-schema.sql` | Database schema (CRITICAL!) |
-| `migration-add-short-codes.sql` | **NEW!** Outlet code mapping migration |
+| `migration-add-short-codes.sql` | Outlet code mapping migration |
+| `migration-supervisor-role-and-cleanup.sql` | **NEW!** Supervisor role + auto-cleanup migration |
 
 ## 📞 Contact
 
@@ -339,5 +353,5 @@ For support and feature requests, contact your system administrator.
 ---
 
 **Last Updated**: November 15, 2025  
-**Version**: 1.2.0 (with Pallet ID Scanning & Outlet Code Mapping)  
-**Status**: ✅ Development Ready | ⏳ Database Migration Required | 🏪 205 Outlets Imported | 📦 Pallet Scanning Active
+**Version**: 1.3.0 (with Advanced Permissions, Duplicate Prevention & Delete Scanned Items)  
+**Status**: ✅ Development Ready | ⏳ Database Migrations Required | 🏪 205 Outlets Imported | 📦 Pallet Scanning Active | 🛡️ Duplicate Prevention Active | 🗑️ Session Delete Active
