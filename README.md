@@ -17,7 +17,8 @@ A comprehensive full-stack web application for logistics tracking and warehouse 
 - ✅ **Advanced Permissions** - Warehouse_supervisor role with enhanced delete/amend rights (NEW!)
 - ✅ **Duplicate Scan Prevention** - Multi-layer detection to prevent duplicate pallet scans (NEW!)
 - ✅ **Delete Scanned Items** - Admin/supervisor can remove items from scanning session (NEW!)
-- ✅ **Live Dashboard** - Real-time statistics with delivery timestamps and receiver names (NEW!)
+- ✅ **Multi-Day Dashboard** - Yesterday/Today/Tomorrow tabs with delivery date filtering (NEW!)
+- ✅ **Delivery Date Planning** - Import tonight for tomorrow, view scheduled deliveries (NEW!)
 - ✅ **Admin Configuration** - User and outlet management system
 - ✅ **Error Tracking** - Comprehensive error logging for unmatched parcels
 - ✅ **Reports & Analytics** - Delivery reports with Excel export functionality
@@ -94,7 +95,7 @@ Parcel (grouped by Pallet ID)
 
 ## 🚀 User Guide
 
-### 1️⃣ Import Pick & Pack Report (Admin/Warehouse)
+### 1️⃣ Import Pick & Pack Report (Admin/Warehouse) - WITH DELIVERY DATE!
 
 1. Navigate to **Import** page
 2. Select Excel file with pick and pack data (DC Pick & Pack Report format)
@@ -106,18 +107,27 @@ Parcel (grouped by Pallet ID)
 4. System automatically extracts:
    - Numeric code from Column E (for database)
    - Short code from Column F (for display to users)
-5. Preview data and confirm import
+5. **NEW: Select Delivery Date** ⭐
+   - Choose the delivery date for this import
+   - Example: Import at night (Nov 15) for tomorrow (Nov 16) delivery
+   - Defaults to today if not changed
+6. Preview data and confirm import
 
-### 2️⃣ Warehouse Loading Process (Warehouse/Driver) - NEW PALLET SCANNING!
+### 2️⃣ Warehouse Loading Process (Warehouse/Driver) - WITH DELIVERY DATE!
 
 1. Navigate to **Warehouse** page
-2. View all outlets with pending pallets (displayed with short codes like "JKJSTT1", "MKC")
-3. **Scan Pallet ID** using barcode scanner or manual input
-4. System marks ALL transfers in that pallet as loaded at once
-5. View outlet details to see all transfers and delete if needed
-6. Complete loading process with signature
+2. **NEW: Select Delivery Date** ⭐
+   - Choose which date's parcels to view and load
+   - Defaults to today
+   - Can view future dates if imported ahead
+3. View all outlets with pending pallets for selected date (displayed with short codes like "JKJSTT1", "MKC")
+4. **Scan Pallet ID** using barcode scanner or manual input
+5. System marks ALL transfers in that pallet as loaded at once
+6. View outlet details to see all transfers and delete if needed
+7. Complete loading process with signature
 
 **NEW Features:**
+- **Delivery date filter** - View and load parcels for specific dates
 - **Pallet ID scanning** - One scan = multiple transfers loaded automatically
 - **Outlet short codes** - See familiar codes (MKC, JBB) instead of numbers
 - **Outlet details view** - Click "Details" to see all transfers for each outlet
@@ -155,21 +165,27 @@ Parcel (grouped by Pallet ID)
 - **Visual pallet list** - See all your deliveries before scanning
 - **Short code lookup** - Use familiar codes (MKC, JBB) not numbers
 
-### 4️⃣ Live Dashboard (Warehouse/Driver/Admin) - NEW!
+### 4️⃣ Multi-Day Dashboard (Warehouse/Driver/Admin) - NEW! ⭐
 
 1. Navigate to **Dashboard** page
-2. View real-time statistics:
-   - **Total Outlets** - Number of unique outlets with today's deliveries
-   - **Total Pallets** - Total number of pallets imported today
+2. **NEW: Select Day to View** ⭐
+   - **Yesterday** tab - Review yesterday's completed deliveries
+   - **Today** tab - Monitor current day's operations (default)
+   - **Tomorrow** tab - Preview next day's scheduled deliveries
+   - Click tabs to switch between dates
+3. View real-time statistics for selected date:
+   - **Total Outlets** - Number of unique outlets with deliveries
+   - **Total Pallets** - Total number of pallets imported
    - **Loaded Pallets** - Number of pallets scanned at warehouse
    - **Delivered Pallets** - Number of pallets received by outlets
-3. Monitor progress bars:
+4. Monitor progress bars:
    - **Loading Progress** - Percentage of pallets loaded vs total
    - **Delivery Progress** - Percentage of pallets delivered vs total
-4. Check outlet status table:
+5. Check outlet status table:
    - Individual outlet progress
    - Pallets pending/loaded/delivered per outlet
-   - **Last Delivered** - Timestamp when outlet completed delivery
+   - **Loaded At** - Date + Time when pallets were scanned at warehouse (e.g., "Nov 15, 08:30 AM")
+   - **Delivered At** - Date + Time when outlet completed delivery
    - **Receiver** - Name of person who signed for delivery
    - Completed outlets remain visible with delivery information
    - Auto-refreshes every 30 seconds
@@ -246,9 +262,13 @@ The application is fully responsive and optimized for mobile devices:
 2. Navigate to SQL Editor
 3. Copy and execute the entire `supabase-schema.sql` file
 4. **IMPORTANT**: Also execute `migration-add-short-codes.sql` for outlet code mapping
-5. Verify tables are created successfully
-6. Default admin user will be created automatically
-7. Import outlets using `import-outlets.py` to populate outlet codes
+5. **⚠️ NEW REQUIRED**: Execute `ADD_DELIVERY_DATE_COLUMN.sql` for multi-day dashboard support
+   - Adds `delivery_date` column to imports, parcels, and transfer_details tables
+   - Backfills existing records with import_date as default
+   - Creates indexes for performance
+6. Verify tables are created successfully
+7. Default admin user will be created automatically
+8. Import outlets using `import-outlets.py` to populate outlet codes
 
 ### Local Development
 
@@ -383,5 +403,5 @@ For support and feature requests, contact your system administrator.
 ---
 
 **Last Updated**: November 15, 2025  
-**Version**: 1.6.0 (with Warehouse-Style Outlet Workflow & Bulk Completion)  
-**Status**: ✅ Development Ready | ⏳ Database Migrations Required | 🏪 205 Outlets Imported | 📦 Pallet Scanning Active | 🛡️ Duplicate Prevention Active | 🗑️ Session Delete Active | 📊 Dashboard with Delivery Tracking Active | ✍️ Bulk Receipt Completion Active | ⚠️ Incomplete Receipt Warning Active
+**Version**: 1.7.0 (with Multi-Day Dashboard & Delivery Date Planning)  
+**Status**: ✅ Development Ready | ⚠️ **MIGRATION REQUIRED** (ADD_DELIVERY_DATE_COLUMN.sql) | 🏪 205 Outlets Imported | 📦 Pallet Scanning Active | 🛡️ Duplicate Prevention Active | 🗑️ Session Delete Active | 📊 Multi-Day Dashboard Active | ✍️ Bulk Receipt Completion Active | 📅 Delivery Date Planning Active
