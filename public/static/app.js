@@ -2194,7 +2194,8 @@ function cancelOutletCompletion() {
     const input = document.getElementById('palletScanInput')
     if (input) {
         input.value = ''
-    document.getElementById('palletScanInput').focus()
+        input.focus()
+    }
 }
 
 function showCompleteUnloadingModal() {
