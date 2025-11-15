@@ -21,8 +21,25 @@ A comprehensive full-stack web application for logistics tracking and warehouse 
 
 - **Development URL**: https://3000-i8ezurtfnv7jlbrg994fh-02b9cc79.sandbox.novita.ai
 - **Default Admin Login**: `admin` / `admin123`
+- **Outlet Login**: [Short Store Name] / `Alpro@123` (e.g., `JKJSTT1` / `Alpro@123`)
 - **GitHub Repository**: (To be deployed)
 - **Production URL**: (To be deployed on Cloudflare Pages)
+
+## 🏪 Outlet System (NEW!)
+
+**2,370 outlet accounts** ready to import from `Outlet List 2026.xlsx`:
+- **Username**: Column B (Short Store Name) - e.g., JKJSTT1, JKJSVR1
+- **Password**: `Alpro@123` (default for all)
+- **Access**: Outlet-specific data only (cannot see other outlets)
+- **Features**: Unloading, reports, history (filtered to their outlet)
+
+**Quick Import**: `python3 import-outlets.py` (see `OUTLET_IMPORT_GUIDE.md`)
+
+**Outlet users automatically:**
+- See only their outlet's data
+- Auto-selected to their outlet page
+- Cannot access admin/warehouse functions
+- Can view delivery history and generate reports
 
 ## 📊 Data Architecture
 
@@ -266,6 +283,19 @@ wrangler pages secret put JWT_SECRET
 - Check for empty rows
 - Ensure Pallet ID and Transfer Number are filled
 
+## 📚 Documentation Files
+
+| File | Purpose |
+|------|---------|
+| `README.md` | Main project documentation (this file) |
+| `QUICK_START.md` | 5-minute testing guide |
+| `DEPLOYMENT_GUIDE.md` | Production deployment steps |
+| `SAMPLE_IMPORT_TEMPLATE.md` | Excel import format guide |
+| `PROJECT_SUMMARY.md` | Complete handover document |
+| `OUTLET_IMPORT_GUIDE.md` | Import 2,370 outlets guide |
+| `OUTLET_LOGIN_INFO.md` | Outlet login quick reference |
+| `supabase-schema.sql` | Database schema (CRITICAL!) |
+
 ## 📞 Contact
 
 For support and feature requests, contact your system administrator.
@@ -273,5 +303,5 @@ For support and feature requests, contact your system administrator.
 ---
 
 **Last Updated**: November 15, 2025  
-**Version**: 1.0.0  
-**Status**: ✅ Development Ready | ⏳ Database Setup Required
+**Version**: 1.1.0 (with Outlet System)  
+**Status**: ✅ Development Ready | ⏳ Database Setup Required | 🏪 2,370 Outlets Ready
