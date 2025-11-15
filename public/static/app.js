@@ -773,6 +773,8 @@ async function loadWarehouseData() {
         const response = await axios.get('/api/warehouse/parcels')
         state.parcels = response.data.parcels
         
+        console.log('Loaded parcels:', state.parcels.length)
+        
         // Group by outlet - using parcels instead of transfers for accurate pallet counting
         const outletMap = new Map()
         state.parcels.forEach(parcel => {
@@ -782,6 +784,7 @@ async function loadWarehouseData() {
                 parcel.outlet_name.toUpperCase() === 'STORE NAME' ||
                 parcel.outlet_name.toUpperCase().includes('STORE CODE') ||
                 parcel.outlet_name.toUpperCase().includes('STORE NAME')) {
+                console.log('Skipping header/invalid parcel:', parcel.outlet_code, parcel.outlet_name)
                 return // Skip this parcel
             }
             
@@ -801,11 +804,18 @@ async function loadWarehouseData() {
             }
         })
         
+        console.log('Outlet map size:', outletMap.size)
+        
         const summary = document.getElementById('outletsSummary')
         if (!summary) return
         
+        if (state.parcels.length === 0) {
+            summary.innerHTML = '<p class="text-gray-500 text-center py-4">No parcels in database</p>'
+            return
+        }
+        
         if (outletMap.size === 0) {
-            summary.innerHTML = '<p class="text-gray-500 text-center py-4">No pending transfers</p>'
+            summary.innerHTML = '<p class="text-gray-500 text-center py-4">All parcels filtered (check data quality)</p>'
             return
         }
         
