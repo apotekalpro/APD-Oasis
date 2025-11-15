@@ -496,11 +496,17 @@ function renderImport() {
                 <div class="mb-6">
                     <h3 class="text-lg font-semibold mb-2">Instructions:</h3>
                     <ul class="list-disc list-inside space-y-2 text-gray-700">
-                        <li><strong>Column E:</strong> Store Code</li>
-                        <li><strong>Column F:</strong> Store Name</li>
-                        <li><strong>Column G:</strong> Pallet ID</li>
-                        <li><strong>Column V:</strong> Transfer No</li>
-                        <li>Same Pallet ID will be combined as one parcel</li>
+                        <li><strong>Format:</strong> Pick & Pack Report from DC system</li>
+                        <li><strong>Header Row:</strong> Row 15 (will be detected automatically)</li>
+                        <li><strong>Data Starts:</strong> Row 16 onwards</li>
+                        <li><strong>Required Columns:</strong></li>
+                        <ul class="list-disc list-inside ml-6 mt-1">
+                            <li>Column E: Store Code</li>
+                            <li>Column F: Store Name</li>
+                            <li>Column G: Pallet ID</li>
+                            <li>Column V: Transfer No</li>
+                        </ul>
+                        <li><strong>Grouping:</strong> Same Pallet ID = One Parcel (multiple transfer numbers)</li>
                     </ul>
                 </div>
                 
@@ -548,16 +554,33 @@ function handleFileSelect(event) {
             const firstSheet = workbook.Sheets[workbook.SheetNames[0]]
             const jsonData = XLSX.utils.sheet_to_json(firstSheet, { header: 1 })
             
-            // Parse data (assuming row 0 is header)
+            // Parse data (header at row 15, data starts at row 16)
+            // In array: row 15 = index 14 (header), row 16 = index 15 (first data)
             importData = []
-            for (let i = 1; i < jsonData.length; i++) {
+            for (let i = 15; i < jsonData.length; i++) {  // Start from index 15 (row 16)
                 const row = jsonData[i]
-                if (row[4] && row[6] && row[21]) { // Check if required columns exist
+                if (row[4] && row[6] && row[21]) { // Check if required columns exist (E, G, V)
+                    // Extract store code from store name if needed
+                    let outletCode = String(row[4]).trim()
+                    let outletName = String(row[5] || '').trim()
+                    
+                    // Handle format like "JKJBJR1 - APOTEK ALPRO..."
+                    // Extract just the short code before the dash
+                    if (outletName.includes(' - ')) {
+                        const parts = outletName.split(' - ')
+                        const shortCode = parts[0].trim()
+                        outletName = parts[1] ? parts[1].trim() : outletName
+                        // Use short code if outlet code is just numbers
+                        if (/^\d+$/.test(outletCode)) {
+                            // Keep the numeric code as is, but note the short name
+                        }
+                    }
+                    
                     importData.push({
-                        outlet_code: row[4], // Column E (index 4)
-                        outlet_name: row[5] || '', // Column F (index 5)
-                        pallet_id: row[6], // Column G (index 6)
-                        transfer_number: row[21] // Column V (index 21)
+                        outlet_code: outletCode, // Column E
+                        outlet_name: outletName, // Column F
+                        pallet_id: String(row[6]).trim(), // Column G
+                        transfer_number: String(row[21]).trim() // Column V
                     })
                 }
             }
