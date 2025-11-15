@@ -847,9 +847,19 @@ async function loadWarehouseData() {
 
 async function handleWarehouseScan() {
     const input = document.getElementById('warehouseScanInput')
-    const palletId = input.value.trim()
+    const palletId = input.value.trim().toUpperCase()
     
     if (!palletId) return
+    
+    // Check for duplicate scan in current session
+    const alreadyScanned = state.scannedItems.find(item => item.pallet_id === palletId)
+    if (alreadyScanned) {
+        playBeep(false)
+        showToast(`⚠️ Duplicate scan! Pallet ${palletId} was already scanned at ${alreadyScanned.time}`, 'error')
+        input.value = ''
+        input.focus()
+        return
+    }
     
     try {
         // NEW: Scan pallet ID (scans entire pallet at once)
@@ -1379,9 +1389,19 @@ function clearOutletSelection() {
 // NEW: Step 2 - Scan pallet ID to confirm receipt
 async function handleOutletScanPallet() {
     const input = document.getElementById('palletScanInput')
-    const palletId = input.value.trim()
+    const palletId = input.value.trim().toUpperCase()
     
     if (!palletId || !state.selectedOutlet) return
+    
+    // Check for duplicate scan in current session
+    const alreadyScanned = state.scannedItems.find(item => item.pallet_id === palletId)
+    if (alreadyScanned) {
+        playBeep(false)
+        showToast(`⚠️ Duplicate scan! Pallet ${palletId} was already received at ${alreadyScanned.time}`, 'error')
+        input.value = ''
+        input.focus()
+        return
+    }
     
     try {
         const response = await axios.post('/api/outlet/scan-pallet', { 

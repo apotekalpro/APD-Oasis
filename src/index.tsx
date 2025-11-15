@@ -365,7 +365,54 @@ app.post('/api/warehouse/scan-pallet', authMiddleware, async (c) => {
     const user = c.get('user')
     const { pallet_id } = await c.req.json()
     
-    // Find parcel by pallet ID
+    // First check if pallet exists at all
+    const allParcelsResponse = await supabaseRequest(c, `parcels?pallet_id=eq.${pallet_id}&select=*`)
+    const allParcels = await allParcelsResponse.json()
+    
+    if (!allParcels || allParcels.length === 0) {
+      // Log error - pallet not found
+      await supabaseRequest(c, 'error_parcels', {
+        method: 'POST',
+        body: JSON.stringify({
+          transfer_number: pallet_id,
+          scanned_by: user.id,
+          scanned_by_name: user.full_name,
+          error_type: 'not_found',
+          error_message: 'Pallet ID not found in system'
+        })
+      })
+      
+      return c.json({ 
+        success: false, 
+        error: 'Pallet ID not found in system',
+        pallet_id 
+      })
+    }
+    
+    // Check if already scanned
+    const existingParcel = allParcels[0]
+    if (existingParcel.status !== 'pending') {
+      // Log error - already scanned
+      await supabaseRequest(c, 'error_parcels', {
+        method: 'POST',
+        body: JSON.stringify({
+          transfer_number: pallet_id,
+          scanned_by: user.id,
+          scanned_by_name: user.full_name,
+          error_type: 'already_scanned',
+          error_message: `Pallet already scanned at ${existingParcel.loaded_at || 'earlier'}`
+        })
+      })
+      
+      return c.json({ 
+        success: false, 
+        error: 'Duplicate scan! This pallet was already scanned',
+        pallet_id,
+        scanned_at: existingParcel.loaded_at
+      })
+    }
+    
+    // Find pending parcel
     const parcelResponse = await supabaseRequest(c, `parcels?pallet_id=eq.${pallet_id}&status=eq.pending&select=*`)
     const parcels = await parcelResponse.json()
     
@@ -691,14 +738,63 @@ app.post('/api/outlet/scan-pallet', authMiddleware, async (c) => {
     
     const outlet = outlets[0]
     
-    // Find parcel by pallet ID and outlet code
+    // First check if pallet exists for this outlet (any status)
+    const allParcelsResponse = await supabaseRequest(c, `parcels?pallet_id=eq.${pallet_id}&outlet_code=eq.${outlet.outlet_code}&select=*`)
+    const allParcels = await allParcelsResponse.json()
+    
+    if (!allParcels || allParcels.length === 0) {
+      // Log error - pallet not found
+      await supabaseRequest(c, 'error_parcels', {
+        method: 'POST',
+        body: JSON.stringify({
+          transfer_number: pallet_id,
+          scanned_by: user.id,
+          scanned_by_name: user.full_name,
+          error_type: 'not_found',
+          error_message: `Pallet ID not found for outlet ${outlet_code_short}`,
+          outlet_code: outlet.outlet_code
+        })
+      })
+      
+      return c.json({ 
+        success: false, 
+        error: 'Pallet not found for your outlet',
+        pallet_id 
+      })
+    }
+    
+    // Check if already delivered
+    const existingParcel = allParcels[0]
+    if (existingParcel.status === 'delivered') {
+      // Log error - already delivered
+      await supabaseRequest(c, 'error_parcels', {
+        method: 'POST',
+        body: JSON.stringify({
+          transfer_number: pallet_id,
+          scanned_by: user.id,
+          scanned_by_name: user.full_name,
+          error_type: 'already_scanned',
+          error_message: `Pallet already delivered at ${existingParcel.delivered_at || 'earlier'}`,
+          outlet_code: outlet.outlet_code
+        })
+      })
+      
+      return c.json({ 
+        success: false, 
+        error: 'Duplicate scan! This pallet was already received',
+        pallet_id,
+        delivered_at: existingParcel.delivered_at
+      })
+    }
+    
+    // Find loaded (ready for unloading) parcel
     const parcelResponse = await supabaseRequest(c, `parcels?pallet_id=eq.${pallet_id}&outlet_code=eq.${outlet.outlet_code}&status=eq.loaded&select=*`)
     const parcels = await parcelResponse.json()
     
     if (!parcels || parcels.length === 0) {
       return c.json({ 
         success: false, 
-        error: 'Pallet not found or already delivered',
+        error: 'Pallet not ready for unloading or already delivered',
         pallet_id 
       })
     }
