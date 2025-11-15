@@ -282,6 +282,17 @@ function renderAdmin() {
                         <i class="fas fa-plus mr-2"></i>Add New User
                     </button>
                     
+                    <!-- User Search -->
+                    <div class="mb-4">
+                        <div class="relative">
+                            <input type="text" id="userSearchInput" 
+                                placeholder="Search by username, full name, or role..." 
+                                oninput="filterUsers()"
+                                class="w-full px-4 py-2 pl-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                            <i class="fas fa-search absolute left-3 top-3 text-gray-400"></i>
+                        </div>
+                    </div>
+                    
                     <div id="usersList" class="space-y-2 max-h-96 overflow-y-auto">
                         <p class="text-gray-500 text-center py-4">Loading users...</p>
                     </div>
@@ -311,48 +322,91 @@ async function loadUsers() {
     try {
         const response = await axios.get('/api/admin/users')
         state.users = response.data.users
-        
-        const usersList = document.getElementById('usersList')
-        if (!usersList) return
-        
-        if (state.users.length === 0) {
-            usersList.innerHTML = '<p class="text-gray-500 text-center py-4">No users found</p>'
-            return
-        }
-        
-        usersList.innerHTML = state.users.map(user => `
-            <div class="border border-gray-200 rounded-lg p-4 hover:bg-gray-50">
-                <div class="flex justify-between items-center">
-                    <div>
-                        <p class="font-semibold">${user.full_name}</p>
-                        <p class="text-sm text-gray-600">@${user.username} - ${user.role}</p>
-                        ${user.outlet_code ? `<p class="text-sm text-blue-600">Outlet: ${user.outlet_code}</p>` : ''}
-                    </div>
-                    <div class="flex space-x-2">
-                        <button onclick="showEditUserModal('${user.id}')" 
-                            class="px-3 py-1 bg-blue-500 hover:bg-blue-600 text-white rounded text-sm">
-                            <i class="fas fa-edit"></i>
-                        </button>
-                        <button onclick="resetUserPassword('${user.id}')" 
-                            class="px-3 py-1 bg-purple-500 hover:bg-purple-600 text-white rounded text-sm"
-                            title="Reset password to Alpro@123">
-                            <i class="fas fa-key"></i>
-                        </button>
-                        <button onclick="toggleUserStatus('${user.id}', ${!user.is_active})" 
-                            class="px-3 py-1 rounded text-sm ${user.is_active ? 'bg-yellow-500 hover:bg-yellow-600' : 'bg-green-500 hover:bg-green-600'} text-white">
-                            ${user.is_active ? 'Deactivate' : 'Activate'}
-                        </button>
-                        <button onclick="deleteUser('${user.id}')" 
-                            class="px-3 py-1 bg-red-500 hover:bg-red-600 text-white rounded text-sm">
-                            <i class="fas fa-trash"></i>
-                        </button>
-                    </div>
-                </div>
-            </div>
-        `).join('')
+        renderUsersList(state.users)
     } catch (error) {
         console.error('Error loading users:', error)
     }
+}
+
+function renderUsersList(users) {
+    const usersList = document.getElementById('usersList')
+    if (!usersList) return
+    
+    if (users.length === 0) {
+        usersList.innerHTML = '<p class="text-gray-500 text-center py-4">No users found</p>'
+        return
+    }
+    
+    // Helper function to format role display
+    const formatRole = (role) => {
+        const roleMap = {
+            'admin': 'Admin',
+            'warehouse': 'Warehouse Staff',
+            'warehouse_staff': 'Warehouse Staff',
+            'warehouse_supervisor': 'Warehouse Supervisor',
+            'driver': 'Driver',
+            'delivery_staff': 'Driver',
+            'outlet': 'Outlet'
+        }
+        return roleMap[role] || role
+    }
+    
+    usersList.innerHTML = users.map(user => `
+        <div class="border border-gray-200 rounded-lg p-4 hover:bg-gray-50">
+            <div class="flex justify-between items-center">
+                <div>
+                    <p class="font-semibold">${user.full_name}</p>
+                    <p class="text-sm text-gray-600">@${user.username} - ${formatRole(user.role)}</p>
+                    ${user.outlet_code ? `<p class="text-sm text-blue-600">Outlet: ${user.outlet_code}</p>` : ''}
+                </div>
+                <div class="flex space-x-2">
+                    <button onclick="showEditUserModal('${user.id}')" 
+                        class="px-3 py-1 bg-blue-500 hover:bg-blue-600 text-white rounded text-sm">
+                        <i class="fas fa-edit"></i>
+                    </button>
+                    <button onclick="resetUserPassword('${user.id}')" 
+                        class="px-3 py-1 bg-purple-500 hover:bg-purple-600 text-white rounded text-sm"
+                        title="Reset password to Alpro@123">
+                        <i class="fas fa-key"></i>
+                    </button>
+                    <button onclick="toggleUserStatus('${user.id}', ${!user.is_active})" 
+                        class="px-3 py-1 rounded text-sm ${user.is_active ? 'bg-yellow-500 hover:bg-yellow-600' : 'bg-green-500 hover:bg-green-600'} text-white">
+                        ${user.is_active ? 'Deactivate' : 'Activate'}
+                    </button>
+                    <button onclick="deleteUser('${user.id}')" 
+                        class="px-3 py-1 bg-red-500 hover:bg-red-600 text-white rounded text-sm">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    `).join('')
+}
+
+function filterUsers() {
+    const searchInput = document.getElementById('userSearchInput')
+    if (!searchInput) return
+    
+    const searchTerm = searchInput.value.toLowerCase().trim()
+    
+    if (!searchTerm) {
+        renderUsersList(state.users)
+        return
+    }
+    
+    const filteredUsers = state.users.filter(user => {
+        const username = user.username.toLowerCase()
+        const fullName = user.full_name.toLowerCase()
+        const role = user.role.toLowerCase()
+        const outletCode = (user.outlet_code || '').toLowerCase()
+        
+        return username.includes(searchTerm) || 
+               fullName.includes(searchTerm) || 
+               role.includes(searchTerm) ||
+               outletCode.includes(searchTerm)
+    })
+    
+    renderUsersList(filteredUsers)
 }
 
 async function loadOutlets() {
@@ -409,10 +463,11 @@ function showAddUserModal() {
                     <div>
                         <label class="block text-sm font-medium mb-1">Role</label>
                         <select id="new_role" required class="w-full px-3 py-2 border rounded-lg" onchange="toggleOutletField()">
-                            <option value="warehouse">Warehouse</option>
-                            <option value="driver">Driver</option>
-                            <option value="outlet">Outlet</option>
                             <option value="admin">Admin</option>
+                            <option value="warehouse_supervisor">Warehouse Supervisor</option>
+                            <option value="warehouse_staff">Warehouse Staff</option>
+                            <option value="delivery_staff">Driver</option>
+                            <option value="outlet">Outlet</option>
                         </select>
                     </div>
                     <div id="outlet_field" style="display: none;">
@@ -516,8 +571,9 @@ async function showEditUserModal(userId) {
                             <select id="edit_role" onchange="toggleEditOutletField()" required
                                 class="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500">
                                 <option value="admin" ${user.role === 'admin' ? 'selected' : ''}>Admin</option>
-                                <option value="warehouse_staff" ${user.role === 'warehouse_staff' ? 'selected' : ''}>Warehouse Staff</option>
-                                <option value="delivery_staff" ${user.role === 'delivery_staff' ? 'selected' : ''}>Delivery Staff</option>
+                                <option value="warehouse_supervisor" ${user.role === 'warehouse_supervisor' ? 'selected' : ''}>Warehouse Supervisor</option>
+                                <option value="warehouse_staff" ${user.role === 'warehouse_staff' || user.role === 'warehouse' ? 'selected' : ''}>Warehouse Staff</option>
+                                <option value="delivery_staff" ${user.role === 'delivery_staff' || user.role === 'driver' ? 'selected' : ''}>Driver</option>
                                 <option value="outlet" ${user.role === 'outlet' ? 'selected' : ''}>Outlet</option>
                             </select>
                         </div>
