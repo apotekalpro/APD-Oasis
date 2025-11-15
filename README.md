@@ -17,6 +17,7 @@ A comprehensive full-stack web application for logistics tracking and warehouse 
 - ✅ **Advanced Permissions** - Warehouse_supervisor role with enhanced delete/amend rights (NEW!)
 - ✅ **Duplicate Scan Prevention** - Multi-layer detection to prevent duplicate pallet scans (NEW!)
 - ✅ **Delete Scanned Items** - Admin/supervisor can remove items from scanning session (NEW!)
+- ✅ **Live Dashboard** - Real-time statistics showing outlets, pallets, loaded/delivered counts (NEW!)
 - ✅ **Admin Configuration** - User and outlet management system
 - ✅ **Error Tracking** - Comprehensive error logging for unmatched parcels
 - ✅ **Reports & Analytics** - Delivery reports with Excel export functionality
@@ -145,7 +146,23 @@ Parcel (grouped by Pallet ID)
 - Real-time remaining pallet count
 - Auto-matching prevents wrong outlet errors
 
-### 4️⃣ Reports & Analytics (All Roles)
+### 4️⃣ Live Dashboard (Warehouse/Driver/Admin) - NEW!
+
+1. Navigate to **Dashboard** page
+2. View real-time statistics:
+   - **Total Outlets** - Number of unique outlets with today's deliveries
+   - **Total Pallets** - Total number of pallets imported today
+   - **Loaded Pallets** - Number of pallets scanned at warehouse
+   - **Delivered Pallets** - Number of pallets received by outlets
+3. Monitor progress bars:
+   - **Loading Progress** - Percentage of pallets loaded vs total
+   - **Delivery Progress** - Percentage of pallets delivered vs total
+4. Check outlet status table:
+   - Individual outlet progress
+   - Pallets pending/loaded/delivered per outlet
+   - Auto-refreshes every 30 seconds
+
+### 5️⃣ Reports & Analytics (All Roles)
 
 1. Navigate to **Reports** page
 2. View delivery reports with timestamps
@@ -153,7 +170,7 @@ Parcel (grouped by Pallet ID)
 4. Export comprehensive Excel reports
 5. Track driver performance and delivery times
 
-### 5️⃣ Admin Configuration (Admin Only)
+### 6️⃣ Admin Configuration (Admin Only)
 
 1. Navigate to **Admin** page
 2. Manage users:
@@ -292,6 +309,7 @@ wrangler pages secret put JWT_SECRET
 - ✅ Mobile-responsive design
 - ✅ Real-time progress tracking
 - ✅ Audio/visual feedback system
+- ✅ Live dashboard with auto-refresh (30s intervals)
 - ✅ 205 outlets imported and configured
 
 ### 🔄 Recommended Next Steps
@@ -353,5 +371,5 @@ For support and feature requests, contact your system administrator.
 ---
 
 **Last Updated**: November 15, 2025  
-**Version**: 1.3.0 (with Advanced Permissions, Duplicate Prevention & Delete Scanned Items)  
-**Status**: ✅ Development Ready | ⏳ Database Migrations Required | 🏪 205 Outlets Imported | 📦 Pallet Scanning Active | 🛡️ Duplicate Prevention Active | 🗑️ Session Delete Active
+**Version**: 1.4.0 (with Live Dashboard & Fixed Header Filtering)  
+**Status**: ✅ Development Ready | ⏳ Database Migrations Required | 🏪 205 Outlets Imported | 📦 Pallet Scanning Active | 🛡️ Duplicate Prevention Active | 🗑️ Session Delete Active | 📊 Live Dashboard Active
