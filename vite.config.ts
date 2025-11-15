@@ -5,7 +5,13 @@ import { defineConfig } from 'vite'
 
 export default defineConfig({
   plugins: [
-    build(),
+    build({
+      outputDir: 'dist',
+      // Configure _routes.json to exclude static assets
+      routes: {
+        exclude: ['/static/*', '/favicon.ico', '/index.html']
+      }
+    }),
     devServer({
       adapter,
       entry: 'src/index.tsx'
