@@ -508,14 +508,15 @@ app.get('/api/warehouse/parcels', authMiddleware, async (c) => {
   try {
     const { import_id, delivery_date } = c.req.query()
     
-    let query = 'parcels?status=neq.delivered&select=*&order=outlet_code.asc'
+    // Return ALL parcels (including delivered) so frontend can show complete overview
+    let query = 'parcels?select=*&order=outlet_code.asc'
     
     if (delivery_date && import_id) {
-      query = `parcels?import_id=eq.${import_id}&delivery_date=eq.${delivery_date}&status=neq.delivered&select=*&order=outlet_code.asc`
+      query = `parcels?import_id=eq.${import_id}&delivery_date=eq.${delivery_date}&select=*&order=outlet_code.asc`
     } else if (delivery_date) {
-      query = `parcels?delivery_date=eq.${delivery_date}&status=neq.delivered&select=*&order=outlet_code.asc`
+      query = `parcels?delivery_date=eq.${delivery_date}&select=*&order=outlet_code.asc`
     } else if (import_id) {
-      query = `parcels?import_id=eq.${import_id}&status=neq.delivered&select=*&order=outlet_code.asc`
+      query = `parcels?import_id=eq.${import_id}&select=*&order=outlet_code.asc`
     }
     
     const response = await supabaseRequest(c, query)
