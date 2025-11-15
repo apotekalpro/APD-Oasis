@@ -728,7 +728,7 @@ function renderWarehouse() {
                         
                         <button onclick="handleWarehouseScan()" 
                             class="w-full bg-blue-500 hover:bg-blue-600 text-white font-semibold py-3 rounded-lg mb-4">
-                            <i class="fas fa-barcode mr-2"></i>Scan Transfer Number
+                            <i class="fas fa-barcode mr-2"></i>Scan Pallet ID
                         </button>
                         
                         <!-- Scanned Items -->
@@ -827,7 +827,7 @@ async function loadWarehouseData() {
                     </div>
                     <div class="mt-2">
                         <div class="flex justify-between text-sm mb-1">
-                            <span>${outlet.scanned} / ${outlet.total}</span>
+                            <span>${outlet.scanned} / ${outlet.total} pallets</span>
                             <span>${percentage}%</span>
                         </div>
                         <div class="w-full bg-gray-200 rounded-full h-2">
@@ -1090,7 +1090,10 @@ async function showOutletDetails(outletCode) {
                         <div>
                             <h3 class="text-2xl font-bold">${outletCode} - ${outletName}</h3>
                             <p class="text-sm text-gray-600 mt-1">
-                                Scanned: ${scannedCount} / ${outletTransfers.length} transfers
+                                ${scannedCount} / ${outletTransfers.length} transfers
+                            </p>
+                            <p class="text-xs text-gray-500 mt-1">
+                                <i class="fas fa-info-circle mr-1"></i>Showing individual transfers (multiple per pallet)
                             </p>
                         </div>
                         <button onclick="this.closest('.fixed').remove()" 
