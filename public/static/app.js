@@ -1707,15 +1707,22 @@ function renderOutlet() {
                             </div>
                             
                             <button onclick="handleOutletScanPallet()" 
-                                class="w-full bg-green-500 hover:bg-green-600 text-white font-bold py-3 rounded-lg mb-4">
-                                <i class="fas fa-check mr-2"></i>Confirm Pallet Receipt
+                                class="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 rounded-lg mb-4">
+                                <i class="fas fa-barcode mr-2"></i>Scan Pallet
                             </button>
+                            
+                            ${state.scannedItems.length > 0 ? `
+                                <button onclick="showOutletCompletionModal()" 
+                                    class="w-full bg-green-500 hover:bg-green-600 text-white font-bold py-3 rounded-lg">
+                                    <i class="fas fa-check-circle mr-2"></i>Complete Receipt (${state.scannedItems.length} pallets)
+                                </button>
+                            ` : ''}
                             
                             <!-- Scanned Items -->
                             <div class="mt-6">
-                                <h4 class="font-semibold mb-3">Received Pallets (${state.scannedItems.length})</h4>
+                                <h4 class="font-semibold mb-3">Scanned Pallets (${state.scannedItems.length})</h4>
                                 <div id="outletScannedList" class="space-y-2 max-h-96 overflow-y-auto">
-                                    <p class="text-gray-500 text-center py-4">No pallets received yet</p>
+                                    <p class="text-gray-500 text-center py-4">No pallets scanned yet</p>
                                 </div>
                             </div>
                         </div>
@@ -1831,7 +1838,7 @@ function clearOutletSelection() {
     render()
 }
 
-// NEW: Step 2 - Scan pallet ID to confirm receipt
+// NEW: Step 2 - Scan pallet ID (validation only, no immediate delivery)
 async function handleOutletScanPallet() {
     const input = document.getElementById('palletScanInput')
     const palletId = input.value.trim().toUpperCase()
@@ -1842,13 +1849,14 @@ async function handleOutletScanPallet() {
     const alreadyScanned = state.scannedItems.find(item => item.pallet_id === palletId)
     if (alreadyScanned) {
         playBeep(false)
-        showToast(`⚠️ Duplicate scan! Pallet ${palletId} was already received at ${alreadyScanned.time}`, 'error')
+        showToast(`⚠️ Duplicate scan! Pallet ${palletId} was already scanned at ${alreadyScanned.time}`, 'error')
         input.value = ''
         input.focus()
         return
     }
     
     try {
+        // Only validate the pallet (don't mark as delivered yet)
         const response = await axios.post('/api/outlet/scan-pallet', { 
             outlet_code_short: state.selectedOutlet.code_short,
             pallet_id: palletId
@@ -1857,15 +1865,15 @@ async function handleOutletScanPallet() {
         if (response.data.success) {
             playBeep(true)
             
-            // Store scan result temporarily
-            state.pendingScan = {
+            // Add to scanned items list (not delivered yet)
+            state.scannedItems.push({
                 pallet_id: palletId,
                 transfer_count: response.data.transfer_count,
-                outlet_code_short: state.selectedOutlet.code_short
-            }
+                time: new Date().toLocaleTimeString()
+            })
             
-            // Show signature modal
-            showOutletSignatureModal()
+            showToast(`✓ Pallet ${palletId} scanned (${response.data.transfer_count} transfers)`, 'success')
+            updateOutletScannedList()
         } else {
             playBeep(false)
             showToast(`✗ ${response.data.error}`, 'error')
@@ -1884,7 +1892,7 @@ function updateOutletScannedList() {
     if (!list) return
     
     if (state.scannedItems.length === 0) {
-        list.innerHTML = '<p class="text-gray-500 text-center py-4">No pallets received yet</p>'
+        list.innerHTML = '<p class="text-gray-500 text-center py-4">No pallets scanned yet</p>'
         return
     }
     
@@ -1893,14 +1901,14 @@ function updateOutletScannedList() {
         const actualIndex = state.scannedItems.length - 1 - reversedIndex
         
         return `
-        <div class="border-l-4 border-green-500 bg-green-50 p-3 rounded">
+        <div class="border-l-4 border-blue-500 bg-blue-50 p-3 rounded">
             <div class="flex justify-between items-start">
                 <div class="flex-1">
                     <p class="font-semibold">
-                        <i class="fas fa-pallet mr-1 text-green-600"></i>${item.pallet_id}
+                        <i class="fas fa-pallet mr-1 text-blue-600"></i>${item.pallet_id}
                     </p>
                     <p class="text-xs text-gray-600">${item.transfer_count} transfers</p>
-                    ${item.receiver_name ? `<p class="text-xs text-gray-600"><i class="fas fa-user mr-1"></i>Received by: ${item.receiver_name}</p>` : ''}
+                    <p class="text-xs text-blue-600"><i class="fas fa-clock mr-1"></i>Scanned (not confirmed yet)</p>
                 </div>
                 <div class="flex items-start space-x-2">
                     <span class="text-sm text-gray-500">${item.time}</span>
@@ -1917,45 +1925,86 @@ function updateOutletScannedList() {
     `}).join('')
 }
 
-function showOutletSignatureModal() {
+// NEW: Show completion modal after scanning all pallets (like warehouse)
+function showOutletCompletionModal() {
+    if (state.scannedItems.length === 0) {
+        showToast('Please scan at least one pallet first', 'error')
+        return
+    }
+    
+    // Check if all available pallets are scanned
+    const unscannedPallets = state.availablePallets.filter(p => 
+        !state.scannedItems.find(s => s.pallet_id === p.pallet_id)
+    )
+    
+    const totalPallets = state.availablePallets.length
+    const scannedCount = state.scannedItems.length
+    const totalTransfers = state.scannedItems.reduce((sum, item) => sum + item.transfer_count, 0)
+    
     const modal = document.createElement('div')
     modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50'
     modal.innerHTML = `
         <div class="bg-white rounded-lg p-6 w-full max-w-md">
             <h3 class="text-xl font-bold mb-4 text-green-600">
-                <i class="fas fa-pallet mr-2"></i>Confirm Pallet Receipt
+                <i class="fas fa-check-circle mr-2"></i>Complete Receipt
             </h3>
-            <form onsubmit="handleConfirmOutletReceipt(event)">
+            <form onsubmit="handleConfirmOutletCompletion(event)">
                 <div class="mb-4 bg-green-50 border border-green-200 rounded-lg p-4">
-                    <p class="text-sm text-gray-600 mb-1">Pallet ID</p>
-                    <p class="text-lg font-bold text-green-700">${state.pendingScan.pallet_id}</p>
-                    <p class="text-sm text-gray-500">${state.pendingScan.transfer_count} transfers</p>
+                    <p class="text-sm text-gray-600 mb-2">Outlet</p>
+                    <p class="text-lg font-bold text-green-700">${state.selectedOutlet.code_short} - ${state.selectedOutlet.name}</p>
+                    <p class="text-sm text-gray-500 mt-2">
+                        <i class="fas fa-pallet mr-1"></i>${scannedCount} pallet(s) scanned
+                        <br>
+                        <i class="fas fa-box mr-1"></i>${totalTransfers} total transfers
+                    </p>
                 </div>
                 
-                <div class="mb-4">
-                    <label class="block text-sm font-medium mb-2">Outlet Code (Verification)</label>
-                    <input type="text" id="outlet_code_confirm" required 
-                        class="w-full px-3 py-2 border rounded-lg"
-                        placeholder="Enter your outlet code"
-                        value="${state.pendingScan.outlet_code_short}"
-                        readonly>
-                    <p class="text-xs text-gray-500 mt-1">Pre-filled for verification</p>
-                </div>
+                ${unscannedPallets.length > 0 ? `
+                    <div class="mb-4 bg-yellow-50 border border-yellow-300 rounded-lg p-4">
+                        <p class="text-sm font-semibold text-yellow-800 mb-2">
+                            <i class="fas fa-exclamation-triangle mr-1"></i>Warning: Incomplete Receipt
+                        </p>
+                        <p class="text-xs text-yellow-700 mb-2">
+                            You have <strong>${unscannedPallets.length} pallet(s)</strong> not yet scanned out of ${totalPallets} total.
+                        </p>
+                        <div class="text-xs text-yellow-600 bg-white rounded p-2">
+                            <strong>Unscanned pallets:</strong>
+                            <ul class="list-disc list-inside mt-1">
+                                ${unscannedPallets.slice(0, 5).map(p => `
+                                    <li>${p.pallet_id} (${p.transfer_count} transfers)</li>
+                                `).join('')}
+                                ${unscannedPallets.length > 5 ? `<li>...and ${unscannedPallets.length - 5} more</li>` : ''}
+                            </ul>
+                        </div>
+                        <p class="text-xs text-yellow-700 mt-2">
+                            <i class="fas fa-info-circle mr-1"></i>These will be marked as <strong>unreceived</strong> in the report.
+                        </p>
+                    </div>
+                ` : `
+                    <div class="mb-4 bg-green-50 border border-green-300 rounded-lg p-4">
+                        <p class="text-sm font-semibold text-green-800">
+                            <i class="fas fa-check-circle mr-1"></i>All Pallets Scanned!
+                        </p>
+                        <p class="text-xs text-green-600 mt-1">
+                            You have scanned all ${totalPallets} pallets for this outlet.
+                        </p>
+                    </div>
+                `}
                 
                 <div class="mb-4">
                     <label class="block text-sm font-medium mb-2">Receiver Name/Signature <span class="text-red-500">*</span></label>
-                    <input type="text" id="receiver_name" required 
+                    <input type="text" id="receiver_name_complete" required 
                         class="w-full px-3 py-2 border rounded-lg"
                         placeholder="Enter receiver name"
                         autofocus>
-                    <p class="text-xs text-gray-500 mt-1">Who is receiving this pallet?</p>
+                    <p class="text-xs text-gray-500 mt-1">Who is receiving these deliveries?</p>
                 </div>
                 
                 <div class="flex space-x-3">
-                    <button type="submit" class="flex-1 bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg">
-                        <i class="fas fa-check mr-2"></i>Confirm Receipt
+                    <button type="submit" class="flex-1 bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg font-semibold">
+                        <i class="fas fa-signature mr-2"></i>Confirm & Sign
                     </button>
-                    <button type="button" onclick="cancelOutletReceipt()" 
+                    <button type="button" onclick="cancelOutletCompletion()" 
                         class="flex-1 bg-gray-300 hover:bg-gray-400 px-4 py-2 rounded-lg">
                         Cancel
                     </button>
@@ -1966,57 +2015,55 @@ function showOutletSignatureModal() {
     document.body.appendChild(modal)
 }
 
-async function handleConfirmOutletReceipt(event) {
+// NEW: Handle completion confirmation with bulk update
+async function handleConfirmOutletCompletion(event) {
     event.preventDefault()
     
-    const receiverName = document.getElementById('receiver_name').value.trim()
-    const outletCode = document.getElementById('outlet_code_confirm').value.trim()
+    const receiverName = document.getElementById('receiver_name_complete').value.trim()
     
     if (!receiverName) {
         showToast('Please enter receiver name', 'error')
         return
     }
     
+    if (state.scannedItems.length === 0) {
+        showToast('No pallets to confirm', 'error')
+        return
+    }
+    
     try {
-        // Update the backend with receiver info
-        await axios.post('/api/outlet/confirm-receipt', {
-            pallet_id: state.pendingScan.pallet_id,
-            outlet_code_short: outletCode,
+        // Confirm all scanned pallets at once
+        const palletIds = state.scannedItems.map(item => item.pallet_id)
+        
+        const response = await axios.post('/api/outlet/confirm-receipt-bulk', {
+            outlet_code_short: state.selectedOutlet.code_short,
+            pallet_ids: palletIds,
             receiver_name: receiverName
         })
         
-        // Add to scanned items
-        state.scannedItems.push({
-            pallet_id: state.pendingScan.pallet_id,
-            transfer_count: state.pendingScan.transfer_count,
-            receiver_name: receiverName,
-            time: new Date().toLocaleTimeString()
-        })
-        
-        showToast(`✓ Pallet ${state.pendingScan.pallet_id} received by ${receiverName}`, 'success')
+        showToast(`✓ Receipt completed! ${palletIds.length} pallet(s) received by ${receiverName}`, 'success')
         
         // Close modal
-        document.querySelector('.fixed').remove()
+        const modal = document.querySelector('.fixed.inset-0')
+        if (modal) modal.remove()
         
-        // Clear pending scan
-        state.pendingScan = null
+        // Clear scanned items
+        state.scannedItems = []
         
-        // Update UI
-        updateOutletScannedList()
-        loadOutletPallets()
-        
-        // Focus back to scan input
-        document.getElementById('palletScanInput').value = ''
-        document.getElementById('palletScanInput').focus()
+        // Refresh pallets list
+        await loadOutletPallets()
+        render()
     } catch (error) {
         showToast(error.response?.data?.error || 'Failed to confirm receipt', 'error')
     }
 }
 
-function cancelOutletReceipt() {
-    document.querySelector('.fixed').remove()
-    state.pendingScan = null
-    document.getElementById('palletScanInput').value = ''
+function cancelOutletCompletion() {
+    const modal = document.querySelector('.fixed.inset-0')
+    if (modal) modal.remove()
+    const input = document.getElementById('palletScanInput')
+    if (input) {
+        input.value = ''
     document.getElementById('palletScanInput').focus()
 }
 

@@ -125,26 +125,35 @@ Parcel (grouped by Pallet ID)
 - Real-time progress tracking with pallet counts
 - Audio feedback for successful/failed scans
 
-### 3️⃣ Outlet Unloading Process (Outlet/Driver) - NEW TWO-STEP PROCESS!
+### 3️⃣ Outlet Unloading Process (Outlet/Driver) - WAREHOUSE-STYLE WORKFLOW!
 
 **Step 1: Identify Your Outlet**
 1. Navigate to **Outlet** page
 2. Scan or enter your **Outlet Short Code** (e.g., "MKC", "JKJSTT1")
 3. System finds and displays all available pallets for your outlet
 
-**Step 2: Scan Pallets**
+**Step 2: Scan All Pallets**
 4. View list of pending pallet IDs with transfer counts
-5. **Scan each Pallet ID** to confirm receipt
-6. System marks ALL transfers in that pallet as delivered at once
-7. Repeat for all pallets
+5. **Scan each Pallet ID** - system validates and adds to scanned list
+6. Scanned pallets show as "Scanned (not confirmed yet)" in blue
+7. Repeat scanning for all pallets you're receiving
+
+**Step 3: Complete Receipt with Signature** (NEW!)
+8. Click **"Complete Receipt"** button when all scanning is done
+9. System shows summary and warns if any pallets are unscanned
+10. Enter **Receiver Name/Signature** once for all deliveries
+11. Click **"Confirm & Sign"** to complete the entire receipt
+12. All scanned pallets marked as delivered at once
 
 **NEW Features:**
-- **Two-step scanning** - Find outlet first, then scan pallets
-- **Pallet-level unloading** - One scan = multiple transfers received
+- **Warehouse-style workflow** - Scan all first, then one signature at end
+- **Bulk completion** - One receiver name for all pallets
+- **Incomplete receipt warning** - System alerts if pallets not scanned
+- **Unreceived tracking** - Unscanned pallets marked in reports
+- **Validation only during scan** - No delivery until completion
+- **Pallet-level unloading** - One scan = multiple transfers
 - **Visual pallet list** - See all your deliveries before scanning
 - **Short code lookup** - Use familiar codes (MKC, JBB) not numbers
-- Real-time remaining pallet count
-- Auto-matching prevents wrong outlet errors
 
 ### 4️⃣ Live Dashboard (Warehouse/Driver/Admin) - NEW!
 
@@ -374,5 +383,5 @@ For support and feature requests, contact your system administrator.
 ---
 
 **Last Updated**: November 15, 2025  
-**Version**: 1.5.0 (with Dashboard Delivery Info & Outlet Signatures)  
-**Status**: ✅ Development Ready | ⏳ Database Migrations Required | 🏪 205 Outlets Imported | 📦 Pallet Scanning Active | 🛡️ Duplicate Prevention Active | 🗑️ Session Delete Active | 📊 Dashboard with Delivery Tracking Active | ✍️ Outlet Receipt Signatures Active
+**Version**: 1.6.0 (with Warehouse-Style Outlet Workflow & Bulk Completion)  
+**Status**: ✅ Development Ready | ⏳ Database Migrations Required | 🏪 205 Outlets Imported | 📦 Pallet Scanning Active | 🛡️ Duplicate Prevention Active | 🗑️ Session Delete Active | 📊 Dashboard with Delivery Tracking Active | ✍️ Bulk Receipt Completion Active | ⚠️ Incomplete Receipt Warning Active

@@ -948,6 +948,91 @@ app.post('/api/outlet/confirm-receipt', authMiddleware, async (c) => {
   }
 })
 
+// NEW: Bulk confirm receipt for multiple pallets at once
+app.post('/api/outlet/confirm-receipt-bulk', authMiddleware, async (c) => {
+  try {
+    const user = c.get('user')
+    const { outlet_code_short, pallet_ids, receiver_name } = await c.req.json()
+    
+    console.log(`Bulk confirming receipt for outlet ${outlet_code_short}: ${pallet_ids.length} pallets by ${receiver_name}`)
+    
+    if (!pallet_ids || pallet_ids.length === 0) {
+      return c.json({ error: 'No pallet IDs provided' }, 400)
+    }
+    
+    let successCount = 0
+    let errorCount = 0
+    const errors = []
+    
+    // Process each pallet
+    for (const pallet_id of pallet_ids) {
+      try {
+        // Find the pallet
+        const parcelsResponse = await supabaseRequest(c, `parcels?pallet_id=eq.${pallet_id}&outlet_code_short=eq.${outlet_code_short}&status=eq.loaded&select=*`)
+        const parcels = await parcelsResponse.json()
+        
+        if (!parcels || parcels.length === 0) {
+          errorCount++
+          errors.push(`${pallet_id}: not found or already delivered`)
+          continue
+        }
+        
+        const parcel = parcels[0]
+        
+        // Get all transfer details for this pallet
+        const transfersResponse = await supabaseRequest(c, `transfer_details?parcel_id=eq.${parcel.id}&select=*`)
+        const transfers = await transfersResponse.json()
+        
+        // Update all transfers as delivered
+        for (const transfer of transfers) {
+          await supabaseRequest(c, `transfer_details?id=eq.${transfer.id}`, {
+            method: 'PATCH',
+            body: JSON.stringify({
+              is_scanned_unloading: true,
+              scanned_unloading_at: new Date().toISOString(),
+              scanned_unloading_by: user.id,
+              status: 'delivered'
+            })
+          })
+        }
+        
+        // Update parcel as delivered with receiver name
+        await supabaseRequest(c, `parcels?id=eq.${parcel.id}`, {
+          method: 'PATCH',
+          body: JSON.stringify({
+            status: 'delivered',
+            delivered_at: new Date().toISOString(),
+            delivered_by: user.id,
+            delivered_by_name: user.full_name,
+            received_by_name: receiver_name
+          })
+        })
+        
+        successCount++
+        console.log(`✓ Pallet ${pallet_id} confirmed as delivered`)
+      } catch (error) {
+        errorCount++
+        errors.push(`${pallet_id}: ${error instanceof Error ? error.message : 'unknown error'}`)
+        console.error(`Error confirming pallet ${pallet_id}:`, error)
+      }
+    }
+    
+    console.log(`Bulk confirmation complete: ${successCount} success, ${errorCount} errors`)
+    
+    return c.json({ 
+      success: true, 
+      total: pallet_ids.length,
+      success_count: successCount,
+      error_count: errorCount,
+      errors: errors.length > 0 ? errors : undefined,
+      receiver_name
+    })
+  } catch (error) {
+    console.error('Bulk confirm receipt error:', error)
+    return c.json({ error: 'Failed to confirm receipts' }, 500)
+  }
+})
+
 // Get parcels for specific outlet
 app.get('/api/outlet/parcels/:outlet_code', authMiddleware, async (c) => {
   try {
