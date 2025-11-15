@@ -164,10 +164,6 @@ function renderLogin() {
                         <i class="fas fa-sign-in-alt mr-2"></i> Login
                     </button>
                 </form>
-                
-                <div class="mt-6 text-center text-sm text-gray-600">
-                    <p>Default Admin: admin / admin123</p>
-                </div>
             </div>
         </div>
     `

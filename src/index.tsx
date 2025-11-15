@@ -70,10 +70,11 @@ app.post('/api/login', async (c) => {
     const user = users[0]
     
     // Simple password check (in production, use bcrypt comparison)
-    // For demo, comparing plain text with hash starting with '$2a$'
-    const isValidPassword = password === 'admin123' && user.username === 'admin'
+    // Check if password matches password_hash OR if it's the default admin
+    const isValidPassword = user.password_hash === password || 
+                           (password === 'admin123' && user.username === 'admin')
     
-    if (!isValidPassword && user.password_hash !== password) {
+    if (!isValidPassword) {
       return c.json({ error: 'Invalid credentials' }, 401)
     }
     
