@@ -14,11 +14,12 @@ A comprehensive full-stack web application for logistics tracking and warehouse 
 - ✅ **Warehouse Loading Process** - Real-time pallet scanning with validation
 - ✅ **Outlet Two-Step Unloading** - Scan outlet code first, then scan pallet IDs
 - ✅ **Warehouse Management** - View outlet details, delete transfers
-- ✅ **Advanced Permissions** - Warehouse_supervisor role with enhanced delete/amend rights (NEW!)
-- ✅ **Duplicate Scan Prevention** - Multi-layer detection to prevent duplicate pallet scans (NEW!)
-- ✅ **Delete Scanned Items** - Admin/supervisor can remove items from scanning session (NEW!)
-- ✅ **Multi-Day Dashboard** - Yesterday/Today/Tomorrow tabs with delivery date filtering (NEW!)
-- ✅ **Delivery Date Planning** - Import tonight for tomorrow, view scheduled deliveries (NEW!)
+- ✅ **Advanced Permissions** - Warehouse_supervisor role with enhanced delete/amend rights
+- ✅ **Duplicate Scan Prevention** - Multi-layer detection to prevent duplicate pallet scans
+- ✅ **Delete Scanned Items** - Admin/supervisor can remove items from scanning session
+- ✅ **Multi-Day Dashboard** - Yesterday/Today/Tomorrow tabs with delivery date filtering
+- ✅ **Delivery Date Planning** - Import tonight for tomorrow, view scheduled deliveries
+- ✅ **Password Management** - Users can change own password, admin can reset to default (NEW!)
 - ✅ **Admin Configuration** - User and outlet management system
 - ✅ **Error Tracking** - Comprehensive error logging for unmatched parcels
 - ✅ **Reports & Analytics** - Delivery reports with Excel export functionality
@@ -198,11 +199,25 @@ Parcel (grouped by Pallet ID)
 4. Export comprehensive Excel reports
 5. Track driver performance and delivery times
 
-### 6️⃣ Admin Configuration (Admin Only)
+### 6️⃣ User Profile & Password Management (All Users) - NEW! ⭐
+
+1. Navigate to **Profile** page (new button in navbar)
+2. View your profile information:
+   - Username, Full Name, Role, Outlet Code
+3. **Change Your Password**:
+   - Enter current password
+   - Enter new password (minimum 6 characters)
+   - Confirm new password
+   - Submit to update
+4. System validates passwords and provides feedback
+
+### 7️⃣ Admin Configuration (Admin Only)
 
 1. Navigate to **Admin** page
 2. Manage users:
    - Add new users (warehouse, driver, outlet, admin)
+   - **Edit user details** with optional password update (NEW!)
+   - **Reset any user's password** to "Alpro@123" (NEW!)
    - Assign outlet codes to outlet users
    - Activate/deactivate accounts
    - Delete users
@@ -385,16 +400,19 @@ wrangler pages secret put JWT_SECRET
 | `DEPLOYMENT_GUIDE.md` | Production deployment steps |
 | `SCANNING_CHANGES.md` | Pallet ID scanning system guide |
 | `WAREHOUSE_DELETE_FEATURE.md` | Delete functionality documentation |
-| `PERMISSIONS_AND_CLEANUP_SUMMARY.md` | **NEW!** Supervisor role and auto-cleanup guide |
-| `DUPLICATE_SCAN_PREVENTION.md` | **NEW!** Multi-layer duplicate detection system |
-| `DELETE_SCANNED_ITEMS.md` | **NEW!** Delete scanned items feature guide |
+| `PERMISSIONS_AND_CLEANUP_SUMMARY.md` | Supervisor role and auto-cleanup guide |
+| `DUPLICATE_SCAN_PREVENTION.md` | Multi-layer duplicate detection system |
+| `DELETE_SCANNED_ITEMS.md` | Delete scanned items feature guide |
+| `PASSWORD_MANAGEMENT_TESTING.md` | **NEW!** Password management testing guide |
+| `ADD_DELIVERY_DATE_COLUMN.sql` | Multi-day dashboard migration (REQUIRED!) |
+| `URGENT_DATABASE_MIGRATION_REQUIRED.md` | Migration instructions |
 | `SAMPLE_IMPORT_TEMPLATE.md` | Excel import format guide |
 | `PROJECT_SUMMARY.md` | Complete handover document |
 | `OUTLET_IMPORT_GUIDE.md` | Import 205 outlets guide |
 | `OUTLET_LOGIN_INFO.md` | Outlet login quick reference |
 | `supabase-schema.sql` | Database schema (CRITICAL!) |
 | `migration-add-short-codes.sql` | Outlet code mapping migration |
-| `migration-supervisor-role-and-cleanup.sql` | **NEW!** Supervisor role + auto-cleanup migration |
+| `migration-supervisor-role-and-cleanup.sql` | Supervisor role + auto-cleanup migration |
 
 ## 📞 Contact
 
@@ -403,5 +421,5 @@ For support and feature requests, contact your system administrator.
 ---
 
 **Last Updated**: November 15, 2025  
-**Version**: 1.7.0 (with Multi-Day Dashboard & Delivery Date Planning)  
-**Status**: ✅ Development Ready | ⚠️ **MIGRATION REQUIRED** (ADD_DELIVERY_DATE_COLUMN.sql) | 🏪 205 Outlets Imported | 📦 Pallet Scanning Active | 🛡️ Duplicate Prevention Active | 🗑️ Session Delete Active | 📊 Multi-Day Dashboard Active | ✍️ Bulk Receipt Completion Active | 📅 Delivery Date Planning Active
+**Version**: 1.8.0 (with Password Management)  
+**Status**: ✅ Development Ready | ⚠️ **MIGRATION REQUIRED** (ADD_DELIVERY_DATE_COLUMN.sql) | 🏪 205 Outlets Imported | 📦 Pallet Scanning Active | 🛡️ Duplicate Prevention Active | 🗑️ Session Delete Active | 📊 Multi-Day Dashboard Active | ✍️ Bulk Receipt Completion Active | 📅 Delivery Date Planning Active | 🔐 Password Management Active
