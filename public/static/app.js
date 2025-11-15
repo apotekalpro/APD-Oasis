@@ -246,6 +246,11 @@ function renderNavBar() {
                             <i class="fas fa-chart-bar mr-2"></i>Reports
                         </button>
                         
+                        <button onclick="navigateTo('profile')" 
+                            class="px-4 py-2 rounded ${state.currentPage === 'profile' ? 'bg-blue-800' : 'bg-blue-500 hover:bg-blue-700'}">
+                            <i class="fas fa-user mr-2"></i>Profile
+                        </button>
+                        
                         <button onclick="logout()" 
                             class="px-4 py-2 bg-red-500 hover:bg-red-600 rounded">
                             <i class="fas fa-sign-out-alt"></i>
@@ -324,13 +329,22 @@ async function loadUsers() {
                         ${user.outlet_code ? `<p class="text-sm text-blue-600">Outlet: ${user.outlet_code}</p>` : ''}
                     </div>
                     <div class="flex space-x-2">
+                        <button onclick="showEditUserModal('${user.id}')" 
+                            class="px-3 py-1 bg-blue-500 hover:bg-blue-600 text-white rounded text-sm">
+                            <i class="fas fa-edit"></i>
+                        </button>
+                        <button onclick="resetUserPassword('${user.id}')" 
+                            class="px-3 py-1 bg-purple-500 hover:bg-purple-600 text-white rounded text-sm"
+                            title="Reset password to Alpro@123">
+                            <i class="fas fa-key"></i>
+                        </button>
                         <button onclick="toggleUserStatus('${user.id}', ${!user.is_active})" 
                             class="px-3 py-1 rounded text-sm ${user.is_active ? 'bg-yellow-500 hover:bg-yellow-600' : 'bg-green-500 hover:bg-green-600'} text-white">
                             ${user.is_active ? 'Deactivate' : 'Activate'}
                         </button>
                         <button onclick="deleteUser('${user.id}')" 
                             class="px-3 py-1 bg-red-500 hover:bg-red-600 text-white rounded text-sm">
-                            Delete
+                            <i class="fas fa-trash"></i>
                         </button>
                     </div>
                 </div>
@@ -469,6 +483,120 @@ async function deleteUser(userId) {
         loadUsers()
     } catch (error) {
         showToast('Failed to delete user', 'error')
+    }
+}
+
+async function showEditUserModal(userId) {
+    // Fetch user data
+    try {
+        const response = await axios.get(`/api/admin/users/${userId}`)
+        const user = response.data
+        
+        const modal = document.createElement('div')
+        modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50'
+        modal.innerHTML = `
+            <div class="bg-white rounded-lg shadow-xl p-6 w-full max-w-md">
+                <h3 class="text-xl font-bold mb-4">Edit User</h3>
+                <form onsubmit="handleEditUser(event, '${userId}')">
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-sm font-medium mb-1">Username</label>
+                            <input type="text" id="edit_username" value="${user.username}" required
+                                class="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500">
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-medium mb-1">Full Name</label>
+                            <input type="text" id="edit_full_name" value="${user.full_name}" required
+                                class="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500">
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-medium mb-1">Role</label>
+                            <select id="edit_role" onchange="toggleEditOutletField()" required
+                                class="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500">
+                                <option value="admin" ${user.role === 'admin' ? 'selected' : ''}>Admin</option>
+                                <option value="warehouse_staff" ${user.role === 'warehouse_staff' ? 'selected' : ''}>Warehouse Staff</option>
+                                <option value="delivery_staff" ${user.role === 'delivery_staff' ? 'selected' : ''}>Delivery Staff</option>
+                                <option value="outlet" ${user.role === 'outlet' ? 'selected' : ''}>Outlet</option>
+                            </select>
+                        </div>
+                        
+                        <div id="edit_outlet_field" style="display: ${user.role === 'outlet' ? 'block' : 'none'}">
+                            <label class="block text-sm font-medium mb-1">Outlet Code</label>
+                            <input type="text" id="edit_outlet_code" value="${user.outlet_code || ''}"
+                                class="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500">
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-medium mb-1">
+                                Password 
+                                <span class="text-gray-500 text-xs">(leave empty to keep unchanged)</span>
+                            </label>
+                            <input type="password" id="edit_password" placeholder="New password (optional)"
+                                class="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500">
+                        </div>
+                        
+                        <div class="flex space-x-2 pt-4">
+                            <button type="submit" 
+                                class="flex-1 bg-blue-500 hover:bg-blue-600 text-white py-2 rounded font-semibold">
+                                <i class="fas fa-save mr-2"></i>Save Changes
+                            </button>
+                            <button type="button" onclick="this.closest('.fixed').remove()"
+                                class="flex-1 bg-gray-500 hover:bg-gray-600 text-white py-2 rounded font-semibold">
+                                Cancel
+                            </button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        `
+        document.body.appendChild(modal)
+    } catch (error) {
+        showToast('Failed to load user data', 'error')
+    }
+}
+
+function toggleEditOutletField() {
+    const role = document.getElementById('edit_role').value
+    const outletField = document.getElementById('edit_outlet_field')
+    outletField.style.display = role === 'outlet' ? 'block' : 'none'
+}
+
+async function handleEditUser(event, userId) {
+    event.preventDefault()
+    
+    const userData = {
+        username: document.getElementById('edit_username').value,
+        full_name: document.getElementById('edit_full_name').value,
+        role: document.getElementById('edit_role').value,
+        outlet_code: document.getElementById('edit_outlet_code').value || null
+    }
+    
+    // Only include password if it's been changed
+    const password = document.getElementById('edit_password').value
+    if (password && password.trim() !== '') {
+        userData.password = password
+    }
+    
+    try {
+        await axios.patch(`/api/admin/users/${userId}`, userData)
+        showToast('User updated successfully', 'success')
+        document.querySelector('.fixed').remove()
+        loadUsers()
+    } catch (error) {
+        showToast(error.response?.data?.error || 'Failed to update user', 'error')
+    }
+}
+
+async function resetUserPassword(userId) {
+    if (!confirm('Reset this user\'s password to "Alpro@123"?')) return
+    
+    try {
+        await axios.post(`/api/admin/reset-password/${userId}`)
+        showToast('Password reset to Alpro@123', 'success')
+    } catch (error) {
+        showToast(error.response?.data?.error || 'Failed to reset password', 'error')
     }
 }
 
@@ -2431,6 +2559,130 @@ async function exportReport() {
     }
 }
 
+// ============ Profile Page ============
+function renderProfile() {
+    return `
+        <div class="container mx-auto px-4 py-6">
+            <h2 class="text-3xl font-bold mb-6 text-gray-800">
+                <i class="fas fa-user text-blue-600 mr-3"></i>My Profile
+            </h2>
+            
+            <div class="max-w-2xl mx-auto">
+                <!-- User Information -->
+                <div class="bg-white rounded-lg shadow-lg p-6 mb-6">
+                    <h3 class="text-xl font-bold mb-4 flex items-center">
+                        <i class="fas fa-info-circle text-blue-600 mr-2"></i>Profile Information
+                    </h3>
+                    
+                    <div class="space-y-3">
+                        <div class="flex justify-between py-2 border-b">
+                            <span class="text-gray-600 font-medium">Username:</span>
+                            <span class="font-semibold">${state.user.username}</span>
+                        </div>
+                        <div class="flex justify-between py-2 border-b">
+                            <span class="text-gray-600 font-medium">Full Name:</span>
+                            <span class="font-semibold">${state.user.full_name}</span>
+                        </div>
+                        <div class="flex justify-between py-2 border-b">
+                            <span class="text-gray-600 font-medium">Role:</span>
+                            <span class="font-semibold capitalize">${state.user.role.replace('_', ' ')}</span>
+                        </div>
+                        ${state.user.outlet_code ? `
+                            <div class="flex justify-between py-2 border-b">
+                                <span class="text-gray-600 font-medium">Outlet Code:</span>
+                                <span class="font-semibold">${state.user.outlet_code}</span>
+                            </div>
+                        ` : ''}
+                    </div>
+                </div>
+                
+                <!-- Change Password -->
+                <div class="bg-white rounded-lg shadow-lg p-6">
+                    <h3 class="text-xl font-bold mb-4 flex items-center">
+                        <i class="fas fa-key text-blue-600 mr-2"></i>Change Password
+                    </h3>
+                    
+                    <form onsubmit="handleChangePassword(event)" class="space-y-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">
+                                Current Password <span class="text-red-500">*</span>
+                            </label>
+                            <input type="password" id="currentPassword" required 
+                                class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                                placeholder="Enter current password">
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">
+                                New Password <span class="text-red-500">*</span>
+                            </label>
+                            <input type="password" id="newPassword" required 
+                                class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                                placeholder="Enter new password"
+                                minlength="6">
+                            <p class="text-xs text-gray-500 mt-1">At least 6 characters</p>
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">
+                                Confirm New Password <span class="text-red-500">*</span>
+                            </label>
+                            <input type="password" id="confirmPassword" required 
+                                class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                                placeholder="Confirm new password">
+                        </div>
+                        
+                        <button type="submit" 
+                            class="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 rounded-lg">
+                            <i class="fas fa-save mr-2"></i>Change Password
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    `
+}
+
+async function handleChangePassword(event) {
+    event.preventDefault()
+    
+    const currentPassword = document.getElementById('currentPassword').value
+    const newPassword = document.getElementById('newPassword').value
+    const confirmPassword = document.getElementById('confirmPassword').value
+    
+    // Validation
+    if (newPassword !== confirmPassword) {
+        showToast('New passwords do not match', 'error')
+        return
+    }
+    
+    if (newPassword.length < 6) {
+        showToast('Password must be at least 6 characters', 'error')
+        return
+    }
+    
+    if (currentPassword === newPassword) {
+        showToast('New password must be different from current password', 'error')
+        return
+    }
+    
+    try {
+        await axios.post('/api/change-password', {
+            current_password: currentPassword,
+            new_password: newPassword
+        })
+        
+        showToast('Password changed successfully!', 'success')
+        
+        // Clear form
+        document.getElementById('currentPassword').value = ''
+        document.getElementById('newPassword').value = ''
+        document.getElementById('confirmPassword').value = ''
+    } catch (error) {
+        showToast(error.response?.data?.error || 'Failed to change password', 'error')
+    }
+}
+
 // ============ Main Render Function ============
 function render() {
     const app = document.getElementById('app')
@@ -2460,6 +2712,9 @@ function render() {
             break
         case 'reports':
             content = renderReports()
+            break
+        case 'profile':
+            content = renderProfile()
             break
         default:
             content = '<p class="text-center py-8">Page not found</p>'

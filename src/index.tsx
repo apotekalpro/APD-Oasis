@@ -169,9 +169,27 @@ app.patch('/api/admin/users/:id', authMiddleware, async (c) => {
     const userId = c.req.param('id')
     const userData = await c.req.json()
     
+    // Prepare update data
+    const updateData: any = {
+      username: userData.username,
+      full_name: userData.full_name,
+      role: userData.role,
+      outlet_code: userData.outlet_code
+    }
+    
+    // Only update password if it's provided and not empty
+    if (userData.password && userData.password.trim() !== '') {
+      updateData.password_hash = userData.password  // In production, hash this
+    }
+    
+    // Handle is_active if provided (for activate/deactivate actions)
+    if (userData.is_active !== undefined) {
+      updateData.is_active = userData.is_active
+    }
+    
     const response = await supabaseRequest(c, `users?id=eq.${userId}`, {
       method: 'PATCH',
-      body: JSON.stringify(userData)
+      body: JSON.stringify(updateData)
     })
     
     const updatedUser = await response.json()
@@ -197,6 +215,99 @@ app.delete('/api/admin/users/:id', authMiddleware, async (c) => {
     return c.json({ success: true })
   } catch (error) {
     return c.json({ error: 'Failed to delete user' }, 500)
+  }
+})
+
+// Get single user (admin only)
+app.get('/api/admin/users/:id', authMiddleware, async (c) => {
+  const user = c.get('user')
+  if (user.role !== 'admin') {
+    return c.json({ error: 'Forbidden' }, 403)
+  }
+  
+  try {
+    const userId = c.req.param('id')
+    const response = await supabaseRequest(c, `users?id=eq.${userId}&select=id,username,full_name,role,outlet_code,is_active`)
+    const users = await response.json()
+    
+    if (!users || users.length === 0) {
+      return c.json({ error: 'User not found' }, 404)
+    }
+    
+    return c.json(users[0])
+  } catch (error) {
+    return c.json({ error: 'Failed to fetch user' }, 500)
+  }
+})
+
+// Reset user password (admin only)
+app.post('/api/admin/reset-password/:id', authMiddleware, async (c) => {
+  const user = c.get('user')
+  if (user.role !== 'admin') {
+    return c.json({ error: 'Forbidden' }, 403)
+  }
+  
+  try {
+    const userId = c.req.param('id')
+    
+    // Reset password to default "Alpro@123"
+    const response = await supabaseRequest(c, `users?id=eq.${userId}`, {
+      method: 'PATCH',
+      body: JSON.stringify({
+        password_hash: 'Alpro@123'  // In production, hash this
+      })
+    })
+    
+    const updatedUser = await response.json()
+    return c.json({ success: true, message: 'Password reset to Alpro@123' })
+  } catch (error) {
+    return c.json({ error: 'Failed to reset password' }, 500)
+  }
+})
+
+// Change own password (authenticated users)
+app.post('/api/change-password', authMiddleware, async (c) => {
+  const user = c.get('user')
+  
+  try {
+    const { current_password, new_password } = await c.req.json()
+    
+    // Validation
+    if (!current_password || !new_password) {
+      return c.json({ error: 'Current and new passwords are required' }, 400)
+    }
+    
+    if (new_password.length < 6) {
+      return c.json({ error: 'New password must be at least 6 characters' }, 400)
+    }
+    
+    // Fetch current user data
+    const response = await supabaseRequest(c, `users?id=eq.${user.id}&select=password_hash`)
+    const users = await response.json()
+    
+    if (!users || users.length === 0) {
+      return c.json({ error: 'User not found' }, 404)
+    }
+    
+    const currentUser = users[0]
+    
+    // Verify current password (simple comparison - in production use bcrypt)
+    if (currentUser.password_hash !== current_password) {
+      return c.json({ error: 'Current password is incorrect' }, 401)
+    }
+    
+    // Update password
+    await supabaseRequest(c, `users?id=eq.${user.id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({
+        password_hash: new_password  // In production, hash this
+      })
+    })
+    
+    return c.json({ success: true, message: 'Password changed successfully' })
+  } catch (error) {
+    console.error('Change password error:', error)
+    return c.json({ error: 'Failed to change password' }, 500)
   }
 })
 
