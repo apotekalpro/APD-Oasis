@@ -364,7 +364,18 @@ app.get('/api/warehouse/parcels', authMiddleware, async (c) => {
 // Get transfer details for warehouse scanning
 app.get('/api/warehouse/transfers', authMiddleware, async (c) => {
   try {
-    const response = await supabaseRequest(c, 'transfer_details?status=eq.pending&select=*&order=outlet_code.asc')
+    const { outlet_code } = c.req.query()
+    
+    let query = 'transfer_details?select=*&order=outlet_code.asc,transfer_number.asc'
+    if (outlet_code) {
+      // If outlet_code specified, get all transfers for that outlet (not just pending)
+      query = `transfer_details?outlet_code=eq.${outlet_code}&select=*&order=transfer_number.asc`
+    } else {
+      // Otherwise, get only pending transfers
+      query = 'transfer_details?status=eq.pending&select=*&order=outlet_code.asc'
+    }
+    
+    const response = await supabaseRequest(c, query)
     const transfers = await response.json()
     return c.json({ transfers })
   } catch (error) {
