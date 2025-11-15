@@ -29,11 +29,11 @@ A comprehensive full-stack web application for logistics tracking and warehouse 
 
 ## 🌐 URLs
 
+- **GitHub Repository**: https://github.com/apotekalpro/APD-Oasis
 - **Development URL**: https://3000-i8ezurtfnv7jlbrg994fh-02b9cc79.sandbox.novita.ai
+- **Production URL**: (To be deployed on Cloudflare Pages)
 - **Default Admin Login**: `admin` / `admin123`
 - **Outlet Login**: [Short Store Name] / `Alpro@123` (e.g., `JKJSTT1` / `Alpro@123`)
-- **GitHub Repository**: (To be deployed)
-- **Production URL**: (To be deployed on Cloudflare Pages)
 
 ## 🏪 Outlet System (NEW!)
 
@@ -259,19 +259,59 @@ Parcel (grouped by Pallet ID)
   - Font Awesome - Icons
   - Tailwind CSS - Styling
 
-## 📱 Mobile Support
+## 📱 Mobile App Support (NEW! Version 1.9.0)
 
-The application is fully responsive and optimized for mobile devices:
-- Touch-friendly interface
-- Large scan buttons
-- Mobile-optimized layouts
-- Ready for APK packaging using Capacitor or similar tools
+The application now includes **full mobile app support** with Capacitor:
+
+### ✅ Mobile Features
+- 📱 **Android APK Ready** - Full Android project structure configured
+- 🎨 **Mobile-Optimized UI** - Touch-friendly interface with 44px minimum touch targets
+- 📵 **No Zoom on Input** - Prevents automatic zoom when focusing input fields
+- 🎯 **Native-Like Experience** - Smooth scrolling and app-like navigation
+- 📦 **Standalone HTML App** - Works offline after initial load
+- 🔄 **Auto-Responsive** - Adapts to all screen sizes and orientations
+
+### 📦 APK Building
+
+The Android project is ready to build! See **`MOBILE_APP_GUIDE.md`** for detailed instructions:
+
+1. **Option 1: Android Studio** (Recommended)
+   - Open `android/` folder in Android Studio
+   - Build APK via Build menu or `./gradlew assembleDebug`
+
+2. **Option 2: Command Line**
+   - Requires Android SDK installed locally
+   - Run: `cd android && ./gradlew assembleDebug`
+
+3. **Option 3: GitHub Actions**
+   - Automated CI/CD build with workflow file
+   - APK artifacts available for download
+
+4. **Option 4: Cloud Services**
+   - EAS Build, Ionic Appflow, or similar services
+   - No local Android SDK required
+
+### 📋 Mobile Setup Status
+- ✅ Capacitor installed and configured
+- ✅ Android platform added
+- ✅ Mobile-optimized `index.html` created
+- ✅ Build script for mobile assets
+- ✅ Java 17 compatibility configured
+- ✅ All icons and splash screens included
+- ⚠️ APK building requires Android SDK (not in sandbox)
+- ⚠️ API endpoint needs production URL configuration
+
+### 📖 Documentation
+- **MOBILE_APP_GUIDE.md** - Complete guide for building APK
+- Includes troubleshooting, API configuration, and deployment checklist
 
 ## 🔧 Deployment Status
 
 - ✅ **Development**: Active on sandbox environment
-- ⏳ **GitHub**: Ready for push
+- ✅ **GitHub**: Code pushed to https://github.com/apotekalpro/APD-Oasis
+- ✅ **Mobile App**: Android project ready (see MOBILE_APP_GUIDE.md)
 - ⏳ **Cloudflare Pages**: Ready for production deployment
+- ⏳ **Android APK**: Requires Android SDK to build (see MOBILE_APP_GUIDE.md)
 - ⏳ **Supabase Database**: Schema needs to be executed (see `supabase-schema.sql`)
 
 ## 📝 Setup Instructions
@@ -413,6 +453,7 @@ wrangler pages secret put JWT_SECRET
 | `VERSION_1.8.1_SUMMARY.md` | User search & role fixes release notes |
 | `VERSION_1.8.2_HOTFIX.md` | Critical login fixes (IMPORTANT!) |
 | `VERSION_1.8.3_FEATURE.md` | **NEW!** Delivered outlets visibility feature |
+| `MOBILE_APP_GUIDE.md` | **NEW!** Complete mobile app building guide (v1.9.0) |
 | `ADD_DELIVERY_DATE_COLUMN.sql` | Multi-day dashboard migration (REQUIRED!) |
 | `FIX_WAREHOUSE_SUPERVISOR_ROLE.sql` | **REQUIRED!** Fix warehouse_supervisor role constraint |
 | `URGENT_FIX_REQUIRED.md` | **MUST READ!** Database fix instructions for roles |
@@ -432,5 +473,5 @@ For support and feature requests, contact your system administrator.
 ---
 
 **Last Updated**: November 15, 2025  
-**Version**: 1.8.5 (Warehouse Complete Overview)  
-**Status**: ✅ Production Ready | ⚠️ **MIGRATION REQUIRED** (ADD_DELIVERY_DATE_COLUMN.sql + FIX_WAREHOUSE_SUPERVISOR_ROLE.sql) | 🏪 205 Outlets Imported | 📦 Pallet Scanning Active | 🛡️ Duplicate Prevention Active | 🗑️ Session Delete Active | 📊 Multi-Day Dashboard Active | ✍️ Bulk Receipt Completion Active | 📅 Delivery Date Planning Active | 🔐 Password Management Active | 🔍 User Search Active | ✅ All Roles Login Working | 📋 Warehouse Shows All Deliveries
+**Version**: 1.9.0 (Mobile App Ready)  
+**Status**: ✅ Production Ready | 📱 Mobile APK Ready | ✅ GitHub Deployed | ⚠️ **MIGRATION REQUIRED** (ADD_DELIVERY_DATE_COLUMN.sql + FIX_WAREHOUSE_SUPERVISOR_ROLE.sql) | 🏪 205 Outlets Imported | 📦 Pallet Scanning Active | 🛡️ Duplicate Prevention Active | 🗑️ Session Delete Active | 📊 Multi-Day Dashboard Active | ✍️ Bulk Receipt Completion Active | 📅 Delivery Date Planning Active | 🔐 Password Management Active | 🔍 User Search Active | ✅ All Roles Login Working | 📋 Warehouse Shows All Deliveries
