@@ -569,6 +569,19 @@ function renderImport() {
                         </table>
                     </div>
                     
+                    <div class="mt-6 bg-blue-50 border border-blue-200 rounded-lg p-4">
+                        <label class="block text-sm font-semibold text-gray-700 mb-2">
+                            <i class="fas fa-calendar mr-2"></i>Delivery Date for this Import *
+                        </label>
+                        <input type="date" id="importDeliveryDate" 
+                            class="w-full px-4 py-2 border-2 border-blue-300 rounded-lg"
+                            value="${new Date().toISOString().split('T')[0]}">
+                        <p class="text-xs text-gray-600 mt-2">
+                            <i class="fas fa-info-circle mr-1"></i>
+                            Select the delivery date for these parcels. Example: Import tonight for tomorrow's delivery.
+                        </p>
+                    </div>
+                    
                     <div class="mt-6 flex space-x-3">
                         <button onclick="confirmImport()" class="flex-1 bg-blue-500 hover:bg-blue-600 text-white px-6 py-3 rounded-lg font-semibold">
                             <i class="fas fa-check mr-2"></i>Confirm Import
@@ -729,12 +742,26 @@ async function confirmImport() {
     }
     
     try {
+        // Get delivery date from input
+        const deliveryDateInput = document.getElementById('importDeliveryDate')
+        const deliveryDate = deliveryDateInput ? deliveryDateInput.value : new Date().toISOString().split('T')[0]
+        
+        if (!deliveryDate) {
+            showToast('Please select a delivery date', 'error')
+            if (confirmBtn) {
+                confirmBtn.disabled = false
+                confirmBtn.innerHTML = '<i class="fas fa-check mr-2"></i>Confirm Import'
+            }
+            return
+        }
+        
         const response = await axios.post('/api/import', {
             data: importData,
-            import_date: new Date().toISOString().split('T')[0]
+            import_date: new Date().toISOString().split('T')[0],
+            delivery_date: deliveryDate
         })
         
-        showToast(`Successfully imported ${response.data.total_parcels} parcels`, 'success')
+        showToast(`Successfully imported ${response.data.total_parcels} parcels for ${deliveryDate}`, 'success')
         cancelImport()
         navigateTo('warehouse')
     } catch (error) {
@@ -756,11 +783,59 @@ function cancelImport() {
 
 // ============ Dashboard Page ============
 function renderDashboard() {
+    // Initialize dashboard date if not set
+    if (!state.dashboardDate) {
+        state.dashboardDate = new Date().toISOString().split('T')[0] // Today
+    }
+    
+    // Calculate yesterday, today, tomorrow
+    const today = new Date()
+    const yesterday = new Date(today)
+    yesterday.setDate(yesterday.getDate() - 1)
+    const tomorrow = new Date(today)
+    tomorrow.setDate(tomorrow.getDate() + 1)
+    
+    const yesterdayStr = yesterday.toISOString().split('T')[0]
+    const todayStr = today.toISOString().split('T')[0]
+    const tomorrowStr = tomorrow.toISOString().split('T')[0]
+    
+    const selectedDate = state.dashboardDate
+    
+    // Format date labels
+    const formatDateLabel = (dateStr) => {
+        const date = new Date(dateStr + 'T00:00:00')
+        return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+    }
+    
     return `
         <div class="container mx-auto px-4 py-6">
             <h2 class="text-3xl font-bold mb-6 text-gray-800">
                 <i class="fas fa-tachometer-alt text-blue-600 mr-3"></i>Live Dashboard
             </h2>
+            
+            <!-- Date Selection Tabs -->
+            <div class="bg-white rounded-lg shadow-lg mb-6 p-4">
+                <div class="flex items-center justify-between flex-wrap gap-3">
+                    <div class="flex gap-2">
+                        <button onclick="setDashboardDate('${yesterdayStr}')" 
+                            class="px-4 py-2 rounded-lg font-semibold transition ${selectedDate === yesterdayStr ? 'bg-blue-600 text-white' : 'bg-gray-200 hover:bg-gray-300 text-gray-700'}">
+                            <i class="fas fa-chevron-left mr-2"></i>Yesterday (${formatDateLabel(yesterdayStr)})
+                        </button>
+                        <button onclick="setDashboardDate('${todayStr}')" 
+                            class="px-4 py-2 rounded-lg font-semibold transition ${selectedDate === todayStr ? 'bg-blue-600 text-white' : 'bg-gray-200 hover:bg-gray-300 text-gray-700'}">
+                            <i class="fas fa-calendar-day mr-2"></i>Today (${formatDateLabel(todayStr)})
+                        </button>
+                        <button onclick="setDashboardDate('${tomorrowStr}')" 
+                            class="px-4 py-2 rounded-lg font-semibold transition ${selectedDate === tomorrowStr ? 'bg-blue-600 text-white' : 'bg-gray-200 hover:bg-gray-300 text-gray-700'}">
+                            Tomorrow (${formatDateLabel(tomorrowStr)})<i class="fas fa-chevron-right ml-2"></i>
+                        </button>
+                    </div>
+                    <button onclick="loadDashboardData()" 
+                        class="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg">
+                        <i class="fas fa-sync mr-2"></i>Refresh
+                    </button>
+                </div>
+            </div>
             
             <!-- Statistics Cards -->
             <div class="grid md:grid-cols-4 gap-6 mb-6">
@@ -842,12 +917,8 @@ function renderDashboard() {
             
             <!-- Outlet Status Table -->
             <div class="bg-white rounded-lg shadow-lg p-6">
-                <div class="flex justify-between items-center mb-4">
-                    <h3 class="text-xl font-bold">Outlet Status (Today)</h3>
-                    <button onclick="loadDashboardData()" 
-                        class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded">
-                        <i class="fas fa-sync mr-2"></i>Refresh
-                    </button>
+                <div class="mb-4">
+                    <h3 class="text-xl font-bold">Outlet Status</h3>
                 </div>
                 
                 <div class="overflow-x-auto">
@@ -860,7 +931,8 @@ function renderDashboard() {
                                 <th class="px-4 py-2 text-center">Loaded</th>
                                 <th class="px-4 py-2 text-center">Delivered</th>
                                 <th class="px-4 py-2 text-center">Status</th>
-                                <th class="px-4 py-2 text-center">Last Delivered</th>
+                                <th class="px-4 py-2 text-center">Loaded At</th>
+                                <th class="px-4 py-2 text-center">Delivered At</th>
                                 <th class="px-4 py-2 text-left">Receiver</th>
                             </tr>
                         </thead>
@@ -876,10 +948,19 @@ function renderDashboard() {
     `
 }
 
+function setDashboardDate(date) {
+    state.dashboardDate = date
+    render()
+    setTimeout(() => loadDashboardData(), 100)
+}
+
 async function loadDashboardData() {
     try {
-        // Fetch ALL parcels including delivered ones for dashboard
-        const response = await axios.get('/api/dashboard/parcels')
+        // Get selected date (default to today)
+        const selectedDate = state.dashboardDate || new Date().toISOString().split('T')[0]
+        
+        // Fetch parcels for selected date
+        const response = await axios.get(`/api/dashboard/parcels?delivery_date=${selectedDate}`)
         const parcels = response.data.parcels || []
         
         // Group by outlet
@@ -906,13 +987,24 @@ async function loadDashboardData() {
                     total: 0,
                     loaded: 0,
                     delivered: 0,
+                    last_loaded_at: null,
                     last_delivered_at: null,
                     last_receiver: null
                 })
             }
             const outlet = outletMap.get(parcel.outlet_code)
             outlet.total++
-            if (parcel.status === 'loaded') outlet.loaded++
+            
+            // Track loaded status and timestamp
+            if (parcel.status === 'loaded' || parcel.status === 'delivered') {
+                outlet.loaded++
+                // Store latest loaded timestamp
+                if (parcel.loaded_at && (!outlet.last_loaded_at || parcel.loaded_at > outlet.last_loaded_at)) {
+                    outlet.last_loaded_at = parcel.loaded_at
+                }
+            }
+            
+            // Track delivered status and info
             if (parcel.status === 'delivered') {
                 outlet.delivered++
                 // Store latest delivery info
@@ -944,8 +1036,21 @@ async function loadDashboardData() {
         // Update outlet table
         const tableBody = document.getElementById('dash-outlet-table')
         if (outletMap.size === 0) {
-            tableBody.innerHTML = '<tr><td colspan="8" class="text-center py-4 text-gray-500">No data available</td></tr>'
+            tableBody.innerHTML = '<tr><td colspan="9" class="text-center py-4 text-gray-500">No data available</td></tr>'
             return
+        }
+        
+        // Helper function to format timestamp with date
+        const formatDateTime = (timestamp) => {
+            if (!timestamp) return '-'
+            const date = new Date(timestamp)
+            const dateStr = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+            const timeStr = date.toLocaleTimeString('en-US', { 
+                hour: '2-digit', 
+                minute: '2-digit',
+                hour12: true 
+            })
+            return `${dateStr}<br/>${timeStr}`
         }
         
         tableBody.innerHTML = Array.from(outletMap.values()).map(outlet => {
@@ -965,17 +1070,9 @@ async function loadDashboardData() {
                 statusClass = 'bg-yellow-200 text-yellow-800'
             }
             
-            // Format delivery timestamp
-            let deliveryTimeStr = '-'
-            if (outlet.last_delivered_at) {
-                const deliveryDate = new Date(outlet.last_delivered_at)
-                deliveryTimeStr = deliveryDate.toLocaleTimeString('en-US', { 
-                    hour: '2-digit', 
-                    minute: '2-digit',
-                    hour12: true 
-                })
-            }
-            
+            // Format loaded and delivered timestamps
+            const loadedTimeStr = formatDateTime(outlet.last_loaded_at)
+            const deliveredTimeStr = formatDateTime(outlet.last_delivered_at)
             const receiverStr = outlet.last_receiver || '-'
             
             return `
@@ -996,8 +1093,11 @@ async function loadDashboardData() {
                             ${status}
                         </span>
                     </td>
-                    <td class="px-4 py-3 text-center text-sm ${outlet.last_delivered_at ? 'text-green-600 font-medium' : 'text-gray-400'}">
-                        ${deliveryTimeStr}
+                    <td class="px-4 py-3 text-center text-xs ${outlet.last_loaded_at ? 'text-green-600 font-medium' : 'text-gray-400'}">
+                        ${loadedTimeStr}
+                    </td>
+                    <td class="px-4 py-3 text-center text-xs ${outlet.last_delivered_at ? 'text-teal-600 font-medium' : 'text-gray-400'}">
+                        ${deliveredTimeStr}
                     </td>
                     <td class="px-4 py-3 text-sm ${outlet.last_receiver ? 'text-gray-700' : 'text-gray-400'}">
                         ${receiverStr}
@@ -1020,11 +1120,33 @@ setInterval(() => {
 
 // ============ Warehouse Page ============
 function renderWarehouse() {
+    // Initialize warehouse delivery date if not set
+    if (!state.warehouseDeliveryDate) {
+        state.warehouseDeliveryDate = new Date().toISOString().split('T')[0]
+    }
+    
     return `
         <div class="container mx-auto px-4 py-6">
             <h2 class="text-3xl font-bold mb-6 text-gray-800">
                 <i class="fas fa-warehouse text-blue-600 mr-3"></i>Warehouse Loading
             </h2>
+            
+            <!-- Delivery Date Selection -->
+            <div class="bg-white rounded-lg shadow-lg mb-6 p-4">
+                <div class="flex items-center gap-4 flex-wrap">
+                    <label class="font-semibold text-gray-700">
+                        <i class="fas fa-calendar mr-2"></i>Delivery Date:
+                    </label>
+                    <input type="date" id="warehouseDeliveryDate" 
+                        class="px-4 py-2 border-2 border-blue-300 rounded-lg font-semibold"
+                        value="${state.warehouseDeliveryDate}"
+                        onchange="setWarehouseDeliveryDate(this.value)">
+                    <p class="text-sm text-gray-600">
+                        <i class="fas fa-info-circle mr-1"></i>
+                        Select the delivery date to view and load parcels
+                    </p>
+                </div>
+            </div>
             
             <div class="grid lg:grid-cols-3 gap-6">
                 <!-- Scanning Panel -->
@@ -1100,9 +1222,17 @@ function renderWarehouse() {
     `
 }
 
+function setWarehouseDeliveryDate(date) {
+    state.warehouseDeliveryDate = date
+    loadWarehouseData()
+}
+
 async function loadWarehouseData() {
     try {
-        const response = await axios.get('/api/warehouse/parcels')
+        // Get selected delivery date (default to today)
+        const deliveryDate = state.warehouseDeliveryDate || new Date().toISOString().split('T')[0]
+        
+        const response = await axios.get(`/api/warehouse/parcels?delivery_date=${deliveryDate}`)
         state.parcels = response.data.parcels
         
         console.log('Loaded parcels:', state.parcels.length)

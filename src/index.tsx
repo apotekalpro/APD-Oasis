@@ -238,13 +238,14 @@ app.post('/api/admin/outlets', authMiddleware, async (c) => {
 app.post('/api/import', authMiddleware, async (c) => {
   try {
     const user = c.get('user')
-    const { data, import_date } = await c.req.json()
+    const { data, import_date, delivery_date } = await c.req.json()
     
     // Create import record
     const importResponse = await supabaseRequest(c, 'imports', {
       method: 'POST',
       body: JSON.stringify({
         import_date: import_date || new Date().toISOString().split('T')[0],
+        delivery_date: delivery_date || new Date().toISOString().split('T')[0],
         imported_by: user.id,
         status: 'active'
       })
@@ -324,6 +325,7 @@ app.post('/api/import', authMiddleware, async (c) => {
         method: 'POST',
         body: JSON.stringify({
           import_id: importId,
+          delivery_date: delivery_date || new Date().toISOString().split('T')[0],
           outlet_code: parcel.outlet_code,
           outlet_code_short: parcel.outlet_code_short,
           outlet_name: parcel.outlet_name,
@@ -350,6 +352,7 @@ app.post('/api/import', authMiddleware, async (c) => {
       const transferDetails = parcel.transfer_numbers.map((tn: string) => ({
         parcel_id: parcelId,
         transfer_number: tn,
+        delivery_date: delivery_date || new Date().toISOString().split('T')[0],
         outlet_code: parcel.outlet_code,
         outlet_code_short: parcel.outlet_code_short,
         outlet_name: parcel.outlet_name,
@@ -391,10 +394,15 @@ app.post('/api/import', authMiddleware, async (c) => {
 // Get all pending parcels for warehouse view
 app.get('/api/warehouse/parcels', authMiddleware, async (c) => {
   try {
-    const { import_id } = c.req.query()
+    const { import_id, delivery_date } = c.req.query()
     
     let query = 'parcels?status=neq.delivered&select=*&order=outlet_code.asc'
-    if (import_id) {
+    
+    if (delivery_date && import_id) {
+      query = `parcels?import_id=eq.${import_id}&delivery_date=eq.${delivery_date}&status=neq.delivered&select=*&order=outlet_code.asc`
+    } else if (delivery_date) {
+      query = `parcels?delivery_date=eq.${delivery_date}&status=neq.delivered&select=*&order=outlet_code.asc`
+    } else if (import_id) {
       query = `parcels?import_id=eq.${import_id}&status=neq.delivered&select=*&order=outlet_code.asc`
     }
     
@@ -409,8 +417,15 @@ app.get('/api/warehouse/parcels', authMiddleware, async (c) => {
 // Get ALL parcels for dashboard view (including delivered)
 app.get('/api/dashboard/parcels', authMiddleware, async (c) => {
   try {
-    // Get all parcels including delivered ones, ordered by outlet
-    const response = await supabaseRequest(c, 'parcels?select=*&order=outlet_code.asc')
+    const { delivery_date } = c.req.query()
+    
+    // Filter by delivery date if provided
+    let query = 'parcels?select=*&order=outlet_code.asc'
+    if (delivery_date) {
+      query = `parcels?delivery_date=eq.${delivery_date}&select=*&order=outlet_code.asc`
+    }
+    
+    const response = await supabaseRequest(c, query)
     const parcels = await response.json()
     return c.json({ parcels })
   } catch (error) {
