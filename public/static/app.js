@@ -904,10 +904,14 @@ function updateScannedItemsList() {
         return
     }
     
-    list.innerHTML = state.scannedItems.slice().reverse().map((item, index) => `
+    list.innerHTML = state.scannedItems.slice().reverse().map((item, reversedIndex) => {
+        // Calculate actual index in original array
+        const actualIndex = state.scannedItems.length - 1 - reversedIndex
+        
+        return `
         <div class="border-l-4 border-green-500 bg-green-50 p-3 rounded">
-            <div class="flex justify-between">
-                <div>
+            <div class="flex justify-between items-start">
+                <div class="flex-1">
                     <p class="font-semibold">
                         <i class="fas fa-pallet mr-1 text-green-600"></i>${item.pallet_id}
                     </p>
@@ -918,10 +922,19 @@ function updateScannedItemsList() {
                         ${item.transfer_count} transfers
                     </p>
                 </div>
-                <span class="text-sm text-gray-500">${item.time}</span>
+                <div class="flex items-start space-x-2">
+                    <span class="text-sm text-gray-500">${item.time}</span>
+                    ${canDelete() ? `
+                        <button onclick="confirmDeleteScannedItem(${actualIndex}, 'warehouse')" 
+                            class="text-red-500 hover:text-red-700 ml-2"
+                            title="Delete this scan">
+                            <i class="fas fa-trash-alt"></i>
+                        </button>
+                    ` : ''}
+                </div>
             </div>
         </div>
-    `).join('')
+    `}).join('')
 }
 
 function showCompleteLoadingModal() {
@@ -975,6 +988,73 @@ async function handleCompleteLoading(event) {
     } catch (error) {
         showToast('Failed to complete loading', 'error')
     }
+}
+
+// Delete scanned item from session
+function confirmDeleteScannedItem(index, context) {
+    const item = state.scannedItems[index]
+    if (!item) return
+    
+    const modal = document.createElement('div')
+    modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50'
+    modal.innerHTML = `
+        <div class="bg-white rounded-lg p-6 w-full max-w-md">
+            <h3 class="text-xl font-bold mb-4 text-red-600">
+                <i class="fas fa-exclamation-triangle mr-2"></i>Delete Scanned Item?
+            </h3>
+            <div class="mb-6">
+                <p class="mb-2">Are you sure you want to delete this scan?</p>
+                <div class="bg-gray-100 p-3 rounded">
+                    <p class="font-semibold">
+                        <i class="fas fa-pallet mr-1 text-green-600"></i>${item.pallet_id}
+                    </p>
+                    ${context === 'warehouse' ? `
+                        <p class="text-sm text-gray-600">
+                            ${item.outlet_code_short || item.outlet_code} - ${item.outlet_name}
+                        </p>
+                    ` : ''}
+                    <p class="text-xs text-gray-500">
+                        ${item.transfer_count} transfers • Scanned at ${item.time}
+                    </p>
+                </div>
+                <p class="text-sm text-red-600 mt-2">
+                    <i class="fas fa-info-circle mr-1"></i>This will remove the item from your current session only.
+                    ${context === 'warehouse' ? 'The parcels will remain in "loaded" status in the database.' : 'The parcels will remain in "delivered" status in the database.'}
+                </p>
+            </div>
+            <div class="flex space-x-3">
+                <button onclick="deleteScannedItem(${index}, '${context}'); this.closest('.fixed').remove()" 
+                    class="flex-1 bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg">
+                    <i class="fas fa-trash-alt mr-2"></i>Delete
+                </button>
+                <button onclick="this.closest('.fixed').remove()" 
+                    class="flex-1 bg-gray-300 hover:bg-gray-400 px-4 py-2 rounded-lg">
+                    Cancel
+                </button>
+            </div>
+        </div>
+    `
+    document.body.appendChild(modal)
+}
+
+function deleteScannedItem(index, context) {
+    const item = state.scannedItems[index]
+    if (!item) {
+        showToast('Item not found', 'error')
+        return
+    }
+    
+    // Remove from scanned items array
+    state.scannedItems.splice(index, 1)
+    
+    // Update the appropriate list
+    if (context === 'warehouse') {
+        updateScannedItemsList()
+    } else if (context === 'outlet') {
+        updateOutletScannedList()
+    }
+    
+    showToast(`Scan removed: ${item.pallet_id}`, 'success')
 }
 
 // Show outlet details modal with all transfers
@@ -1444,19 +1524,32 @@ function updateOutletScannedList() {
         return
     }
     
-    list.innerHTML = state.scannedItems.slice().reverse().map(item => `
+    list.innerHTML = state.scannedItems.slice().reverse().map((item, reversedIndex) => {
+        // Calculate actual index in original array
+        const actualIndex = state.scannedItems.length - 1 - reversedIndex
+        
+        return `
         <div class="border-l-4 border-green-500 bg-green-50 p-3 rounded">
             <div class="flex justify-between items-start">
-                <div>
+                <div class="flex-1">
                     <p class="font-semibold">
                         <i class="fas fa-pallet mr-1 text-green-600"></i>${item.pallet_id}
                     </p>
                     <p class="text-xs text-gray-600">${item.transfer_count} transfers</p>
                 </div>
-                <span class="text-sm text-gray-500">${item.time}</span>
+                <div class="flex items-start space-x-2">
+                    <span class="text-sm text-gray-500">${item.time}</span>
+                    ${canDelete() ? `
+                        <button onclick="confirmDeleteScannedItem(${actualIndex}, 'outlet')" 
+                            class="text-red-500 hover:text-red-700 ml-2"
+                            title="Delete this scan">
+                            <i class="fas fa-trash-alt"></i>
+                        </button>
+                    ` : ''}
+                </div>
             </div>
         </div>
-    `).join('')
+    `}).join('')
 }
 
 function showCompleteUnloadingModal() {
