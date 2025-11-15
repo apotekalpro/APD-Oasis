@@ -1465,29 +1465,52 @@ async function loadWarehouseData() {
             return
         }
         
-        summary.innerHTML = Array.from(outletMap.values()).map(outlet => {
+        // Check if outlets are delivered (all parcels delivered)
+        const outlets = Array.from(outletMap.values()).map(outlet => {
             const percentage = outlet.total > 0 ? Math.round((outlet.scanned / outlet.total) * 100) : 0
             const isComplete = outlet.scanned === outlet.total
             
+            // Check if all parcels for this outlet are delivered (not just loaded)
+            const outletParcels = state.parcels.filter(p => p.outlet_code === outlet.code)
+            const allDelivered = outletParcels.every(p => p.status === 'delivered')
+            
+            return { ...outlet, percentage, isComplete, allDelivered }
+        })
+        
+        // Separate into pending and delivered outlets
+        const pendingOutlets = outlets.filter(o => !o.allDelivered)
+        const deliveredOutlets = outlets.filter(o => o.allDelivered)
+        
+        // Render function for outlet card
+        const renderOutletCard = (outlet) => {
+            const badgeColor = outlet.allDelivered ? 'bg-purple-500' : (outlet.isComplete ? 'bg-green-500' : 'bg-blue-500')
+            const badgeText = outlet.allDelivered ? 'Delivered' : (outlet.isComplete ? 'Loaded' : 'Pending')
+            const borderColor = outlet.allDelivered ? 'border-purple-500 bg-purple-50' : (outlet.isComplete ? 'border-green-500 bg-green-50' : 'border-gray-300')
+            
             return `
-                <div class="border-2 ${isComplete ? 'border-green-500 bg-green-50' : 'border-gray-300'} rounded-lg p-4">
+                <div class="border-2 ${borderColor} rounded-lg p-4">
                     <div class="flex justify-between items-center mb-2">
                         <div class="flex-1">
-                            <p class="font-bold text-lg">${outlet.code_short}</p>
+                            <div class="flex items-center gap-2 mb-1">
+                                <p class="font-bold text-lg">${outlet.code_short}</p>
+                                <span class="${badgeColor} text-white text-xs px-2 py-1 rounded-full">
+                                    ${badgeText}
+                                </span>
+                            </div>
                             <p class="text-sm text-gray-600">${outlet.name}</p>
                             <p class="text-xs text-gray-500">Code: ${outlet.code}</p>
                         </div>
                         <div class="flex items-center space-x-2">
-                            ${isComplete ? '<i class="fas fa-check-circle text-green-500 text-2xl"></i>' : ''}
+                            ${outlet.isComplete ? '<i class="fas fa-check-circle text-green-500 text-2xl"></i>' : ''}
                         </div>
                     </div>
                     <div class="mt-2">
                         <div class="flex justify-between text-sm mb-1">
                             <span>${outlet.scanned} / ${outlet.total} pallets</span>
-                            <span>${percentage}%</span>
+                            <span>${outlet.percentage}%</span>
                         </div>
                         <div class="w-full bg-gray-200 rounded-full h-2">
-                            <div class="bg-blue-500 h-2 rounded-full" style="width: ${percentage}%"></div>
+                            <div class="${outlet.allDelivered ? 'bg-purple-500' : 'bg-blue-500'} h-2 rounded-full" style="width: ${outlet.percentage}%"></div>
                         </div>
                     </div>
                     <div class="mt-3 flex space-x-2">
@@ -1504,7 +1527,31 @@ async function loadWarehouseData() {
                     </div>
                 </div>
             `
-        }).join('')
+        }
+        
+        // Build HTML: Pending first, then delivered with separator
+        let html = ''
+        
+        // Pending outlets
+        if (pendingOutlets.length > 0) {
+            html += pendingOutlets.map(renderOutletCard).join('')
+        }
+        
+        // Delivered outlets with separator
+        if (deliveredOutlets.length > 0) {
+            if (pendingOutlets.length > 0) {
+                html += `
+                    <div class="my-4 border-t-2 border-gray-300 pt-4">
+                        <p class="text-sm text-gray-600 font-semibold mb-3">
+                            <i class="fas fa-check-double mr-2"></i>Delivered (${deliveredOutlets.length})
+                        </p>
+                    </div>
+                `
+            }
+            html += deliveredOutlets.map(renderOutletCard).join('')
+        }
+        
+        summary.innerHTML = html
     } catch (error) {
         console.error('Error loading warehouse data:', error)
     }
