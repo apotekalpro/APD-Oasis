@@ -202,6 +202,10 @@ function renderNavBar() {
                         ` : ''}
                         
                         ${['admin', 'warehouse', 'driver'].includes(state.user.role) ? `
+                            <button onclick="navigateTo('dashboard')" 
+                                class="px-4 py-2 rounded ${state.currentPage === 'dashboard' ? 'bg-blue-800' : 'bg-blue-500 hover:bg-blue-700'}">
+                                <i class="fas fa-tachometer-alt mr-2"></i>Dashboard
+                            </button>
                             <button onclick="navigateTo('warehouse')" 
                                 class="px-4 py-2 rounded ${state.currentPage === 'warehouse' ? 'bg-blue-800' : 'bg-blue-500 hover:bg-blue-700'}">
                                 <i class="fas fa-warehouse mr-2"></i>Warehouse
@@ -686,6 +690,239 @@ function cancelImport() {
     document.getElementById('importPreview').classList.add('hidden')
 }
 
+// ============ Dashboard Page ============
+function renderDashboard() {
+    return `
+        <div class="container mx-auto px-4 py-6">
+            <h2 class="text-3xl font-bold mb-6 text-gray-800">
+                <i class="fas fa-tachometer-alt text-blue-600 mr-3"></i>Live Dashboard
+            </h2>
+            
+            <!-- Statistics Cards -->
+            <div class="grid md:grid-cols-4 gap-6 mb-6">
+                <div class="bg-white rounded-lg shadow-lg p-6">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-gray-500 text-sm">Total Outlets</p>
+                            <p id="dash-total-outlets" class="text-3xl font-bold text-blue-600">-</p>
+                        </div>
+                        <i class="fas fa-store text-4xl text-blue-200"></i>
+                    </div>
+                </div>
+                
+                <div class="bg-white rounded-lg shadow-lg p-6">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-gray-500 text-sm">Total Pallets</p>
+                            <p id="dash-total-pallets" class="text-3xl font-bold text-purple-600">-</p>
+                        </div>
+                        <i class="fas fa-pallet text-4xl text-purple-200"></i>
+                    </div>
+                </div>
+                
+                <div class="bg-white rounded-lg shadow-lg p-6">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-gray-500 text-sm">Loaded Pallets</p>
+                            <p id="dash-loaded-pallets" class="text-3xl font-bold text-green-600">-</p>
+                        </div>
+                        <i class="fas fa-check-circle text-4xl text-green-200"></i>
+                    </div>
+                </div>
+                
+                <div class="bg-white rounded-lg shadow-lg p-6">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-gray-500 text-sm">Delivered Pallets</p>
+                            <p id="dash-delivered-pallets" class="text-3xl font-bold text-teal-600">-</p>
+                        </div>
+                        <i class="fas fa-truck text-4xl text-teal-200"></i>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Progress Overview -->
+            <div class="grid md:grid-cols-2 gap-6 mb-6">
+                <div class="bg-white rounded-lg shadow-lg p-6">
+                    <h3 class="text-xl font-bold mb-4">Loading Progress</h3>
+                    <div class="mb-2">
+                        <div class="flex justify-between text-sm mb-1">
+                            <span>Loaded</span>
+                            <span id="dash-loading-percent">0%</span>
+                        </div>
+                        <div class="w-full bg-gray-200 rounded-full h-4">
+                            <div id="dash-loading-bar" class="bg-green-500 h-4 rounded-full" style="width: 0%"></div>
+                        </div>
+                    </div>
+                    <p class="text-sm text-gray-600 mt-2">
+                        <span id="dash-loading-text">0 / 0 pallets loaded</span>
+                    </p>
+                </div>
+                
+                <div class="bg-white rounded-lg shadow-lg p-6">
+                    <h3 class="text-xl font-bold mb-4">Delivery Progress</h3>
+                    <div class="mb-2">
+                        <div class="flex justify-between text-sm mb-1">
+                            <span>Delivered</span>
+                            <span id="dash-delivery-percent">0%</span>
+                        </div>
+                        <div class="w-full bg-gray-200 rounded-full h-4">
+                            <div id="dash-delivery-bar" class="bg-teal-500 h-4 rounded-full" style="width: 0%"></div>
+                        </div>
+                    </div>
+                    <p class="text-sm text-gray-600 mt-2">
+                        <span id="dash-delivery-text">0 / 0 pallets delivered</span>
+                    </p>
+                </div>
+            </div>
+            
+            <!-- Outlet Status Table -->
+            <div class="bg-white rounded-lg shadow-lg p-6">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="text-xl font-bold">Outlet Status (Today)</h3>
+                    <button onclick="loadDashboardData()" 
+                        class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded">
+                        <i class="fas fa-sync mr-2"></i>Refresh
+                    </button>
+                </div>
+                
+                <div class="overflow-x-auto">
+                    <table class="w-full">
+                        <thead class="bg-gray-100">
+                            <tr>
+                                <th class="px-4 py-2 text-left">Outlet Code</th>
+                                <th class="px-4 py-2 text-left">Outlet Name</th>
+                                <th class="px-4 py-2 text-center">Total Pallets</th>
+                                <th class="px-4 py-2 text-center">Loaded</th>
+                                <th class="px-4 py-2 text-center">Delivered</th>
+                                <th class="px-4 py-2 text-center">Status</th>
+                            </tr>
+                        </thead>
+                        <tbody id="dash-outlet-table">
+                            <tr>
+                                <td colspan="6" class="text-center py-4 text-gray-500">Loading...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    `
+}
+
+async function loadDashboardData() {
+    try {
+        const response = await axios.get('/api/warehouse/parcels')
+        const parcels = response.data.parcels || []
+        
+        // Group by outlet
+        const outletMap = new Map()
+        let totalPallets = 0
+        let loadedPallets = 0
+        let deliveredPallets = 0
+        
+        parcels.forEach(parcel => {
+            // Skip invalid parcels
+            if (!parcel.outlet_code || !parcel.outlet_name) return
+            if (parcel.outlet_code.toUpperCase().trim() === 'STORE CODE' && 
+                parcel.outlet_name.toUpperCase().trim() === 'STORE NAME') return
+            
+            totalPallets++
+            if (parcel.status === 'loaded') loadedPallets++
+            if (parcel.status === 'delivered') deliveredPallets++
+            
+            if (!outletMap.has(parcel.outlet_code)) {
+                outletMap.set(parcel.outlet_code, {
+                    code: parcel.outlet_code,
+                    code_short: parcel.outlet_code_short || parcel.outlet_code,
+                    name: parcel.outlet_name,
+                    total: 0,
+                    loaded: 0,
+                    delivered: 0
+                })
+            }
+            const outlet = outletMap.get(parcel.outlet_code)
+            outlet.total++
+            if (parcel.status === 'loaded') outlet.loaded++
+            if (parcel.status === 'delivered') outlet.delivered++
+        })
+        
+        // Update statistics
+        document.getElementById('dash-total-outlets').textContent = outletMap.size
+        document.getElementById('dash-total-pallets').textContent = totalPallets
+        document.getElementById('dash-loaded-pallets').textContent = loadedPallets
+        document.getElementById('dash-delivered-pallets').textContent = deliveredPallets
+        
+        // Update loading progress
+        const loadingPercent = totalPallets > 0 ? Math.round((loadedPallets / totalPallets) * 100) : 0
+        document.getElementById('dash-loading-percent').textContent = loadingPercent + '%'
+        document.getElementById('dash-loading-bar').style.width = loadingPercent + '%'
+        document.getElementById('dash-loading-text').textContent = `${loadedPallets} / ${totalPallets} pallets loaded`
+        
+        // Update delivery progress
+        const deliveryPercent = totalPallets > 0 ? Math.round((deliveredPallets / totalPallets) * 100) : 0
+        document.getElementById('dash-delivery-percent').textContent = deliveryPercent + '%'
+        document.getElementById('dash-delivery-bar').style.width = deliveryPercent + '%'
+        document.getElementById('dash-delivery-text').textContent = `${deliveredPallets} / ${totalPallets} pallets delivered`
+        
+        // Update outlet table
+        const tableBody = document.getElementById('dash-outlet-table')
+        if (outletMap.size === 0) {
+            tableBody.innerHTML = '<tr><td colspan="6" class="text-center py-4 text-gray-500">No data available</td></tr>'
+            return
+        }
+        
+        tableBody.innerHTML = Array.from(outletMap.values()).map(outlet => {
+            const loadedPercent = outlet.total > 0 ? Math.round((outlet.loaded / outlet.total) * 100) : 0
+            const deliveredPercent = outlet.total > 0 ? Math.round((outlet.delivered / outlet.total) * 100) : 0
+            let status = 'Pending'
+            let statusClass = 'bg-gray-200 text-gray-800'
+            
+            if (outlet.delivered === outlet.total) {
+                status = 'Completed'
+                statusClass = 'bg-green-200 text-green-800'
+            } else if (outlet.loaded === outlet.total) {
+                status = 'In Transit'
+                statusClass = 'bg-blue-200 text-blue-800'
+            } else if (outlet.loaded > 0) {
+                status = 'Loading'
+                statusClass = 'bg-yellow-200 text-yellow-800'
+            }
+            
+            return `
+                <tr class="border-b hover:bg-gray-50">
+                    <td class="px-4 py-3 font-mono">${outlet.code_short}</td>
+                    <td class="px-4 py-3">${outlet.name}</td>
+                    <td class="px-4 py-3 text-center font-bold">${outlet.total}</td>
+                    <td class="px-4 py-3 text-center">
+                        <span class="text-green-600 font-semibold">${outlet.loaded}</span>
+                        <span class="text-gray-400 text-sm"> (${loadedPercent}%)</span>
+                    </td>
+                    <td class="px-4 py-3 text-center">
+                        <span class="text-teal-600 font-semibold">${outlet.delivered}</span>
+                        <span class="text-gray-400 text-sm"> (${deliveredPercent}%)</span>
+                    </td>
+                    <td class="px-4 py-3 text-center">
+                        <span class="px-3 py-1 rounded-full text-xs font-semibold ${statusClass}">
+                            ${status}
+                        </span>
+                    </td>
+                </tr>
+            `
+        }).join('')
+    } catch (error) {
+        console.error('Error loading dashboard data:', error)
+        showToast('Failed to load dashboard data', 'error')
+    }
+}
+
+// Auto-refresh dashboard every 30 seconds
+setInterval(() => {
+    if (state.currentPage === 'dashboard') {
+        loadDashboardData()
+    }
+}, 30000)
+
 // ============ Warehouse Page ============
 function renderWarehouse() {
     return `
@@ -778,13 +1015,17 @@ async function loadWarehouseData() {
         // Group by outlet - using parcels instead of transfers for accurate pallet counting
         const outletMap = new Map()
         state.parcels.forEach(parcel => {
-            // Skip header rows or invalid outlets
-            if (!parcel.outlet_code || 
-                parcel.outlet_code.toUpperCase() === 'STORE CODE' ||
-                parcel.outlet_name.toUpperCase() === 'STORE NAME' ||
-                parcel.outlet_name.toUpperCase().includes('STORE CODE') ||
-                parcel.outlet_name.toUpperCase().includes('STORE NAME')) {
-                console.log('Skipping header/invalid parcel:', parcel.outlet_code, parcel.outlet_name)
+            // Skip ONLY if outlet_code AND outlet_name BOTH match header pattern exactly
+            // This prevents filtering out legitimate data that happens to have "STORE CODE" in the name
+            if (!parcel.outlet_code || !parcel.outlet_name) {
+                console.log('Skipping parcel with missing data:', parcel.outlet_code, parcel.outlet_name)
+                return // Skip this parcel
+            }
+            
+            // Only skip if BOTH fields are exactly "STORE CODE" and "STORE NAME" (header row)
+            if (parcel.outlet_code.toUpperCase().trim() === 'STORE CODE' && 
+                parcel.outlet_name.toUpperCase().trim() === 'STORE NAME') {
+                console.log('Skipping header row:', parcel.outlet_code, parcel.outlet_name)
                 return // Skip this parcel
             }
             
@@ -1832,6 +2073,9 @@ function render() {
         case 'import':
             content = renderImport()
             break
+        case 'dashboard':
+            content = renderDashboard()
+            break
         case 'warehouse':
             content = renderWarehouse()
             break
@@ -1853,6 +2097,9 @@ function render() {
             case 'admin':
                 loadUsers()
                 loadOutlets()
+                break
+            case 'dashboard':
+                loadDashboardData()
                 break
             case 'warehouse':
                 loadWarehouseData()

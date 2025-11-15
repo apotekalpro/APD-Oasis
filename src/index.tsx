@@ -257,17 +257,18 @@ app.post('/api/import', authMiddleware, async (c) => {
     const parcelMap = new Map()
     
     data.forEach((row: any) => {
-      // Skip header rows or invalid data
-      const outletCode = String(row.outlet_code || '').trim().toUpperCase()
-      const outletName = String(row.outlet_name || '').trim().toUpperCase()
-      
-      if (!row.pallet_id || 
-          !row.transfer_number ||
-          outletCode === 'STORE CODE' ||
-          outletName === 'STORE NAME' ||
-          outletName.includes('STORE CODE') ||
-          outletName.includes('STORE NAME')) {
+      // Skip rows with missing required data
+      if (!row.pallet_id || !row.transfer_number || !row.outlet_code || !row.outlet_name) {
         return // Skip this row
+      }
+      
+      // Skip ONLY if BOTH outlet_code AND outlet_name are exactly "STORE CODE" and "STORE NAME"
+      // This prevents filtering out legitimate data
+      const outletCode = String(row.outlet_code).trim().toUpperCase()
+      const outletName = String(row.outlet_name).trim().toUpperCase()
+      
+      if (outletCode === 'STORE CODE' && outletName === 'STORE NAME') {
+        return // Skip header row
       }
       
       const palletId = row.pallet_id
