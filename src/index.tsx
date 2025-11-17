@@ -402,17 +402,17 @@ app.post('/api/import', authMiddleware, async (c) => {
         return // Skip header row
       }
       
-      const palletId = row.pallet_id
+      const palletId = String(row.pallet_id).trim()
       if (!parcelMap.has(palletId)) {
         parcelMap.set(palletId, {
-          outlet_code: row.outlet_code,  // Numeric code
-          outlet_code_short: row.outlet_code_short,  // Short code for display
-          outlet_name: row.outlet_name,
+          outlet_code: String(row.outlet_code).trim(),  // Ensure string
+          outlet_code_short: String(row.outlet_code_short || row.outlet_code).trim(),  // Short code for display
+          outlet_name: String(row.outlet_name).trim(),
           pallet_id: palletId,
           transfer_numbers: []
         })
       }
-      parcelMap.get(palletId).transfer_numbers.push(row.transfer_number)
+      parcelMap.get(palletId).transfer_numbers.push(String(row.transfer_number).trim())
     })
     
     // Insert parcels and transfer details
@@ -473,13 +473,24 @@ app.post('/api/import', authMiddleware, async (c) => {
       }))
       
       console.log(`  Inserting ${transferDetails.length} transfer details...`)
+      console.log(`  Sample transfer detail:`, transferDetails[0])
+      
       const transferResponse = await supabaseRequest(c, 'transfer_details', {
         method: 'POST',
         body: JSON.stringify(transferDetails)
       })
       
-      const transferResult = await transferResponse.json()
       console.log(`  Transfer response status: ${transferResponse.status}`)
+      
+      let transferResult
+      try {
+        transferResult = await transferResponse.json()
+        console.log(`  Transfer response body:`, transferResult)
+      } catch (jsonError) {
+        const responseText = await transferResponse.text()
+        console.error(`  ❌ ERROR parsing transfer response:`, responseText)
+        throw new Error(`Failed to parse transfer_details response: ${responseText}`)
+      }
       
       if (transferResponse.status !== 201 && transferResponse.status !== 200) {
         console.error(`  ❌ ERROR inserting transfer_details:`, transferResult)
