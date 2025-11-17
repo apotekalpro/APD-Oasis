@@ -1,387 +1,239 @@
-# 🚀 APD OASIS - Deployment Guide
+# APD OASIS - Deployment Guide
 
-Complete step-by-step instructions for deploying the APD OASIS Warehouse Logistic System.
+## 🌐 Current Deployment Status
 
-## 📋 Prerequisites Checklist
+Your application is currently deployed using **Direct Upload** method to Cloudflare Pages.
 
-Before starting deployment, ensure you have:
-
-- ✅ Supabase account and project URL
-- ✅ Supabase API keys (Anon + Service Role)
-- ✅ GitHub account (for code repository)
-- ✅ Cloudflare account (for production hosting)
-- ✅ This project files in `/home/user/webapp/`
-
-## 🗄️ Step 1: Database Setup (CRITICAL - Do This First!)
-
-### 1.1 Access Supabase SQL Editor
-
-1. Go to your Supabase project: https://ptfnmivvowgiqzwyznmu.supabase.co
-2. Navigate to **SQL Editor** in the left sidebar
-3. Click **"New Query"**
-
-### 1.2 Execute Database Schema
-
-1. Open the file `supabase-schema.sql` from this project
-2. Copy ALL content (entire file)
-3. Paste into Supabase SQL Editor
-4. Click **"Run"** button
-5. Wait for execution to complete (should take 5-10 seconds)
-
-### 1.3 Verify Database Tables
-
-After execution, verify these tables exist:
-- ✅ users
-- ✅ outlets
-- ✅ imports
-- ✅ parcels
-- ✅ transfer_details
-- ✅ error_parcels
-- ✅ audit_logs
-
-**Check in Supabase:**
-1. Go to **Table Editor**
-2. You should see all 7 tables listed
-3. Click on `users` table - you should see 1 default admin user
-
-### 1.4 Default Admin Account
-
-After schema execution, you can login with:
-- **Username**: `admin`
-- **Password**: `admin123`
-
-⚠️ **IMPORTANT**: Change the admin password after first login!
-
-## 🐙 Step 2: GitHub Setup (Optional but Recommended)
-
-### 2.1 Configure GitHub Authentication
-
-1. In the code sandbox interface, navigate to the **#github** tab
-2. Complete GitHub authorization (both App and OAuth if available)
-3. Wait for successful authorization confirmation
-
-### 2.2 Create or Select Repository
-
-**Option A: Create New Repository**
-```bash
-# The code is ready in /home/user/webapp/
-# You can create a new repo through GitHub UI or use gh CLI after authorization
-```
-
-**Option B: Use Existing Repository**
-```bash
-# After GitHub authorization, you can push to your existing repo
-cd /home/user/webapp
-git remote add origin https://github.com/YOUR_USERNAME/YOUR_REPO.git
-git push -f origin main
-```
-
-### 2.3 Push Code to GitHub
-
-After GitHub authorization is complete:
-
-```bash
-cd /home/user/webapp
-git remote add origin https://github.com/YOUR_USERNAME/apd-oasis.git
-git push -u origin main
-```
-
-## ☁️ Step 3: Cloudflare Pages Deployment
-
-### 3.1 Setup Cloudflare API Key
-
-1. In the code sandbox interface, navigate to the **Deploy** tab
-2. Add your Cloudflare API Key
-3. Wait for successful setup confirmation
-
-### 3.2 Build the Application
-
-```bash
-cd /home/user/webapp
-npm run build
-```
-
-This creates the `dist/` directory with:
-- `_worker.js` - Compiled Hono backend
-- `_routes.json` - Routing configuration
-- `static/` - Frontend assets
-
-### 3.3 Create Cloudflare Pages Project
-
-```bash
-cd /home/user/webapp
-
-# Create project (use main branch for production)
-npx wrangler pages project create apd-oasis \
-  --production-branch main \
-  --compatibility-date 2025-11-15
-```
-
-### 3.4 Deploy to Cloudflare Pages
-
-```bash
-# Deploy the built application
-npx wrangler pages deploy dist --project-name apd-oasis
-```
-
-You'll receive two URLs:
-- **Production**: `https://apd-oasis.pages.dev`
-- **Branch**: `https://main.apd-oasis.pages.dev`
-
-### 3.5 Configure Environment Variables
-
-⚠️ **CRITICAL**: Set these secrets in Cloudflare for the app to work!
-
-```bash
-cd /home/user/webapp
-
-# Set Supabase URL
-npx wrangler pages secret put SUPABASE_URL --project-name apd-oasis
-# Enter: https://ptfnmivvowgiqzwyznmu.supabase.co
-
-# Set Supabase Anon Key
-npx wrangler pages secret put SUPABASE_ANON_KEY --project-name apd-oasis
-# Paste your anon key
-
-# Set Supabase Service Key
-npx wrangler pages secret put SUPABASE_SERVICE_KEY --project-name apd-oasis
-# Paste your service role key
-
-# Set JWT Secret (use a strong random string)
-npx wrangler pages secret put JWT_SECRET --project-name apd-oasis
-# Enter a strong secret: e.g., "your-super-secret-jwt-key-12345678"
-```
-
-**To verify secrets are set:**
-```bash
-npx wrangler pages secret list --project-name apd-oasis
-```
-
-### 3.6 Test Production Deployment
-
-1. Visit your production URL: `https://apd-oasis.pages.dev`
-2. You should see the login page
-3. Login with: `admin` / `admin123`
-4. Test basic functionality:
-   - Admin panel (add user, add outlet)
-   - Import page (upload sample Excel)
-   - Warehouse scanning
-   - Reports
-
-## 📱 Step 4: Mobile APK Preparation (Optional)
-
-To package as Android APK using Capacitor:
-
-### 4.1 Install Capacitor
-
-```bash
-cd /home/user/webapp
-npm install @capacitor/core @capacitor/cli @capacitor/android
-```
-
-### 4.2 Initialize Capacitor
-
-```bash
-npx cap init "APD OASIS" "com.apd.oasis" --web-dir=dist
-```
-
-### 4.3 Add Android Platform
-
-```bash
-npx cap add android
-```
-
-### 4.4 Update Capacitor Config
-
-Edit `capacitor.config.ts`:
-```typescript
-import { CapacitorConfig } from '@capacitor/cli';
-
-const config: CapacitorConfig = {
-  appId: 'com.apd.oasis',
-  appName: 'APD OASIS',
-  webDir: 'dist',
-  server: {
-    url: 'https://apd-oasis.pages.dev',
-    cleartext: true
-  }
-};
-
-export default config;
-```
-
-### 4.5 Build and Open in Android Studio
-
-```bash
-npm run build
-npx cap sync
-npx cap open android
-```
-
-Then in Android Studio:
-1. Build → Generate Signed Bundle / APK
-2. Follow wizard to create release APK
-
-## 🧪 Step 5: Testing Checklist
-
-### 5.1 Database Testing
-
-- [ ] Tables created successfully
-- [ ] Default admin user exists
-- [ ] Can login with admin credentials
-
-### 5.2 Admin Functions
-
-- [ ] Can add new users
-- [ ] Can add new outlets
-- [ ] Can activate/deactivate users
-- [ ] User roles work correctly
-
-### 5.3 Import Process
-
-- [ ] Can upload Excel file
-- [ ] Preview shows correct data
-- [ ] Import creates parcels in database
-- [ ] Pallet IDs are grouped correctly
-
-### 5.4 Warehouse Loading
-
-- [ ] Can scan transfer numbers
-- [ ] Valid scans show success
-- [ ] Invalid scans show error
-- [ ] Outlet summary updates in real-time
-- [ ] Can complete loading with signature
-
-### 5.5 Outlet Unloading
-
-- [ ] Can select outlet
-- [ ] Can scan transfer numbers
-- [ ] Wrong outlet detection works
-- [ ] Can complete unloading with signature
-
-### 5.6 Reports
-
-- [ ] Delivery report shows data
-- [ ] Error report shows failed scans
-- [ ] Excel export works
-- [ ] Data is accurate
-
-## 🔧 Troubleshooting
-
-### Issue: Login fails with "Invalid credentials"
-
-**Solution:**
-1. Verify database schema was executed
-2. Check if `users` table has data
-3. Try login with: `admin` / `admin123`
-4. Check browser console for errors
-
-### Issue: "Cannot read property 'SUPABASE_URL'"
-
-**Solution:**
-1. Environment variables not set in Cloudflare
-2. Run all `wrangler pages secret put` commands
-3. Verify with `wrangler pages secret list`
-4. Redeploy after setting secrets
-
-### Issue: Import fails or no data shows
-
-**Solution:**
-1. Check Excel file format (columns E, F, G, V)
-2. Verify database connection
-3. Check browser console for errors
-4. Ensure Supabase API keys are correct
-
-### Issue: Scanning doesn't work
-
-**Solution:**
-1. Ensure data is imported first
-2. Check if transfer numbers match imported data
-3. Verify user has correct role permissions
-4. Check network connection to Supabase
-
-### Issue: Mobile APK shows blank screen
-
-**Solution:**
-1. Update `server.url` in capacitor.config.ts to production URL
-2. Rebuild: `npm run build && npx cap sync`
-3. Check Android WebView compatibility
-4. Enable CORS in Cloudflare if needed
-
-## 📊 Production Checklist
-
-Before going live:
-
-- [ ] Database schema executed successfully
-- [ ] All environment variables set in Cloudflare
-- [ ] Default admin password changed
-- [ ] Test users created for each role
-- [ ] Sample outlets added
-- [ ] Full workflow tested (import → warehouse → outlet → reports)
-- [ ] Error handling verified
-- [ ] Mobile responsiveness tested
-- [ ] GitHub repository pushed (if using)
-- [ ] Documentation reviewed
-- [ ] Backup plan established
-- [ ] Training materials prepared for staff
-
-## 🔄 Update Process
-
-To deploy updates:
-
-```bash
-cd /home/user/webapp
-
-# Make your changes to code
-# ...
-
-# Build and deploy
-npm run build
-npx wrangler pages deploy dist --project-name apd-oasis
-
-# For mobile app
-npm run build
-npx cap sync
-# Then rebuild APK in Android Studio
-```
-
-## 📞 Support
-
-### Database Issues
-- Check Supabase dashboard for errors
-- Review SQL logs in Supabase
-- Verify table permissions
-
-### Deployment Issues
-- Check Cloudflare Pages dashboard
-- Review deployment logs
-- Verify environment variables
-
-### Application Issues
-- Check browser console (F12)
-- Review PM2 logs (development): `pm2 logs apd-oasis`
-- Test API endpoints directly
-
-## 🎉 Success Indicators
-
-Your deployment is successful when:
-
-1. ✅ You can access the application at the production URL
-2. ✅ Login works with admin credentials
-3. ✅ Can add users and outlets
-4. ✅ Can import Excel files
-5. ✅ Scanning workflow works end-to-end
-6. ✅ Reports generate correctly
-7. ✅ Mobile interface is responsive
-8. ✅ No console errors in browser
-
-## 📝 Notes
-
-- **Development URL**: https://3000-i8ezurtfnv7jlbrg994fh-02b9cc79.sandbox.novita.ai
-- **Supabase Project**: https://ptfnmivvowgiqzwyznmu.supabase.co
-- **Default Admin**: admin / admin123
+**Production URL**: https://apd-oasis.pages.dev
 
 ---
 
-**Last Updated**: November 15, 2025  
-**Version**: 1.0.0
+## 🔄 Setting Up Automatic GitHub Deployments
+
+Your current Cloudflare Pages project is NOT connected to GitHub, which is why you don't see "Build & deployments" in settings.
+
+### **Option A: Create New GitHub-Connected Project** ⭐ (Recommended)
+
+This will enable automatic deployments whenever you push to GitHub.
+
+#### **Step 1: Go to Cloudflare Pages**
+- Visit: https://dash.cloudflare.com/
+- Click **"Workers & Pages"** in the left sidebar
+- Click **"Create application"** button (top right)
+- Select **"Pages"** tab
+
+#### **Step 2: Connect to Git**
+- Click **"Connect to Git"** button
+- If prompted, click **"Connect GitHub"** and authorize Cloudflare
+- Select your GitHub account: **apotekalpro**
+- Select repository: **APD-Oasis**
+- Click **"Begin setup"**
+
+#### **Step 3: Configure Build Settings**
+
+```
+Project name: apd-oasis-github (or apd-oasis if you delete old project first)
+Production branch: main
+Build command: npm run build
+Build output directory: dist
+Root directory: / (leave empty or default)
+```
+
+#### **Step 4: Add Environment Variables**
+
+Click **"Environment variables (advanced)"** and add:
+
+```
+SUPABASE_URL=<your-supabase-url>
+SUPABASE_ANON_KEY=<your-supabase-anon-key>
+SUPABASE_SERVICE_KEY=<your-supabase-service-key>
+JWT_SECRET=<your-jwt-secret>
+```
+
+#### **Step 5: Deploy**
+- Click **"Save and Deploy"**
+- Wait for the build to complete (2-3 minutes)
+- Your app will be live at the new URL
+
+#### **Step 6: (Optional) Switch to Primary Domain**
+
+If you want to use `apd-oasis.pages.dev` instead of the new URL:
+
+1. Go to old **apd-oasis** project settings
+2. Click **"Delete project"** (backup first!)
+3. Go to new project settings
+4. Change project name to `apd-oasis`
+
+---
+
+### **Option B: Continue with Manual Deployments**
+
+If you prefer to keep manual control, use the deployment script provided.
+
+#### **Quick Deploy:**
+
+```bash
+cd /home/user/flutter_app
+export CLOUDFLARE_API_TOKEN="V8-ANEdbKY_5pqnKY6nM25v-xrrUdEbjrMjqcTo_"
+./deploy.sh
+```
+
+#### **What the script does:**
+1. Builds the application (`npm run build`)
+2. Deploys to Cloudflare Pages
+3. Shows deployment URL
+
+---
+
+## 📱 Mobile APK Build
+
+To build the Android APK:
+
+```bash
+cd /home/user/flutter_app
+
+# Build web assets
+bash build-mobile.sh
+
+# Sync Capacitor
+npx cap sync android
+
+# Fix Java version (required after each sync)
+sed -i 's/VERSION_21/VERSION_17/g' android/app/capacitor.build.gradle
+sed -i 's/VERSION_21/VERSION_17/g' android/capacitor-cordova-android-plugins/build.gradle
+
+# Build APK
+cd android
+./gradlew assembleRelease
+
+# APK location:
+# android/app/build/outputs/apk/release/app-release-unsigned.apk
+```
+
+---
+
+## 🗄️ Database Migration
+
+**IMPORTANT**: Execute this SQL in Supabase before using the container count feature!
+
+```sql
+-- Add container_count columns to parcels table
+ALTER TABLE parcels 
+ADD COLUMN IF NOT EXISTS container_count_loaded INTEGER,
+ADD COLUMN IF NOT EXISTS container_count_delivered INTEGER;
+
+-- Add comments for clarity
+COMMENT ON COLUMN parcels.container_count_loaded IS 'Number of containers when loaded at warehouse';
+COMMENT ON COLUMN parcels.container_count_delivered IS 'Number of containers when delivered to outlet';
+
+-- Create index for better performance
+CREATE INDEX IF NOT EXISTS idx_parcels_container_counts ON parcels(container_count_loaded, container_count_delivered);
+
+-- Add audit log for this migration
+INSERT INTO audit_logs (user_name, action, entity_type, details)
+VALUES (
+    'SYSTEM',
+    'DATABASE_MIGRATION',
+    'parcels',
+    '{"migration": "ADD_CONTAINER_COUNT", "description": "Added container count tracking for loaded and delivered parcels"}'::jsonb
+);
+```
+
+**How to execute:**
+1. Go to Supabase Dashboard: https://supabase.com/dashboard
+2. Select your project
+3. Click **"SQL Editor"** in left sidebar
+4. Click **"New query"**
+5. Paste the SQL above
+6. Click **"Run"** (or Ctrl/Cmd + Enter)
+
+---
+
+## 🔐 Cloudflare API Token
+
+Your current token is stored for manual deployments.
+
+**Token**: `V8-ANEdbKY_5pqnKY6nM25v-xrrUdEbjrMjqcTo_`
+
+To use it in deployments:
+```bash
+export CLOUDFLARE_API_TOKEN="V8-ANEdbKY_5pqnKY6nM25v-xrrUdEbjrMjqcTo_"
+```
+
+---
+
+## 📋 Deployment Checklist
+
+Before deploying:
+- [ ] All code changes committed to Git
+- [ ] Database migration executed in Supabase
+- [ ] Environment variables configured (for GitHub deployments)
+- [ ] Build tested locally (`npm run build`)
+- [ ] APK built and tested (if deploying mobile)
+
+After deploying:
+- [ ] Verify web app loads correctly
+- [ ] Test login functionality
+- [ ] Test warehouse scanning with container count popup
+- [ ] Test outlet delivery with container count input
+- [ ] Check dashboard shows new terminology (Total TN, Loaded Containers, etc.)
+
+---
+
+## 🆘 Troubleshooting
+
+### **"No Build & Deployments in Settings"**
+- Your project is a Direct Upload project (not GitHub-connected)
+- Follow **Option A** above to create a GitHub-connected project
+
+### **"Build Failed"**
+- Check that `npm run build` works locally
+- Verify all dependencies are in `package.json`
+- Check Cloudflare build logs for specific errors
+
+### **"Container Count Not Saving"**
+- Ensure database migration was executed
+- Check browser console (F12) for API errors
+- Verify Supabase credentials are correct
+
+### **"APK Build Failed"**
+- Ensure Java version is fixed to VERSION_17
+- Run `./gradlew clean` before building again
+- Check Android SDK is properly installed
+
+---
+
+## 🎯 Quick Reference
+
+**Web Deployment (Manual)**:
+```bash
+export CLOUDFLARE_API_TOKEN="V8-ANEdbKY_5pqnKY6nM25v-xrrUdEbjrMjqcTo_"
+./deploy.sh
+```
+
+**Web Deployment (Auto via GitHub)**:
+```bash
+git add .
+git commit -m "Your changes"
+git push origin main
+# Cloudflare will auto-deploy!
+```
+
+**Production URL**: https://apd-oasis.pages.dev
+
+**GitHub Repository**: https://github.com/apotekalpro/APD-Oasis
+
+---
+
+## 📞 Support
+
+For issues or questions:
+1. Check this guide first
+2. Review Cloudflare build logs
+3. Check browser console for frontend errors
+4. Verify database migration was executed
+
+---
+
+**Last Updated**: November 17, 2024
+**Version**: 2.0 (Container Count Feature)
