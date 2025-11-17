@@ -1356,17 +1356,29 @@ async function loadDashboardData() {
         document.getElementById('dash-loaded-pallets').textContent = totalLoadedContainers > 0 ? totalLoadedContainers : loadedPallets
         document.getElementById('dash-delivered-pallets').textContent = totalDeliveredContainers > 0 ? totalDeliveredContainers : deliveredPallets
         
-        // Update loading progress
+        // Update loading progress - show percentage based on TN, but text shows containers
         const loadingPercent = totalPallets > 0 ? Math.round((loadedPallets / totalPallets) * 100) : 0
         document.getElementById('dash-loading-percent').textContent = loadingPercent + '%'
         document.getElementById('dash-loading-bar').style.width = loadingPercent + '%'
-        document.getElementById('dash-loading-text').textContent = `${totalLoadedContainers > 0 ? totalLoadedContainers : loadedPallets} / ${totalPallets} containers loaded`
         
-        // Update delivery progress
+        // Only show container count in text if containers have been recorded
+        if (totalLoadedContainers > 0) {
+            document.getElementById('dash-loading-text').textContent = `${totalLoadedContainers} container${totalLoadedContainers !== 1 ? 's' : ''} loaded`
+        } else {
+            document.getElementById('dash-loading-text').textContent = `0 containers loaded (${loadedPallets} / ${totalPallets} TN loaded)`
+        }
+        
+        // Update delivery progress - show percentage based on TN, but text shows containers
         const deliveryPercent = totalPallets > 0 ? Math.round((deliveredPallets / totalPallets) * 100) : 0
         document.getElementById('dash-delivery-percent').textContent = deliveryPercent + '%'
         document.getElementById('dash-delivery-bar').style.width = deliveryPercent + '%'
-        document.getElementById('dash-delivery-text').textContent = `${totalDeliveredContainers > 0 ? totalDeliveredContainers : deliveredPallets} / ${totalPallets} containers delivered`
+        
+        // Only show container count in text if containers have been recorded
+        if (totalDeliveredContainers > 0) {
+            document.getElementById('dash-delivery-text').textContent = `${totalDeliveredContainers} container${totalDeliveredContainers !== 1 ? 's' : ''} delivered`
+        } else {
+            document.getElementById('dash-delivery-text').textContent = `0 containers delivered (${deliveredPallets} / ${totalPallets} TN delivered)`
+        }
         
         // Update outlet table
         const tableBody = document.getElementById('dash-outlet-table')
