@@ -472,10 +472,21 @@ app.post('/api/import', authMiddleware, async (c) => {
         status: 'pending'
       }))
       
-      await supabaseRequest(c, 'transfer_details', {
+      console.log(`  Inserting ${transferDetails.length} transfer details...`)
+      const transferResponse = await supabaseRequest(c, 'transfer_details', {
         method: 'POST',
         body: JSON.stringify(transferDetails)
       })
+      
+      const transferResult = await transferResponse.json()
+      console.log(`  Transfer response status: ${transferResponse.status}`)
+      
+      if (transferResponse.status !== 201 && transferResponse.status !== 200) {
+        console.error(`  ❌ ERROR inserting transfer_details:`, transferResult)
+        throw new Error(`Failed to insert transfer_details: ${JSON.stringify(transferResult)}`)
+      }
+      
+      console.log(`  ✓ ${transferDetails.length} transfer details inserted`)
       
       totalCreated++
       console.log(`  ✓ Parcel inserted successfully`)
