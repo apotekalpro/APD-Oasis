@@ -1,0 +1,9 @@
+name = "apd-oasis"
+compatibility_date = "2024-11-15"
+pages_build_output_dir = "dist"
+
+[env.production]
+name = "apd-oasis"
+routes = [
+  { pattern = "apd-oasis.pages.dev", custom_domain = false }
+]
