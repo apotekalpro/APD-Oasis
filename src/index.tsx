@@ -552,19 +552,37 @@ app.get('/api/warehouse/transfers', authMiddleware, async (c) => {
   try {
     const { outlet_code } = c.req.query()
     
+    console.log('=== WAREHOUSE TRANSFERS API ===')
+    console.log('outlet_code parameter:', outlet_code)
+    
     let query = 'transfer_details?select=*&order=outlet_code.asc,transfer_number.asc'
     if (outlet_code) {
-      // If outlet_code specified, get all transfers for that outlet (not just pending)
-      query = `transfer_details?outlet_code=eq.${outlet_code}&select=*&order=transfer_number.asc`
+      // Try both outlet_code and outlet_code_short
+      query = `transfer_details?or=(outlet_code.eq.${outlet_code},outlet_code_short.eq.${outlet_code})&select=*&order=transfer_number.asc`
+      console.log('Query for specific outlet:', query)
     } else {
       // Otherwise, get only pending transfers
       query = 'transfer_details?status=eq.pending&select=*&order=outlet_code.asc'
+      console.log('Query for all pending:', query)
     }
     
     const response = await supabaseRequest(c, query)
     const transfers = await response.json()
+    
+    console.log('Transfer details found:', transfers.length)
+    if (transfers.length > 0) {
+      console.log('Sample transfer:', {
+        transfer_number: transfers[0].transfer_number,
+        outlet_code: transfers[0].outlet_code,
+        outlet_code_short: transfers[0].outlet_code_short,
+        pallet_id: transfers[0].pallet_id,
+        status: transfers[0].status
+      })
+    }
+    
     return c.json({ transfers })
   } catch (error) {
+    console.error('Error fetching transfers:', error)
     return c.json({ error: 'Failed to fetch transfers' }, 500)
   }
 })
