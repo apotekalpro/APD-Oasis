@@ -6,12 +6,10 @@ const config: CapacitorConfig = {
   webDir: 'dist',
   server: {
     // For production, the app will load from the APK
-    // But we need to configure API calls to go to your backend
+    // API calls will go to production backend
     androidScheme: 'https',
     cleartext: true,
-    // Uncomment and set your production API URL when deploying
-    // url: 'https://your-backend-url.com',
-    // allowNavigation: ['https://your-backend-url.com']
+    allowNavigation: ['https://apd-oasis.pages.dev', 'https://*.pages.dev']
   },
   android: {
     buildOptions: {

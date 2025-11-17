@@ -1,5 +1,39 @@
 // APD OASIS Warehouse Logistic System - Frontend Application
 
+// ============ Simple Storage Helper ============
+// Simple wrapper that just uses localStorage (works in Capacitor webview)
+const Storage = {
+    get(key) {
+        try {
+            const value = localStorage.getItem(key)
+            console.log('Storage GET:', key, '=', value ? (value.length > 50 ? value.substring(0, 50) + '...' : value) : 'null')
+            return value
+        } catch (e) {
+            console.error('Storage get error:', e)
+            return null
+        }
+    },
+    set(key, value) {
+        try {
+            localStorage.setItem(key, value)
+            console.log('Storage SET:', key, '=', value ? (value.length > 50 ? 'saved (' + value.length + ' chars)' : value) : 'empty')
+            // Verify it was saved
+            const verify = localStorage.getItem(key)
+            console.log('Storage VERIFY:', key, 'exists after save:', !!verify)
+        } catch (e) {
+            console.error('Storage set error:', e)
+        }
+    },
+    remove(key) {
+        try {
+            localStorage.removeItem(key)
+            console.log('Storage REMOVE:', key)
+        } catch (e) {
+            console.error('Storage remove error:', e)
+        }
+    }
+}
+
 // ============ State Management ============
 const state = {
     user: null,
@@ -32,28 +66,55 @@ function isSupervisor() {
 }
 
 // ============ API Configuration ============
-const API_BASE = window.location.origin
-axios.defaults.baseURL = API_BASE
+// Use production backend for mobile app
+// Check multiple conditions for mobile environment
+const isMobile = window.location.origin.startsWith('capacitor://') || 
+                 window.location.origin.startsWith('file://') ||
+                 window.location.origin.includes('localhost') ||
+                 window.location.protocol === 'capacitor:' ||
+                 window.location.protocol === 'file:'
 
-// Set auth token if exists
-const storedToken = localStorage.getItem('token')
-if (storedToken) {
-    state.token = storedToken
-    axios.defaults.headers.common['Authorization'] = `Bearer ${storedToken}`
-    
-    // Verify token
-    axios.get('/api/me')
-        .then(response => {
-            state.user = response.data.user
-            navigateTo(getDefaultPage())
-        })
-        .catch(() => {
-            localStorage.removeItem('token')
-            state.token = null
-            delete axios.defaults.headers.common['Authorization']
-            navigateTo('login')
-        })
+const API_BASE = isMobile ? 'https://apd-oasis.pages.dev' : window.location.origin
+
+console.log('Window location origin:', window.location.origin)
+console.log('Window location protocol:', window.location.protocol)
+console.log('Is mobile detected:', isMobile)
+console.log('API Base URL:', API_BASE)
+
+axios.defaults.baseURL = API_BASE
+axios.defaults.headers.common['Content-Type'] = 'application/json'
+axios.defaults.headers.common['Accept'] = 'application/json'
+
+// Ensure Axios always expects JSON responses
+axios.defaults.responseType = 'json'
+
+// Initialize app with stored token
+const storedToken = Storage.get('token')
+const storedUser = Storage.get('user')
+console.log('Initializing app - Token:', !!storedToken, 'User:', !!storedUser)
+
+// Check if there's a hash in URL
+const initialHash = window.location.hash.substring(1)
+console.log('Initial hash:', initialHash)
+
+if (storedToken && storedUser) {
+    try {
+        state.token = storedToken
+        state.user = JSON.parse(storedUser)
+        axios.defaults.headers.common['Authorization'] = `Bearer ${storedToken}`
+        console.log('User loaded from storage:', state.user)
+        
+        // If hash exists, use it, otherwise go to default page
+        const targetPage = initialHash || getDefaultPage()
+        navigateTo(targetPage)
+    } catch (error) {
+        console.log('Failed to parse stored user:', error)
+        Storage.remove('token')
+        Storage.remove('user')
+        navigateTo('login')
+    }
 } else {
+    console.log('No stored credentials, showing login')
     navigateTo('login')
 }
 
@@ -119,16 +180,30 @@ function showToast(message, type = 'success') {
 
 // ============ Navigation ============
 function navigateTo(page) {
+    console.log('navigateTo called:', page)
     state.currentPage = page
+    // Use hash-based routing for better mobile compatibility
+    window.location.hash = page
     render()
 }
 
+// Listen for hash changes (back button support)
+window.addEventListener('hashchange', function() {
+    const hash = window.location.hash.substring(1) || 'login'
+    console.log('Hash changed to:', hash)
+    if (hash !== state.currentPage) {
+        state.currentPage = hash
+        render()
+    }
+})
+
 function logout() {
-    localStorage.removeItem('token')
+    Storage.remove('token')
+    Storage.remove('user')
     state.token = null
     state.user = null
     delete axios.defaults.headers.common['Authorization']
-    navigateTo('login')
+    window.location.reload()
 }
 
 // ============ Login Page ============
@@ -176,17 +251,69 @@ async function handleLogin(event) {
     const password = document.getElementById('password').value
     
     try {
-        const response = await axios.post('/api/login', { username, password })
+        console.log('Attempting login for:', username)
+        console.log('API URL:', axios.defaults.baseURL + '/api/login')
         
+        const response = await axios.post('/api/login', 
+            { username, password },
+            { 
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json'
+                }
+            }
+        )
+        
+        console.log('Login API response received')
+        console.log('Response type:', typeof response.data)
+        console.log('Response data:', response.data)
+        
+        // Check if response is actually JSON
+        if (typeof response.data === 'string' || !response.data.token) {
+            console.error('API returned non-JSON response:', response.data)
+            showToast('Backend error - please check server configuration', 'error')
+            return
+        }
+        
+        // CRITICAL: Set state FIRST before storage
         state.token = response.data.token
         state.user = response.data.user
-        
-        localStorage.setItem('token', state.token)
         axios.defaults.headers.common['Authorization'] = `Bearer ${state.token}`
         
+        // Then save to storage
+        Storage.set('token', response.data.token)
+        Storage.set('user', JSON.stringify(response.data.user))
+        
+        console.log('State set:', state.user)
+        console.log('Storage saved')
+        
         showToast('Login successful!', 'success')
-        navigateTo(getDefaultPage())
+        
+        // NO RELOAD, NO LOCATION.HREF - Pure DOM navigation
+        setTimeout(() => {
+            const targetPage = state.user.role === 'outlet' ? 'outlet' : 'dashboard'
+            console.log('=== NAVIGATING TO:', targetPage, '===')
+            console.log('Current state.user:', state.user)
+            console.log('Current state.token:', state.token ? 'exists' : 'missing')
+            
+            // Set page and hash
+            state.currentPage = targetPage
+            window.location.hash = targetPage
+            
+            // FORCE COMPLETE DOM REPLACEMENT
+            const app = document.getElementById('app')
+            console.log('Clearing app DOM')
+            app.innerHTML = ''
+            
+            console.log('Calling render()')
+            render()
+            
+            console.log('=== NAVIGATION COMPLETE ===')
+            console.log('Final state.currentPage:', state.currentPage)
+            console.log('Final app.innerHTML length:', app.innerHTML.length)
+        }, 100)
     } catch (error) {
+        console.error('Login error:', error)
         showToast(error.response?.data?.error || 'Login failed', 'error')
     }
 }
@@ -194,6 +321,10 @@ async function handleLogin(event) {
 // ============ Navigation Bar ============
 function renderNavBar() {
     if (!state.user) return ''
+    
+    // Mobile APK version: Show only Dashboard, Warehouse, Outlet
+    // Web version: Show all tabs including Admin, Import, Reports, Profile
+    const showAllTabs = !isMobile
     
     return `
         <nav class="bg-blue-600 text-white shadow-lg sticky top-0 z-40">
@@ -208,7 +339,7 @@ function renderNavBar() {
                     </div>
                     
                     <div class="flex space-x-2">
-                        ${state.user.role === 'admin' ? `
+                        ${showAllTabs && state.user.role === 'admin' ? `
                             <button onclick="navigateTo('admin')" 
                                 class="px-4 py-2 rounded ${state.currentPage === 'admin' ? 'bg-blue-800' : 'bg-blue-500 hover:bg-blue-700'}">
                                 <i class="fas fa-cog mr-2"></i>Admin
@@ -237,15 +368,17 @@ function renderNavBar() {
                             </button>
                         ` : ''}
                         
-                        <button onclick="navigateTo('reports')" 
-                            class="px-4 py-2 rounded ${state.currentPage === 'reports' ? 'bg-blue-800' : 'bg-blue-500 hover:bg-blue-700'}">
-                            <i class="fas fa-chart-bar mr-2"></i>Reports
-                        </button>
-                        
-                        <button onclick="navigateTo('profile')" 
-                            class="px-4 py-2 rounded ${state.currentPage === 'profile' ? 'bg-blue-800' : 'bg-blue-500 hover:bg-blue-700'}">
-                            <i class="fas fa-user mr-2"></i>Profile
-                        </button>
+                        ${showAllTabs ? `
+                            <button onclick="navigateTo('reports')" 
+                                class="px-4 py-2 rounded ${state.currentPage === 'reports' ? 'bg-blue-800' : 'bg-blue-500 hover:bg-blue-700'}">
+                                <i class="fas fa-chart-bar mr-2"></i>Reports
+                            </button>
+                            
+                            <button onclick="navigateTo('profile')" 
+                                class="px-4 py-2 rounded ${state.currentPage === 'profile' ? 'bg-blue-800' : 'bg-blue-500 hover:bg-blue-700'}">
+                                <i class="fas fa-user mr-2"></i>Profile
+                            </button>
+                        ` : ''}
                         
                         <button onclick="logout()" 
                             class="px-4 py-2 bg-red-500 hover:bg-red-600 rounded">
@@ -1032,7 +1165,7 @@ function renderDashboard() {
                 <div class="bg-white rounded-lg shadow-lg p-6">
                     <div class="flex items-center justify-between">
                         <div>
-                            <p class="text-gray-500 text-sm">Total Pallets</p>
+                            <p class="text-gray-500 text-sm">Total TN (Transfer Numbers)</p>
                             <p id="dash-total-pallets" class="text-3xl font-bold text-purple-600">-</p>
                         </div>
                         <i class="fas fa-pallet text-4xl text-purple-200"></i>
@@ -1042,7 +1175,7 @@ function renderDashboard() {
                 <div class="bg-white rounded-lg shadow-lg p-6">
                     <div class="flex items-center justify-between">
                         <div>
-                            <p class="text-gray-500 text-sm">Loaded Pallets</p>
+                            <p class="text-gray-500 text-sm">Loaded Containers</p>
                             <p id="dash-loaded-pallets" class="text-3xl font-bold text-green-600">-</p>
                         </div>
                         <i class="fas fa-check-circle text-4xl text-green-200"></i>
@@ -1052,7 +1185,7 @@ function renderDashboard() {
                 <div class="bg-white rounded-lg shadow-lg p-6">
                     <div class="flex items-center justify-between">
                         <div>
-                            <p class="text-gray-500 text-sm">Delivered Pallets</p>
+                            <p class="text-gray-500 text-sm">Delivered Containers</p>
                             <p id="dash-delivered-pallets" class="text-3xl font-bold text-teal-600">-</p>
                         </div>
                         <i class="fas fa-truck text-4xl text-teal-200"></i>
@@ -1074,7 +1207,7 @@ function renderDashboard() {
                         </div>
                     </div>
                     <p class="text-sm text-gray-600 mt-2">
-                        <span id="dash-loading-text">0 / 0 pallets loaded</span>
+                        <span id="dash-loading-text">0 / 0 containers loaded</span>
                     </p>
                 </div>
                 
@@ -1090,7 +1223,7 @@ function renderDashboard() {
                         </div>
                     </div>
                     <p class="text-sm text-gray-600 mt-2">
-                        <span id="dash-delivery-text">0 / 0 pallets delivered</span>
+                        <span id="dash-delivery-text">0 / 0 containers delivered</span>
                     </p>
                 </div>
             </div>
@@ -1107,7 +1240,7 @@ function renderDashboard() {
                             <tr>
                                 <th class="px-4 py-2 text-left">Outlet Code</th>
                                 <th class="px-4 py-2 text-left">Outlet Name</th>
-                                <th class="px-4 py-2 text-center">Total Pallets</th>
+                                <th class="px-4 py-2 text-center">Total TN</th>
                                 <th class="px-4 py-2 text-center">Loaded</th>
                                 <th class="px-4 py-2 text-center">Delivered</th>
                                 <th class="px-4 py-2 text-center">Status</th>
@@ -1148,6 +1281,8 @@ async function loadDashboardData() {
         let totalPallets = 0
         let loadedPallets = 0
         let deliveredPallets = 0
+        let totalLoadedContainers = 0
+        let totalDeliveredContainers = 0
         
         parcels.forEach(parcel => {
             // Skip invalid parcels
@@ -1167,6 +1302,8 @@ async function loadDashboardData() {
                     total: 0,
                     loaded: 0,
                     delivered: 0,
+                    container_count_loaded: null,
+                    container_count_delivered: null,
                     last_loaded_at: null,
                     last_delivered_at: null,
                     last_receiver: null
@@ -1182,6 +1319,10 @@ async function loadDashboardData() {
                 if (parcel.loaded_at && (!outlet.last_loaded_at || parcel.loaded_at > outlet.last_loaded_at)) {
                     outlet.last_loaded_at = parcel.loaded_at
                 }
+                // Track container count (use first non-null value from outlet)
+                if (parcel.container_count_loaded && !outlet.container_count_loaded) {
+                    outlet.container_count_loaded = parcel.container_count_loaded
+                }
             }
             
             // Track delivered status and info
@@ -1192,26 +1333,40 @@ async function loadDashboardData() {
                     outlet.last_delivered_at = parcel.delivered_at
                     outlet.last_receiver = parcel.received_by_name
                 }
+                // Track container count delivered
+                if (parcel.container_count_delivered && !outlet.container_count_delivered) {
+                    outlet.container_count_delivered = parcel.container_count_delivered
+                }
             }
         })
         
-        // Update statistics
+        // Calculate total container counts from outlets
+        outletMap.forEach(outlet => {
+            if (outlet.container_count_loaded) {
+                totalLoadedContainers += outlet.container_count_loaded
+            }
+            if (outlet.container_count_delivered) {
+                totalDeliveredContainers += outlet.container_count_delivered
+            }
+        })
+        
+        // Update statistics - use container counts if available, fallback to pallet counts
         document.getElementById('dash-total-outlets').textContent = outletMap.size
         document.getElementById('dash-total-pallets').textContent = totalPallets
-        document.getElementById('dash-loaded-pallets').textContent = loadedPallets
-        document.getElementById('dash-delivered-pallets').textContent = deliveredPallets
+        document.getElementById('dash-loaded-pallets').textContent = totalLoadedContainers > 0 ? totalLoadedContainers : loadedPallets
+        document.getElementById('dash-delivered-pallets').textContent = totalDeliveredContainers > 0 ? totalDeliveredContainers : deliveredPallets
         
         // Update loading progress
         const loadingPercent = totalPallets > 0 ? Math.round((loadedPallets / totalPallets) * 100) : 0
         document.getElementById('dash-loading-percent').textContent = loadingPercent + '%'
         document.getElementById('dash-loading-bar').style.width = loadingPercent + '%'
-        document.getElementById('dash-loading-text').textContent = `${loadedPallets} / ${totalPallets} pallets loaded`
+        document.getElementById('dash-loading-text').textContent = `${totalLoadedContainers > 0 ? totalLoadedContainers : loadedPallets} / ${totalPallets} containers loaded`
         
         // Update delivery progress
         const deliveryPercent = totalPallets > 0 ? Math.round((deliveredPallets / totalPallets) * 100) : 0
         document.getElementById('dash-delivery-percent').textContent = deliveryPercent + '%'
         document.getElementById('dash-delivery-bar').style.width = deliveryPercent + '%'
-        document.getElementById('dash-delivery-text').textContent = `${deliveredPallets} / ${totalPallets} pallets delivered`
+        document.getElementById('dash-delivery-text').textContent = `${totalDeliveredContainers > 0 ? totalDeliveredContainers : deliveredPallets} / ${totalPallets} containers delivered`
         
         // Update outlet table
         const tableBody = document.getElementById('dash-outlet-table')
@@ -1594,6 +1749,9 @@ async function handleWarehouseScan() {
             
             updateScannedItemsList()
             loadWarehouseData()
+            
+            // Check if this outlet is now fully scanned
+            checkOutletCompletionAndPromptContainerCount(response.data.outlet_code)
         } else {
             playBeep(false)
             showToast(`✗ ${response.data.error}`, 'error')
@@ -1647,6 +1805,127 @@ function updateScannedItemsList() {
             </div>
         </div>
     `}).join('')
+}
+
+// Check if outlet is fully scanned and prompt for container count
+async function checkOutletCompletionAndPromptContainerCount(outletCode) {
+    // Get all parcels for this outlet
+    const outletParcels = state.parcels.filter(p => p.outlet_code === outletCode)
+    if (outletParcels.length === 0) return
+    
+    // Count scanned pallets for this outlet
+    const scannedPallets = state.scannedItems.filter(item => item.outlet_code === outletCode)
+    const totalPallets = outletParcels.length
+    const scannedCount = scannedPallets.length
+    
+    console.log(`Outlet ${outletCode}: ${scannedCount}/${totalPallets} pallets scanned`)
+    
+    // Check if outlet is fully scanned
+    if (scannedCount === totalPallets && scannedCount > 0) {
+        // Check if we already prompted for this outlet
+        if (!state.outletContainerCounts) state.outletContainerCounts = {}
+        if (state.outletContainerCounts[outletCode]) {
+            console.log(`Already recorded container count for ${outletCode}`)
+            return
+        }
+        
+        // Get outlet name
+        const outletName = outletParcels[0].outlet_name || outletCode
+        const outletShortCode = outletParcels[0].outlet_code_short || outletCode
+        
+        // Show container count popup
+        showContainerCountModal(outletCode, outletShortCode, outletName, totalPallets)
+    }
+}
+
+// Show modal to input container count for completed outlet
+function showContainerCountModal(outletCode, outletShortCode, outletName, palletCount) {
+    const modal = document.createElement('div')
+    modal.id = `container-modal-${outletCode}`
+    modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50'
+    modal.innerHTML = `
+        <div class="bg-white rounded-lg p-6 w-full max-w-md">
+            <div class="mb-4 text-center">
+                <i class="fas fa-box-open text-green-500 text-4xl mb-3"></i>
+                <h3 class="text-xl font-bold text-green-600">Outlet Fully Loaded!</h3>
+            </div>
+            <div class="bg-blue-50 border-l-4 border-blue-500 p-4 mb-4">
+                <p class="font-semibold text-lg">${outletShortCode} - ${outletName}</p>
+                <p class="text-sm text-gray-600 mt-1">
+                    <i class="fas fa-pallet mr-1"></i>${palletCount} pallet${palletCount > 1 ? 's' : ''} scanned
+                </p>
+            </div>
+            <form onsubmit="handleContainerCountSubmit(event, '${outletCode}')">
+                <div class="mb-4">
+                    <label class="block text-sm font-medium mb-2">
+                        How many containers for this outlet?
+                        <span class="text-xs text-gray-500 block mt-1">
+                            (Multiple pallets may be in one container)
+                        </span>
+                    </label>
+                    <input type="number" id="container_count_${outletCode}" required 
+                        min="1" max="${palletCount}"
+                        class="w-full px-3 py-2 border rounded-lg text-center text-2xl font-bold"
+                        placeholder="${palletCount}"
+                        value="${palletCount}">
+                </div>
+                <div class="flex space-x-3">
+                    <button type="submit" class="flex-1 bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg">
+                        <i class="fas fa-check mr-2"></i>Confirm
+                    </button>
+                    <button type="button" onclick="this.closest('.fixed').remove()" 
+                        class="flex-1 bg-gray-300 hover:bg-gray-400 px-4 py-2 rounded-lg">
+                        Skip
+                    </button>
+                </div>
+            </form>
+        </div>
+    `
+    document.body.appendChild(modal)
+    
+    // Focus on input field
+    setTimeout(() => {
+        const input = document.getElementById(`container_count_${outletCode}`)
+        if (input) {
+            input.focus()
+            input.select()
+        }
+    }, 100)
+}
+
+// Handle container count submission
+async function handleContainerCountSubmit(event, outletCode) {
+    event.preventDefault()
+    
+    const containerCount = parseInt(document.getElementById(`container_count_${outletCode}`).value)
+    
+    if (!containerCount || containerCount < 1) {
+        showToast('Please enter a valid container count', 'error')
+        return
+    }
+    
+    try {
+        // Save container count to backend
+        await axios.post('/api/warehouse/set-container-count', {
+            outlet_code: outletCode,
+            container_count: containerCount
+        })
+        
+        // Record in state to prevent duplicate prompts
+        if (!state.outletContainerCounts) state.outletContainerCounts = {}
+        state.outletContainerCounts[outletCode] = containerCount
+        
+        showToast(`✓ Container count recorded: ${containerCount} container${containerCount > 1 ? 's' : ''}`, 'success')
+        
+        // Close modal
+        const modal = document.getElementById(`container-modal-${outletCode}`)
+        if (modal) modal.remove()
+        
+        // Reload data to reflect changes
+        loadWarehouseData()
+    } catch (error) {
+        showToast(error.response?.data?.error || 'Failed to save container count', 'error')
+    }
 }
 
 function showCompleteLoadingModal() {
@@ -2368,6 +2647,20 @@ function showOutletCompletionModal() {
                 `}
                 
                 <div class="mb-4">
+                    <label class="block text-sm font-medium mb-2">
+                        How many containers were delivered? <span class="text-red-500">*</span>
+                        <span class="text-xs text-gray-500 block mt-1">
+                            (Multiple pallets may be in one container)
+                        </span>
+                    </label>
+                    <input type="number" id="container_count_outlet" required 
+                        min="1" max="${scannedCount}"
+                        class="w-full px-3 py-2 border rounded-lg text-center text-xl font-bold"
+                        placeholder="${scannedCount}"
+                        value="${scannedCount}">
+                </div>
+                
+                <div class="mb-4">
                     <label class="block text-sm font-medium mb-2">Receiver Name/Signature <span class="text-red-500">*</span></label>
                     <input type="text" id="receiver_name_complete" required 
                         class="w-full px-3 py-2 border rounded-lg"
@@ -2396,9 +2689,15 @@ async function handleConfirmOutletCompletion(event) {
     event.preventDefault()
     
     const receiverName = document.getElementById('receiver_name_complete').value.trim()
+    const containerCount = parseInt(document.getElementById('container_count_outlet').value)
     
     if (!receiverName) {
         showToast('Please enter receiver name', 'error')
+        return
+    }
+    
+    if (!containerCount || containerCount < 1) {
+        showToast('Please enter a valid container count', 'error')
         return
     }
     
@@ -2414,10 +2713,11 @@ async function handleConfirmOutletCompletion(event) {
         const response = await axios.post('/api/outlet/confirm-receipt-bulk', {
             outlet_code_short: state.selectedOutlet.code_short,
             pallet_ids: palletIds,
-            receiver_name: receiverName
+            receiver_name: receiverName,
+            container_count: containerCount
         })
         
-        showToast(`✓ Receipt completed! ${palletIds.length} pallet(s) received by ${receiverName}`, 'success')
+        showToast(`✓ Receipt completed! ${containerCount} container(s) with ${palletIds.length} pallet(s) received by ${receiverName}`, 'success')
         
         // Close modal
         const modal = document.querySelector('.fixed.inset-0')
@@ -2805,9 +3105,43 @@ async function handleChangePassword(event) {
 function render() {
     const app = document.getElementById('app')
     
+    console.log('=== RENDER START ===')
+    console.log('Rendering page:', state.currentPage)
+    console.log('User exists:', !!state.user)
+    console.log('User data:', state.user)
+    console.log('Token exists:', !!state.token)
+    
     if (state.currentPage === 'login') {
         app.innerHTML = renderLogin()
+        console.log('Rendered login page')
         return
+    }
+    
+    // If no user but we have storage, try to load it
+    if (!state.user) {
+        console.log('No user in state, checking storage...')
+        const storedUser = Storage.get('user')
+        const storedToken = Storage.get('token')
+        
+        if (storedUser && storedToken) {
+            console.log('Found user in storage, restoring to state')
+            try {
+                state.user = JSON.parse(storedUser)
+                state.token = storedToken
+                axios.defaults.headers.common['Authorization'] = `Bearer ${storedToken}`
+                console.log('State restored from storage:', state.user)
+            } catch (e) {
+                console.error('Failed to restore from storage:', e)
+                state.currentPage = 'login'
+                app.innerHTML = renderLogin()
+                return
+            }
+        } else {
+            console.log('No user in storage either, showing login')
+            state.currentPage = 'login'
+            app.innerHTML = renderLogin()
+            return
+        }
     }
     
     let content = ''

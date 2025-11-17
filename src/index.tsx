@@ -795,6 +795,30 @@ app.post('/api/warehouse/complete', authMiddleware, async (c) => {
   }
 })
 
+// Set container count for an outlet
+app.post('/api/warehouse/set-container-count', authMiddleware, async (c) => {
+  try {
+    const user = c.get('user')
+    const { outlet_code, container_count } = await c.req.json()
+    
+    if (!outlet_code || !container_count) {
+      return c.json({ error: 'Missing required fields' }, 400)
+    }
+    
+    // Update container_count_loaded for all loaded parcels of this outlet
+    await supabaseRequest(c, `parcels?outlet_code=eq.${outlet_code}&status=eq.loaded`, {
+      method: 'PATCH',
+      body: JSON.stringify({
+        container_count_loaded: container_count
+      })
+    })
+    
+    return c.json({ success: true, container_count })
+  } catch (error) {
+    return c.json({ error: 'Failed to set container count' }, 500)
+  }
+})
+
 // Delete all transfers for an outlet
 app.delete('/api/warehouse/outlet/:outlet_code', authMiddleware, async (c) => {
   try {
@@ -1080,9 +1104,9 @@ app.post('/api/outlet/confirm-receipt', authMiddleware, async (c) => {
 app.post('/api/outlet/confirm-receipt-bulk', authMiddleware, async (c) => {
   try {
     const user = c.get('user')
-    const { outlet_code_short, pallet_ids, receiver_name } = await c.req.json()
+    const { outlet_code_short, pallet_ids, receiver_name, container_count } = await c.req.json()
     
-    console.log(`Bulk confirming receipt for outlet ${outlet_code_short}: ${pallet_ids.length} pallets by ${receiver_name}`)
+    console.log(`Bulk confirming receipt for outlet ${outlet_code_short}: ${pallet_ids.length} pallets in ${container_count || 'unknown'} containers by ${receiver_name}`)
     
     if (!pallet_ids || pallet_ids.length === 0) {
       return c.json({ error: 'No pallet IDs provided' }, 400)
@@ -1124,7 +1148,7 @@ app.post('/api/outlet/confirm-receipt-bulk', authMiddleware, async (c) => {
           })
         }
         
-        // Update parcel as delivered with receiver name
+        // Update parcel as delivered with receiver name and container count
         await supabaseRequest(c, `parcels?id=eq.${parcel.id}`, {
           method: 'PATCH',
           body: JSON.stringify({
@@ -1132,7 +1156,8 @@ app.post('/api/outlet/confirm-receipt-bulk', authMiddleware, async (c) => {
             delivered_at: new Date().toISOString(),
             delivered_by: user.id,
             delivered_by_name: user.full_name,
-            received_by_name: receiver_name
+            received_by_name: receiver_name,
+            container_count_delivered: container_count
           })
         })
         
