@@ -377,7 +377,7 @@ function renderNavBar() {
                         </button>
                     ` : ''}
                     
-                    ${['admin', 'warehouse_staff', 'warehouse_supervisor', 'driver'].includes(state.user.role) ? `
+                    ${['admin', 'warehouse_staff', 'warehouse_supervisor', 'outlet', 'driver'].includes(state.user.role) ? `
                         <button onclick="navigateTo('containers')" 
                             class="flex-1 min-w-[120px] px-4 py-2 rounded ${state.currentPage === 'containers' ? 'bg-blue-800' : 'bg-blue-500 hover:bg-blue-700'}">
                             <i class="fas fa-recycle mr-2"></i>Containers
@@ -3226,34 +3226,34 @@ async function handleCompleteUnloading(event) {
 function renderContainers() {
     return `
         <div class="container mx-auto px-4 py-6">
-            <h2 class="text-3xl font-bold mb-6 text-gray-800">
-                <i class="fas fa-recycle text-green-600 mr-3"></i>Container Collection & Management
+            <h2 class="text-2xl md:text-3xl font-bold mb-6 text-gray-800">
+                <i class="fas fa-recycle text-green-600 mr-2"></i>Container Collection & Management
             </h2>
             
-            <div class="grid md:grid-cols-2 gap-6 mb-6">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6 mb-6">
                 <!-- Collection Workflow -->
                 <button onclick="showContainerCollectionView()" 
-                    class="bg-green-500 hover:bg-green-600 text-white p-6 rounded-lg text-left">
-                    <i class="fas fa-hand-holding text-3xl mb-2"></i>
-                    <h3 class="text-xl font-bold">Collect Containers</h3>
-                    <p class="text-sm opacity-90">Scan containers at outlet for collection</p>
+                    class="bg-green-500 hover:bg-green-600 text-white p-5 md:p-6 rounded-lg text-left shadow-md active:shadow-lg transition-all">
+                    <i class="fas fa-hand-holding text-2xl md:text-3xl mb-2 block"></i>
+                    <h3 class="text-lg md:text-xl font-bold">Collect Containers</h3>
+                    <p class="text-xs md:text-sm opacity-90 mt-1">Scan containers at outlet for collection</p>
                 </button>
                 
                 <!-- View Inventory -->
                 <button onclick="showContainerInventoryView()" 
-                    class="bg-blue-500 hover:bg-blue-600 text-white p-6 rounded-lg text-left">
-                    <i class="fas fa-warehouse text-3xl mb-2"></i>
-                    <h3 class="text-xl font-bold">Container Inventory</h3>
-                    <p class="text-sm opacity-90">View containers across all outlets</p>
+                    class="bg-blue-500 hover:bg-blue-600 text-white p-5 md:p-6 rounded-lg text-left shadow-md active:shadow-lg transition-all">
+                    <i class="fas fa-warehouse text-2xl md:text-3xl mb-2 block"></i>
+                    <h3 class="text-lg md:text-xl font-bold">Container Inventory</h3>
+                    <p class="text-xs md:text-sm opacity-90 mt-1">View containers across all outlets</p>
                 </button>
             </div>
             
             <!-- Content Area -->
             <div id="containerContent">
-                <div class="bg-white rounded-lg shadow-lg p-8 text-center">
-                    <i class="fas fa-recycle text-6xl text-gray-300 mb-4"></i>
-                    <p class="text-xl text-gray-500">Select an option above to get started</p>
-                    <p class="text-sm text-gray-400 mt-2">Manage recyclable containers (Pallet IDs starting with "A")</p>
+                <div class="bg-white rounded-lg shadow-lg p-6 md:p-8 text-center">
+                    <i class="fas fa-recycle text-5xl md:text-6xl text-gray-300 mb-3 md:mb-4"></i>
+                    <p class="text-lg md:text-xl text-gray-500">Select an option above to get started</p>
+                    <p class="text-xs md:text-sm text-gray-400 mt-2">Manage recyclable containers (Pallet IDs starting with "A")</p>
                 </div>
             </div>
         </div>
@@ -3289,64 +3289,64 @@ function showContainerCollectionView() {
                 </div>
             ` : `
                 <!-- Step 2: Scan Containers -->
-                <div class="grid md:grid-cols-2 gap-6">
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
                     <!-- Scanning Section -->
                     <div>
-                        <div class="bg-green-50 border border-green-200 rounded-lg p-4 mb-4">
-                            <p class="font-semibold text-green-800 mb-2">
+                        <div class="bg-green-50 border border-green-200 rounded-lg p-3 md:p-4 mb-4">
+                            <p class="font-semibold text-green-800 mb-1 text-sm md:text-base">
                                 <i class="fas fa-store mr-2"></i>Collecting from: ${state.selectedOutlet.name}
                             </p>
-                            <p class="text-sm text-green-700">Code: ${state.selectedOutlet.code_short}</p>
+                            <p class="text-xs md:text-sm text-green-700">Code: ${state.selectedOutlet.code_short}</p>
                             <button onclick="resetContainerCollection()" 
-                                class="mt-2 text-sm text-green-600 hover:text-green-800">
+                                class="mt-2 text-xs md:text-sm text-green-600 hover:text-green-800 underline">
                                 <i class="fas fa-arrow-left mr-1"></i>Change Outlet
                             </button>
                         </div>
                         
                         <div class="mb-4">
-                            <label class="block text-sm font-medium mb-2">
+                            <label class="block text-xs md:text-sm font-medium mb-2">
                                 <i class="fas fa-qrcode mr-1"></i>Scan Container ID
                             </label>
                             <div class="flex gap-2">
                                 <input type="text" id="containerScanInput" 
-                                    placeholder="Scan or enter container ID (starts with A)"
-                                    class="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
+                                    placeholder="Scan container ID (A...)"
+                                    class="flex-1 px-3 md:px-4 py-2.5 md:py-2 text-sm md:text-base border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
                                     onkeydown="if(event.key==='Enter' || event.keyCode===13) { event.preventDefault(); handleContainerScan(); }"
                                     onkeypress="if(event.key==='Enter') handleContainerScan()"
                                     autofocus>
                                 <button onclick="handleContainerScan()" 
-                                    class="bg-green-500 hover:bg-green-600 text-white px-6 py-2 rounded-lg">
+                                    class="bg-green-500 hover:bg-green-600 active:bg-green-700 text-white px-4 md:px-6 py-2 rounded-lg shadow-md">
                                     <i class="fas fa-check"></i>
                                 </button>
                             </div>
                         </div>
                         
                         <!-- Available Containers at Outlet -->
-                        <div class="bg-gray-50 rounded-lg p-4">
-                            <h4 class="font-semibold mb-3">
+                        <div class="bg-gray-50 rounded-lg p-3 md:p-4">
+                            <h4 class="font-semibold mb-3 text-sm md:text-base">
                                 <i class="fas fa-box mr-2"></i>Available Containers (${state.availableContainers?.length || 0})
                             </h4>
-                            <div id="availableContainersList" class="space-y-2 max-h-64 overflow-y-auto">
-                                <p class="text-gray-500 text-center py-2">Loading...</p>
+                            <div id="availableContainersList" class="space-y-2 max-h-48 md:max-h-64 overflow-y-auto">
+                                <p class="text-gray-500 text-center py-2 text-sm">Loading...</p>
                             </div>
                         </div>
                     </div>
                     
                     <!-- Scanned Containers List -->
                     <div>
-                        <div class="bg-white border border-gray-200 rounded-lg p-4">
-                            <h4 class="font-semibold mb-3">
+                        <div class="bg-white border border-gray-200 rounded-lg p-3 md:p-4">
+                            <h4 class="font-semibold mb-3 text-sm md:text-base">
                                 <i class="fas fa-check-circle text-green-600 mr-2"></i>
                                 Scanned Containers (${state.scannedContainers?.length || 0})
                             </h4>
-                            <div id="scannedContainersList" class="space-y-2 max-h-64 overflow-y-auto mb-4">
-                                <p class="text-gray-500 text-center py-4">No containers scanned yet</p>
+                            <div id="scannedContainersList" class="space-y-2 max-h-48 md:max-h-64 overflow-y-auto mb-4">
+                                <p class="text-gray-500 text-center py-4 text-sm">No containers scanned yet</p>
                             </div>
                             
                             ${state.scannedContainers?.length > 0 ? `
                                 <button onclick="completeContainerCollection()" 
-                                    class="w-full bg-green-500 hover:bg-green-600 text-white font-bold py-3 rounded-lg">
-                                    <i class="fas fa-check-circle mr-2"></i>Complete Collection (${state.scannedContainers.length} containers)
+                                    class="w-full bg-green-500 hover:bg-green-600 active:bg-green-700 text-white font-bold py-3 rounded-lg shadow-md">
+                                    <i class="fas fa-check-circle mr-2"></i>Complete Collection (${state.scannedContainers.length})
                                 </button>
                             ` : ''}
                         </div>
@@ -3510,30 +3510,30 @@ async function handleContainerScan() {
 // Show cross-outlet confirmation dialog
 function showCrossOutletConfirmation(data) {
     const modal = document.createElement('div')
-    modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50'
+    modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4'
     modal.innerHTML = `
-        <div class="bg-white rounded-lg p-6 max-w-md mx-4">
-            <h3 class="text-xl font-bold mb-4 text-orange-600">
+        <div class="bg-white rounded-lg p-4 md:p-6 max-w-md w-full max-h-[90vh] overflow-y-auto">
+            <h3 class="text-lg md:text-xl font-bold mb-3 md:mb-4 text-orange-600">
                 <i class="fas fa-exclamation-triangle mr-2"></i>Wrong Outlet Container
             </h3>
-            <p class="mb-4">
-                This container <strong class="font-mono">${data.container_id}</strong> belongs to:
+            <p class="mb-3 md:mb-4 text-sm md:text-base">
+                This container <strong class="font-mono text-xs md:text-sm">${data.container_id}</strong> belongs to:
             </p>
-            <div class="bg-yellow-50 border border-yellow-200 rounded p-3 mb-4">
-                <p class="font-semibold">${data.current_outlet_name}</p>
-                <p class="text-sm text-gray-600">Code: ${data.current_outlet}</p>
+            <div class="bg-yellow-50 border border-yellow-200 rounded p-3 mb-3 md:mb-4">
+                <p class="font-semibold text-sm md:text-base">${data.current_outlet_name}</p>
+                <p class="text-xs md:text-sm text-gray-600">Code: ${data.current_outlet}</p>
             </div>
-            <p class="mb-6 text-sm text-gray-700">
+            <p class="mb-4 md:mb-6 text-xs md:text-sm text-gray-700">
                 Do you want to proceed to collect it and deduct from the owner outlet?
             </p>
-            <div class="flex gap-3">
+            <div class="flex flex-col sm:flex-row gap-3">
                 <button onclick="collectCrossOutletContainer('${data.container_id}', '${data.scanning_outlet}'); this.closest('.fixed').remove()" 
-                    class="flex-1 bg-green-500 hover:bg-green-600 text-white py-2 rounded-lg font-semibold">
-                    YES - Collect
+                    class="flex-1 bg-green-500 hover:bg-green-600 active:bg-green-700 text-white py-2.5 md:py-2 rounded-lg font-semibold text-sm md:text-base shadow-md">
+                    <i class="fas fa-check-circle mr-2"></i>YES - Collect
                 </button>
                 <button onclick="this.closest('.fixed').remove()" 
-                    class="flex-1 bg-gray-300 hover:bg-gray-400 text-gray-800 py-2 rounded-lg font-semibold">
-                    NO - Cancel
+                    class="flex-1 bg-gray-300 hover:bg-gray-400 active:bg-gray-500 text-gray-800 py-2.5 md:py-2 rounded-lg font-semibold text-sm md:text-base shadow-md">
+                    <i class="fas fa-times mr-2"></i>NO - Cancel
                 </button>
             </div>
         </div>
@@ -3704,19 +3704,19 @@ function showContainerInventoryView() {
     const content = document.getElementById('containerContent')
     
     content.innerHTML = `
-        <div class="bg-white rounded-lg shadow-lg p-6">
-            <h3 class="text-2xl font-bold mb-6 flex items-center">
-                <i class="fas fa-warehouse text-blue-600 mr-3"></i>
-                Container Inventory - All Outlets
+        <div class="bg-white rounded-lg shadow-lg p-4 md:p-6">
+            <h3 class="text-xl md:text-2xl font-bold mb-4 md:mb-6 flex items-center">
+                <i class="fas fa-warehouse text-blue-600 mr-2"></i>
+                <span>Container Inventory</span>
             </h3>
             
-            <div id="containerInventoryList" class="space-y-4">
-                <p class="text-gray-500 text-center py-8">Loading inventory...</p>
+            <div id="containerInventoryList" class="space-y-3 md:space-y-4">
+                <p class="text-gray-500 text-center py-6 md:py-8 text-sm md:text-base">Loading inventory...</p>
             </div>
             
             <button onclick="loadContainerInventory()" 
-                class="w-full mt-4 bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg">
-                <i class="fas fa-sync mr-2"></i>Refresh
+                class="w-full mt-4 bg-blue-500 hover:bg-blue-600 active:bg-blue-700 text-white px-4 py-2.5 md:py-2 rounded-lg shadow-md text-sm md:text-base">
+                <i class="fas fa-sync mr-2"></i>Refresh Inventory
             </button>
         </div>
     `
@@ -3759,23 +3759,23 @@ async function loadContainerInventory() {
         })
         
         listDiv.innerHTML = Object.values(groupedByOutlet).map(group => `
-            <div class="border border-gray-200 rounded-lg p-4">
-                <div class="flex justify-between items-center mb-3">
-                    <div>
-                        <h4 class="font-semibold text-lg">${group.outlet_name}</h4>
-                        <p class="text-sm text-gray-500">Code: ${group.outlet_code}</p>
+            <div class="border border-gray-200 rounded-lg p-3 md:p-4">
+                <div class="flex justify-between items-start md:items-center mb-3 gap-2">
+                    <div class="flex-1 min-w-0">
+                        <h4 class="font-semibold text-base md:text-lg truncate">${group.outlet_name}</h4>
+                        <p class="text-xs md:text-sm text-gray-500">Code: ${group.outlet_code}</p>
                     </div>
-                    <div class="bg-blue-100 px-4 py-2 rounded-full">
-                        <span class="font-bold text-blue-800">${group.containers.length}</span>
-                        <span class="text-xs text-blue-600 ml-1">containers</span>
+                    <div class="bg-blue-100 px-3 md:px-4 py-1.5 md:py-2 rounded-full flex-shrink-0">
+                        <span class="font-bold text-blue-800 text-sm md:text-base">${group.containers.length}</span>
+                        <span class="text-xs text-blue-600 ml-1 hidden sm:inline">containers</span>
                     </div>
                 </div>
-                <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
+                <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
                     ${group.containers.map(c => `
                         <div class="bg-gray-50 border border-gray-200 rounded p-2">
-                            <p class="font-mono text-sm font-bold">${c.container_id}</p>
+                            <p class="font-mono text-xs md:text-sm font-bold truncate">${c.container_id}</p>
                             <p class="text-xs text-gray-500">${formatDate(c.delivered_at)}</p>
-                            <span class="inline-block px-2 py-1 text-xs rounded ${
+                            <span class="inline-block px-2 py-0.5 text-xs rounded mt-1 ${
                                 c.status === 'at_outlet' ? 'bg-green-100 text-green-800' :
                                 c.status === 'collected' ? 'bg-blue-100 text-blue-800' :
                                 'bg-gray-100 text-gray-800'
