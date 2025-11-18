@@ -377,6 +377,13 @@ function renderNavBar() {
                         </button>
                     ` : ''}
                     
+                    ${['admin', 'warehouse_staff', 'warehouse_supervisor', 'driver'].includes(state.user.role) ? `
+                        <button onclick="navigateTo('containers')" 
+                            class="flex-1 min-w-[120px] px-4 py-2 rounded ${state.currentPage === 'containers' ? 'bg-blue-800' : 'bg-blue-500 hover:bg-blue-700'}">
+                            <i class="fas fa-recycle mr-2"></i>Containers
+                        </button>
+                    ` : ''}
+                    
                     ${showAllTabs ? `
                         <button onclick="navigateTo('reports')" 
                             class="flex-1 min-w-[120px] px-4 py-2 rounded ${state.currentPage === 'reports' ? 'bg-blue-800' : 'bg-blue-500 hover:bg-blue-700'}">
@@ -3129,6 +3136,581 @@ async function handleCompleteUnloading(event) {
     }
 }
 
+// ============ Container Collection Page ============
+function renderContainers() {
+    return `
+        <div class="container mx-auto px-4 py-6">
+            <h2 class="text-3xl font-bold mb-6 text-gray-800">
+                <i class="fas fa-recycle text-green-600 mr-3"></i>Container Collection & Management
+            </h2>
+            
+            <div class="grid md:grid-cols-2 gap-6 mb-6">
+                <!-- Collection Workflow -->
+                <button onclick="showContainerCollectionView()" 
+                    class="bg-green-500 hover:bg-green-600 text-white p-6 rounded-lg text-left">
+                    <i class="fas fa-hand-holding text-3xl mb-2"></i>
+                    <h3 class="text-xl font-bold">Collect Containers</h3>
+                    <p class="text-sm opacity-90">Scan containers at outlet for collection</p>
+                </button>
+                
+                <!-- View Inventory -->
+                <button onclick="showContainerInventoryView()" 
+                    class="bg-blue-500 hover:bg-blue-600 text-white p-6 rounded-lg text-left">
+                    <i class="fas fa-warehouse text-3xl mb-2"></i>
+                    <h3 class="text-xl font-bold">Container Inventory</h3>
+                    <p class="text-sm opacity-90">View containers across all outlets</p>
+                </button>
+            </div>
+            
+            <!-- Content Area -->
+            <div id="containerContent">
+                <div class="bg-white rounded-lg shadow-lg p-8 text-center">
+                    <i class="fas fa-recycle text-6xl text-gray-300 mb-4"></i>
+                    <p class="text-xl text-gray-500">Select an option above to get started</p>
+                    <p class="text-sm text-gray-400 mt-2">Manage recyclable containers (Pallet IDs starting with "A")</p>
+                </div>
+            </div>
+        </div>
+    `
+}
+
+// Show container collection workflow
+function showContainerCollectionView() {
+    const content = document.getElementById('containerContent')
+    
+    content.innerHTML = `
+        <div class="bg-white rounded-lg shadow-lg p-6">
+            <h3 class="text-2xl font-bold mb-6 flex items-center">
+                <i class="fas fa-hand-holding text-green-600 mr-3"></i>
+                Collect Containers from Outlet
+            </h3>
+            
+            ${!state.selectedOutlet ? `
+                <!-- Step 1: Select Outlet -->
+                <div class="mb-6">
+                    <label class="block text-sm font-medium mb-2">Enter Outlet Code</label>
+                    <div class="flex gap-2">
+                        <input type="text" id="containerOutletCodeInput" 
+                            placeholder="Enter outlet short code (e.g., MKC, JKJSTT1)"
+                            class="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
+                            onkeypress="if(event.key==='Enter') findOutletContainers()">
+                        <button onclick="findOutletContainers()" 
+                            class="bg-green-500 hover:bg-green-600 text-white px-6 py-2 rounded-lg">
+                            <i class="fas fa-search mr-2"></i>Find
+                        </button>
+                    </div>
+                </div>
+            ` : `
+                <!-- Step 2: Scan Containers -->
+                <div class="grid md:grid-cols-2 gap-6">
+                    <!-- Scanning Section -->
+                    <div>
+                        <div class="bg-green-50 border border-green-200 rounded-lg p-4 mb-4">
+                            <p class="font-semibold text-green-800 mb-2">
+                                <i class="fas fa-store mr-2"></i>Collecting from: ${state.selectedOutlet.name}
+                            </p>
+                            <p class="text-sm text-green-700">Code: ${state.selectedOutlet.code_short}</p>
+                            <button onclick="resetContainerCollection()" 
+                                class="mt-2 text-sm text-green-600 hover:text-green-800">
+                                <i class="fas fa-arrow-left mr-1"></i>Change Outlet
+                            </button>
+                        </div>
+                        
+                        <div class="mb-4">
+                            <label class="block text-sm font-medium mb-2">
+                                <i class="fas fa-qrcode mr-1"></i>Scan Container ID
+                            </label>
+                            <div class="flex gap-2">
+                                <input type="text" id="containerScanInput" 
+                                    placeholder="Scan or enter container ID (starts with A)"
+                                    class="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
+                                    onkeypress="if(event.key==='Enter') handleContainerScan()"
+                                    autofocus>
+                                <button onclick="handleContainerScan()" 
+                                    class="bg-green-500 hover:bg-green-600 text-white px-6 py-2 rounded-lg">
+                                    <i class="fas fa-check"></i>
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <!-- Available Containers at Outlet -->
+                        <div class="bg-gray-50 rounded-lg p-4">
+                            <h4 class="font-semibold mb-3">
+                                <i class="fas fa-box mr-2"></i>Available Containers (${state.availableContainers?.length || 0})
+                            </h4>
+                            <div id="availableContainersList" class="space-y-2 max-h-64 overflow-y-auto">
+                                <p class="text-gray-500 text-center py-2">Loading...</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Scanned Containers List -->
+                    <div>
+                        <div class="bg-white border border-gray-200 rounded-lg p-4">
+                            <h4 class="font-semibold mb-3">
+                                <i class="fas fa-check-circle text-green-600 mr-2"></i>
+                                Scanned Containers (${state.scannedContainers?.length || 0})
+                            </h4>
+                            <div id="scannedContainersList" class="space-y-2 max-h-64 overflow-y-auto mb-4">
+                                <p class="text-gray-500 text-center py-4">No containers scanned yet</p>
+                            </div>
+                            
+                            ${state.scannedContainers?.length > 0 ? `
+                                <button onclick="completeContainerCollection()" 
+                                    class="w-full bg-green-500 hover:bg-green-600 text-white font-bold py-3 rounded-lg">
+                                    <i class="fas fa-check-circle mr-2"></i>Complete Collection (${state.scannedContainers.length} containers)
+                                </button>
+                            ` : ''}
+                        </div>
+                    </div>
+                </div>
+            `}
+        </div>
+    `
+    
+    // Initialize state
+    if (!state.scannedContainers) {
+        state.scannedContainers = []
+    }
+    if (!state.availableContainers) {
+        state.availableContainers = []
+    }
+    
+    // Load containers if outlet selected
+    if (state.selectedOutlet) {
+        setTimeout(() => loadAvailableContainers(), 100)
+    }
+}
+
+// Find containers at outlet
+async function findOutletContainers() {
+    const input = document.getElementById('containerOutletCodeInput')
+    const outletCodeShort = input.value.trim().toUpperCase()
+    
+    if (!outletCodeShort) {
+        showToast('Please enter outlet code', 'error')
+        return
+    }
+    
+    try {
+        // Find outlet info first
+        const outletResponse = await axios.post('/api/outlet/find-pallets', { 
+            outlet_code_short: outletCodeShort 
+        })
+        
+        if (outletResponse.data.success) {
+            state.selectedOutlet = {
+                code: outletResponse.data.outlet_code,
+                code_short: outletResponse.data.outlet_code_short,
+                name: outletResponse.data.outlet_name
+            }
+            state.scannedContainers = []
+            state.availableContainers = []
+            
+            // Reload the view
+            showContainerCollectionView()
+            
+            // Load containers
+            await loadAvailableContainers()
+            
+            showToast(`Outlet found: ${outletCodeShort}`, 'success')
+        } else {
+            showToast(outletResponse.data.error || 'Outlet not found', 'error')
+        }
+    } catch (error) {
+        console.error('Error finding outlet:', error)
+        showToast(error.response?.data?.error || 'Failed to find outlet', 'error')
+    }
+}
+
+// Load available containers at outlet
+async function loadAvailableContainers() {
+    if (!state.selectedOutlet) return
+    
+    try {
+        const response = await axios.get(`/api/containers/by-outlet/${state.selectedOutlet.code}`)
+        
+        state.availableContainers = response.data.containers || []
+        
+        const listDiv = document.getElementById('availableContainersList')
+        if (!listDiv) return
+        
+        if (state.availableContainers.length === 0) {
+            listDiv.innerHTML = `
+                <div class="text-center py-6">
+                    <i class="fas fa-check-circle text-3xl text-green-500 mb-2"></i>
+                    <p class="text-sm text-gray-600">No containers at this outlet</p>
+                </div>
+            `
+        } else {
+            listDiv.innerHTML = state.availableContainers.map(container => `
+                <div class="bg-white border border-gray-200 rounded p-3">
+                    <p class="font-mono font-bold text-gray-800">${container.container_id}</p>
+                    <p class="text-xs text-gray-500">Delivered: ${formatDate(container.delivered_at)}</p>
+                </div>
+            `).join('')
+        }
+        
+        // Update scanned list
+        updateScannedContainersList()
+    } catch (error) {
+        console.error('Error loading containers:', error)
+        showToast('Failed to load containers', 'error')
+    }
+}
+
+// Handle container scan
+let containerScanTimeout = null
+async function handleContainerScan() {
+    const input = document.getElementById('containerScanInput')
+    const containerId = input.value.trim().toUpperCase()
+    
+    if (!containerId) return
+    
+    // Clear input immediately
+    input.value = ''
+    
+    // Debounce: prevent double-scan within 500ms
+    if (containerScanTimeout) {
+        console.log('Debounced duplicate container scan')
+        return
+    }
+    containerScanTimeout = setTimeout(() => {
+        containerScanTimeout = null
+    }, 500)
+    
+    // Check if already scanned
+    if (state.scannedContainers.some(c => c.container_id === containerId)) {
+        playBeep(false)
+        showToast(`Already scanned: ${containerId}`, 'warning')
+        return
+    }
+    
+    try {
+        const response = await axios.post('/api/containers/scan-collect', {
+            container_id: containerId,
+            outlet_code: state.selectedOutlet.code
+        })
+        
+        if (response.data.success) {
+            // Add to scanned list
+            state.scannedContainers.push({
+                container_id: containerId,
+                outlet_code: response.data.outlet_code,
+                outlet_name: response.data.outlet_name,
+                delivered_at: response.data.delivered_at
+            })
+            
+            playBeep(true)
+            showToast(`✓ Container ${containerId} ready for collection`, 'success')
+            
+            // Update UI
+            loadAvailableContainers()
+        } else if (response.data.cross_outlet) {
+            // Cross-outlet validation - ask for confirmation
+            showCrossOutletConfirmation(response.data)
+        } else {
+            playBeep(false)
+            showToast(response.data.error || 'Container not found', 'error')
+        }
+    } catch (error) {
+        playBeep(false)
+        showToast(error.response?.data?.error || 'Scan failed', 'error')
+    }
+}
+
+// Show cross-outlet confirmation dialog
+function showCrossOutletConfirmation(data) {
+    const modal = document.createElement('div')
+    modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50'
+    modal.innerHTML = `
+        <div class="bg-white rounded-lg p-6 max-w-md mx-4">
+            <h3 class="text-xl font-bold mb-4 text-orange-600">
+                <i class="fas fa-exclamation-triangle mr-2"></i>Wrong Outlet Container
+            </h3>
+            <p class="mb-4">
+                This container <strong class="font-mono">${data.container_id}</strong> belongs to:
+            </p>
+            <div class="bg-yellow-50 border border-yellow-200 rounded p-3 mb-4">
+                <p class="font-semibold">${data.current_outlet_name}</p>
+                <p class="text-sm text-gray-600">Code: ${data.current_outlet}</p>
+            </div>
+            <p class="mb-6 text-sm text-gray-700">
+                Do you want to proceed to collect it and deduct from the owner outlet?
+            </p>
+            <div class="flex gap-3">
+                <button onclick="collectCrossOutletContainer('${data.container_id}', '${data.scanning_outlet}'); this.closest('.fixed').remove()" 
+                    class="flex-1 bg-green-500 hover:bg-green-600 text-white py-2 rounded-lg font-semibold">
+                    YES - Collect
+                </button>
+                <button onclick="this.closest('.fixed').remove()" 
+                    class="flex-1 bg-gray-300 hover:bg-gray-400 text-gray-800 py-2 rounded-lg font-semibold">
+                    NO - Cancel
+                </button>
+            </div>
+        </div>
+    `
+    document.body.appendChild(modal)
+}
+
+// Collect container from wrong outlet
+async function collectCrossOutletContainer(containerId, scanningOutlet) {
+    try {
+        const response = await axios.post('/api/containers/collect-cross-outlet', {
+            container_id: containerId,
+            scanning_outlet: scanningOutlet
+        })
+        
+        if (response.data.success) {
+            playBeep(true)
+            showToast(`✓ Collected ${containerId} from ${response.data.original_outlet_name}`, 'success')
+            
+            // Add to scanned list with cross-outlet flag
+            state.scannedContainers.push({
+                container_id: containerId,
+                outlet_code: response.data.original_outlet,
+                outlet_name: response.data.original_outlet_name,
+                cross_outlet: true
+            })
+            
+            // Reload available containers
+            loadAvailableContainers()
+        } else {
+            playBeep(false)
+            showToast(response.data.error || 'Collection failed', 'error')
+        }
+    } catch (error) {
+        playBeep(false)
+        showToast(error.response?.data?.error || 'Collection failed', 'error')
+    }
+}
+
+// Update scanned containers list
+function updateScannedContainersList() {
+    const listDiv = document.getElementById('scannedContainersList')
+    if (!listDiv) return
+    
+    if (!state.scannedContainers || state.scannedContainers.length === 0) {
+        listDiv.innerHTML = `<p class="text-gray-500 text-center py-4">No containers scanned yet</p>`
+        return
+    }
+    
+    listDiv.innerHTML = state.scannedContainers.map((container, index) => `
+        <div class="bg-green-50 border border-green-200 rounded p-3">
+            <div class="flex justify-between items-start">
+                <div>
+                    <p class="font-mono font-bold text-gray-800">${container.container_id}</p>
+                    ${container.cross_outlet ? `
+                        <p class="text-xs text-orange-600 font-semibold">
+                            <i class="fas fa-exchange-alt mr-1"></i>From: ${container.outlet_name}
+                        </p>
+                    ` : ''}
+                    <p class="text-xs text-gray-500">Ready for collection</p>
+                </div>
+                <button onclick="removeScannedContainer(${index})" 
+                    class="text-red-500 hover:text-red-700">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+        </div>
+    `).join('')
+}
+
+// Remove container from scanned list
+function removeScannedContainer(index) {
+    state.scannedContainers.splice(index, 1)
+    updateScannedContainersList()
+    showContainerCollectionView() // Refresh to update button
+}
+
+// Complete container collection
+async function completeContainerCollection() {
+    if (!state.scannedContainers || state.scannedContainers.length === 0) {
+        showToast('No containers scanned', 'warning')
+        return
+    }
+    
+    // Show signature modal
+    const modal = document.createElement('div')
+    modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50'
+    modal.innerHTML = `
+        <div class="bg-white rounded-lg p-6 max-w-md mx-4">
+            <h3 class="text-xl font-bold mb-4">
+                <i class="fas fa-signature text-blue-600 mr-2"></i>Complete Collection
+            </h3>
+            <p class="mb-4">Collecting <strong>${state.scannedContainers.length}</strong> container(s) from <strong>${state.selectedOutlet.name}</strong></p>
+            
+            <div class="mb-4">
+                <label class="block text-sm font-medium mb-2">Collector Name/Signature</label>
+                <input type="text" id="collectionSignature" 
+                    placeholder="Enter your name"
+                    class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+            </div>
+            
+            <div class="flex gap-3">
+                <button onclick="confirmContainerCollection(); this.closest('.fixed').remove()" 
+                    class="flex-1 bg-green-500 hover:bg-green-600 text-white py-2 rounded-lg font-semibold">
+                    <i class="fas fa-check-circle mr-2"></i>Confirm & Sign
+                </button>
+                <button onclick="this.closest('.fixed').remove()" 
+                    class="flex-1 bg-gray-300 hover:bg-gray-400 text-gray-800 py-2 rounded-lg font-semibold">
+                    Cancel
+                </button>
+            </div>
+        </div>
+    `
+    document.body.appendChild(modal)
+    
+    setTimeout(() => {
+        document.getElementById('collectionSignature')?.focus()
+    }, 100)
+}
+
+// Confirm container collection
+async function confirmContainerCollection() {
+    const signature = document.getElementById('collectionSignature')?.value.trim()
+    
+    if (!signature) {
+        showToast('Please enter collector name', 'error')
+        return
+    }
+    
+    try {
+        const containerIds = state.scannedContainers.map(c => c.container_id)
+        
+        const response = await axios.post('/api/containers/complete-collection', {
+            outlet_code: state.selectedOutlet.code,
+            container_ids: containerIds,
+            signature_name: signature
+        })
+        
+        if (response.data.success) {
+            showToast(`✓ ${response.data.success_count} container(s) collected successfully!`, 'success')
+            
+            // Reset state
+            state.scannedContainers = []
+            state.selectedOutlet = null
+            state.availableContainers = []
+            
+            // Reload the collection view
+            showContainerCollectionView()
+        } else {
+            showToast('Collection failed', 'error')
+        }
+    } catch (error) {
+        console.error('Collection error:', error)
+        showToast(error.response?.data?.error || 'Failed to complete collection', 'error')
+    }
+}
+
+// Reset container collection
+function resetContainerCollection() {
+    state.selectedOutlet = null
+    state.scannedContainers = []
+    state.availableContainers = []
+    showContainerCollectionView()
+}
+
+// Show container inventory view
+function showContainerInventoryView() {
+    const content = document.getElementById('containerContent')
+    
+    content.innerHTML = `
+        <div class="bg-white rounded-lg shadow-lg p-6">
+            <h3 class="text-2xl font-bold mb-6 flex items-center">
+                <i class="fas fa-warehouse text-blue-600 mr-3"></i>
+                Container Inventory - All Outlets
+            </h3>
+            
+            <div id="containerInventoryList" class="space-y-4">
+                <p class="text-gray-500 text-center py-8">Loading inventory...</p>
+            </div>
+            
+            <button onclick="loadContainerInventory()" 
+                class="w-full mt-4 bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg">
+                <i class="fas fa-sync mr-2"></i>Refresh
+            </button>
+        </div>
+    `
+    
+    setTimeout(() => loadContainerInventory(), 100)
+}
+
+// Load container inventory
+async function loadContainerInventory() {
+    try {
+        const response = await axios.get('/api/containers/inventory')
+        const containers = response.data.containers || []
+        
+        const listDiv = document.getElementById('containerInventoryList')
+        if (!listDiv) return
+        
+        if (containers.length === 0) {
+            listDiv.innerHTML = `
+                <div class="text-center py-12">
+                    <i class="fas fa-box-open text-6xl text-gray-300 mb-4"></i>
+                    <p class="text-xl text-gray-500">No containers in inventory</p>
+                    <p class="text-sm text-gray-400 mt-2">Containers will appear here after outlet deliveries</p>
+                </div>
+            `
+            return
+        }
+        
+        // Group by outlet
+        const groupedByOutlet = {}
+        containers.forEach(container => {
+            const key = container.outlet_code
+            if (!groupedByOutlet[key]) {
+                groupedByOutlet[key] = {
+                    outlet_code: container.outlet_code,
+                    outlet_name: container.outlet_name,
+                    containers: []
+                }
+            }
+            groupedByOutlet[key].containers.push(container)
+        })
+        
+        listDiv.innerHTML = Object.values(groupedByOutlet).map(group => `
+            <div class="border border-gray-200 rounded-lg p-4">
+                <div class="flex justify-between items-center mb-3">
+                    <div>
+                        <h4 class="font-semibold text-lg">${group.outlet_name}</h4>
+                        <p class="text-sm text-gray-500">Code: ${group.outlet_code}</p>
+                    </div>
+                    <div class="bg-blue-100 px-4 py-2 rounded-full">
+                        <span class="font-bold text-blue-800">${group.containers.length}</span>
+                        <span class="text-xs text-blue-600 ml-1">containers</span>
+                    </div>
+                </div>
+                <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
+                    ${group.containers.map(c => `
+                        <div class="bg-gray-50 border border-gray-200 rounded p-2">
+                            <p class="font-mono text-sm font-bold">${c.container_id}</p>
+                            <p class="text-xs text-gray-500">${formatDate(c.delivered_at)}</p>
+                            <span class="inline-block px-2 py-1 text-xs rounded ${
+                                c.status === 'at_outlet' ? 'bg-green-100 text-green-800' :
+                                c.status === 'collected' ? 'bg-blue-100 text-blue-800' :
+                                'bg-gray-100 text-gray-800'
+                            }">${c.status}</span>
+                        </div>
+                    `).join('')}
+                </div>
+            </div>
+        `).join('')
+    } catch (error) {
+        console.error('Error loading inventory:', error)
+        const listDiv = document.getElementById('containerInventoryList')
+        if (listDiv) {
+            listDiv.innerHTML = `
+                <div class="text-center py-8">
+                    <i class="fas fa-exclamation-triangle text-4xl text-red-500 mb-3"></i>
+                    <p class="text-red-600">Failed to load container inventory</p>
+                </div>
+            `
+        }
+    }
+}
+
 // ============ Reports Page ============
 function renderReports() {
     return `
@@ -3137,12 +3719,19 @@ function renderReports() {
                 <i class="fas fa-chart-bar text-blue-600 mr-3"></i>Reports & Analytics
             </h2>
             
-            <div class="grid md:grid-cols-3 gap-6 mb-6">
+            <div class="grid md:grid-cols-4 gap-6 mb-6">
                 <button onclick="loadDeliveryReport()" 
                     class="bg-blue-500 hover:bg-blue-600 text-white p-6 rounded-lg text-left">
                     <i class="fas fa-truck text-3xl mb-2"></i>
                     <p class="text-xl font-bold">Delivery Report</p>
                     <p class="text-sm">View completed deliveries</p>
+                </button>
+                
+                <button onclick="loadContainerReport()" 
+                    class="bg-green-500 hover:bg-green-600 text-white p-6 rounded-lg text-left">
+                    <i class="fas fa-recycle text-3xl mb-2"></i>
+                    <p class="text-xl font-bold">Container Report</p>
+                    <p class="text-sm">Track recyclable containers</p>
                 </button>
                 
                 <button onclick="loadErrorReport()" 
@@ -3153,7 +3742,7 @@ function renderReports() {
                 </button>
                 
                 <button onclick="exportReport()" 
-                    class="bg-green-500 hover:bg-green-600 text-white p-6 rounded-lg text-left">
+                    class="bg-orange-500 hover:bg-orange-600 text-white p-6 rounded-lg text-left">
                     <i class="fas fa-download text-3xl mb-2"></i>
                     <p class="text-xl font-bold">Export Data</p>
                     <p class="text-sm">Download Excel report</p>
@@ -3223,6 +3812,147 @@ async function loadDeliveryReport() {
         `
     } catch (error) {
         showToast('Failed to load report', 'error')
+    }
+}
+
+async function loadContainerReport() {
+    try {
+        const response = await axios.get('/api/containers/inventory')
+        const containers = response.data.containers || []
+        
+        const content = document.getElementById('reportContent')
+        if (!containers || containers.length === 0) {
+            content.innerHTML = '<p class="text-gray-500 text-center py-8">No container records found</p>'
+            return
+        }
+        
+        // Calculate statistics
+        const totalContainers = containers.length
+        const atOutletCount = containers.filter(c => c.status === 'at_outlet').length
+        const collectedCount = containers.filter(c => c.status === 'collected').length
+        
+        // Group by outlet
+        const byOutlet = {}
+        containers.forEach(c => {
+            if (!byOutlet[c.outlet_code]) {
+                byOutlet[c.outlet_code] = {
+                    outlet_name: c.outlet_name,
+                    containers: []
+                }
+            }
+            byOutlet[c.outlet_code].containers.push(c)
+        })
+        
+        content.innerHTML = `
+            <h3 class="text-xl font-bold mb-4">
+                <i class="fas fa-recycle text-green-600 mr-2"></i>Container Tracking Report
+            </h3>
+            
+            <!-- Statistics -->
+            <div class="grid md:grid-cols-3 gap-4 mb-6">
+                <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                    <p class="text-sm text-blue-600 mb-1">Total Containers</p>
+                    <p class="text-3xl font-bold text-blue-800">${totalContainers}</p>
+                </div>
+                <div class="bg-green-50 border border-green-200 rounded-lg p-4">
+                    <p class="text-sm text-green-600 mb-1">At Outlets</p>
+                    <p class="text-3xl font-bold text-green-800">${atOutletCount}</p>
+                </div>
+                <div class="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                    <p class="text-sm text-gray-600 mb-1">Collected</p>
+                    <p class="text-3xl font-bold text-gray-800">${collectedCount}</p>
+                </div>
+            </div>
+            
+            <!-- Container Details by Outlet -->
+            <h4 class="font-semibold mb-3">Containers by Outlet</h4>
+            <div class="overflow-x-auto mb-6">
+                <table class="w-full border-collapse">
+                    <thead class="bg-gray-100">
+                        <tr>
+                            <th class="border px-4 py-2">Outlet</th>
+                            <th class="border px-4 py-2">Container Count</th>
+                            <th class="border px-4 py-2">At Outlet</th>
+                            <th class="border px-4 py-2">Collected</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${Object.entries(byOutlet).map(([code, data]) => {
+                            const atOutlet = data.containers.filter(c => c.status === 'at_outlet').length
+                            const collected = data.containers.filter(c => c.status === 'collected').length
+                            return `
+                                <tr>
+                                    <td class="border px-4 py-2">
+                                        <div>
+                                            <p class="font-semibold">${data.outlet_name}</p>
+                                            <p class="text-xs text-gray-500">${code}</p>
+                                        </div>
+                                    </td>
+                                    <td class="border px-4 py-2 text-center font-bold">${data.containers.length}</td>
+                                    <td class="border px-4 py-2 text-center">
+                                        <span class="px-2 py-1 bg-green-100 text-green-800 rounded text-sm font-semibold">
+                                            ${atOutlet}
+                                        </span>
+                                    </td>
+                                    <td class="border px-4 py-2 text-center">
+                                        <span class="px-2 py-1 bg-gray-100 text-gray-800 rounded text-sm font-semibold">
+                                            ${collected}
+                                        </span>
+                                    </td>
+                                </tr>
+                            `
+                        }).join('')}
+                    </tbody>
+                </table>
+            </div>
+            
+            <!-- All Container Details -->
+            <h4 class="font-semibold mb-3">All Container Records</h4>
+            <div class="overflow-x-auto">
+                <table class="w-full border-collapse">
+                    <thead class="bg-gray-100">
+                        <tr>
+                            <th class="border px-4 py-2">Container ID</th>
+                            <th class="border px-4 py-2">Outlet</th>
+                            <th class="border px-4 py-2">Status</th>
+                            <th class="border px-4 py-2">Delivered At</th>
+                            <th class="border px-4 py-2">Delivered By</th>
+                            <th class="border px-4 py-2">Collected At</th>
+                            <th class="border px-4 py-2">Collected By</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${containers.map(c => `
+                            <tr>
+                                <td class="border px-4 py-2 font-mono font-bold">${c.container_id}</td>
+                                <td class="border px-4 py-2">
+                                    <div>
+                                        <p class="font-semibold">${c.outlet_name}</p>
+                                        <p class="text-xs text-gray-500">${c.outlet_code}</p>
+                                    </div>
+                                </td>
+                                <td class="border px-4 py-2">
+                                    <span class="px-2 py-1 rounded text-sm ${
+                                        c.status === 'at_outlet' ? 'bg-green-100 text-green-800' :
+                                        c.status === 'collected' ? 'bg-blue-100 text-blue-800' :
+                                        'bg-gray-100 text-gray-800'
+                                    }">
+                                        ${c.status}
+                                    </span>
+                                </td>
+                                <td class="border px-4 py-2">${formatDate(c.delivered_at)}</td>
+                                <td class="border px-4 py-2">${c.delivered_by_name || '-'}</td>
+                                <td class="border px-4 py-2">${c.collected_at ? formatDate(c.collected_at) : '-'}</td>
+                                <td class="border px-4 py-2">${c.collected_by_name || '-'}</td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            </div>
+        `
+    } catch (error) {
+        console.error('Failed to load container report:', error)
+        showToast('Failed to load container report', 'error')
     }
 }
 
@@ -3509,6 +4239,9 @@ function render() {
             break
         case 'outlet':
             content = renderOutlet()
+            break
+        case 'containers':
+            content = renderContainers()
             break
         case 'reports':
             content = renderReports()
