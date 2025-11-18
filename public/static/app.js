@@ -1246,42 +1246,64 @@ function renderDashboard() {
             </div>
             
             <!-- Statistics Cards -->
-            <div class="grid md:grid-cols-4 gap-6 mb-6">
-                <div class="bg-white rounded-lg shadow-lg p-6">
-                    <div class="flex items-center justify-between">
-                        <div>
-                            <p class="text-gray-500 text-sm">Total Outlets</p>
-                            <p id="dash-total-outlets" class="text-3xl font-bold text-blue-600">-</p>
+            <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-6">
+                <div class="bg-white rounded-lg shadow-lg p-4">
+                    <div class="flex flex-col">
+                        <div class="flex items-center justify-between mb-2">
+                            <p class="text-gray-500 text-xs">Total Outlets</p>
+                            <i class="fas fa-store text-2xl text-blue-200"></i>
                         </div>
-                        <i class="fas fa-store text-4xl text-blue-200"></i>
+                        <p id="dash-total-outlets" class="text-2xl font-bold text-blue-600">-</p>
                     </div>
                 </div>
                 
-                <div class="bg-white rounded-lg shadow-lg p-6">
-                    <div class="flex items-center justify-between">
-                        <div>
-                            <p class="text-gray-500 text-sm">Total TN (Transfer Numbers)</p>
-                            <p id="dash-total-pallets" class="text-3xl font-bold text-purple-600">-</p>
+                <div class="bg-white rounded-lg shadow-lg p-4">
+                    <div class="flex flex-col">
+                        <div class="flex items-center justify-between mb-2">
+                            <p class="text-gray-500 text-xs">Total TN</p>
+                            <i class="fas fa-pallet text-2xl text-purple-200"></i>
                         </div>
-                        <i class="fas fa-pallet text-4xl text-purple-200"></i>
+                        <p id="dash-total-pallets" class="text-2xl font-bold text-purple-600">-</p>
                     </div>
                 </div>
                 
-                <div class="bg-white rounded-lg shadow-lg p-6">
-                    <div class="flex items-center justify-between">
-                        <div>
-                            <p class="text-gray-500 text-sm">Loaded Containers</p>
-                            <p id="dash-loaded-pallets" class="text-3xl font-bold text-green-600">-</p>
+                <div class="bg-white rounded-lg shadow-lg p-4">
+                    <div class="flex flex-col">
+                        <div class="flex items-center justify-between mb-2">
+                            <p class="text-gray-500 text-xs">TN Scanned</p>
+                            <i class="fas fa-barcode text-2xl text-orange-200"></i>
                         </div>
-                        <i class="fas fa-check-circle text-4xl text-green-200"></i>
+                        <p id="dash-tn-scanned" class="text-2xl font-bold text-orange-600">-</p>
                     </div>
                 </div>
                 
-                <div class="bg-white rounded-lg shadow-lg p-6">
-                    <div class="flex items-center justify-between">
-                        <div>
-                            <p class="text-gray-500 text-sm">Delivered Containers</p>
-                            <p id="dash-delivered-pallets" class="text-3xl font-bold text-teal-600">-</p>
+                <div class="bg-white rounded-lg shadow-lg p-4">
+                    <div class="flex flex-col">
+                        <div class="flex items-center justify-between mb-2">
+                            <p class="text-gray-500 text-xs">Outlet Loaded</p>
+                            <i class="fas fa-warehouse text-2xl text-indigo-200"></i>
+                        </div>
+                        <p id="dash-outlet-loaded" class="text-2xl font-bold text-indigo-600">-</p>
+                    </div>
+                </div>
+                
+                <div class="bg-white rounded-lg shadow-lg p-4">
+                    <div class="flex flex-col">
+                        <div class="flex items-center justify-between mb-2">
+                            <p class="text-gray-500 text-xs">Loaded Containers</p>
+                            <i class="fas fa-check-circle text-2xl text-green-200"></i>
+                        </div>
+                        <p id="dash-loaded-pallets" class="text-2xl font-bold text-green-600">-</p>
+                    </div>
+                </div>
+                
+                <div class="bg-white rounded-lg shadow-lg p-4">
+                    <div class="flex flex-col">
+                        <div class="flex items-center justify-between mb-2">
+                            <p class="text-gray-500 text-xs">Delivered Containers</p>
+                            <i class="fas fa-truck text-2xl text-teal-200"></i>
+                        </div>
+                        <p id="dash-delivered-pallets" class="text-2xl font-bold text-teal-600">-</p>
                         </div>
                         <i class="fas fa-truck text-4xl text-teal-200"></i>
                     </div>
@@ -1379,6 +1401,8 @@ async function loadDashboardData() {
         let deliveredPallets = 0
         let totalLoadedContainers = 0
         let totalDeliveredContainers = 0
+        let totalTNScanned = 0 // NEW: Count total transfer numbers scanned
+        const outletsLoaded = new Set() // NEW: Track unique outlets that have been loaded
         
         parcels.forEach(parcel => {
             // Skip invalid parcels
@@ -1389,6 +1413,13 @@ async function loadDashboardData() {
             totalPallets++
             if (parcel.status === 'loaded') loadedPallets++
             if (parcel.status === 'delivered') deliveredPallets++
+            
+            // NEW: Count total transfer numbers (TN) scanned (loaded or delivered)
+            if (parcel.status === 'loaded' || parcel.status === 'delivered') {
+                totalTNScanned += (parcel.total_count || 0)
+                // NEW: Track outlet has been loaded
+                outletsLoaded.add(parcel.outlet_code)
+            }
             
             if (!outletMap.has(parcel.outlet_code)) {
                 outletMap.set(parcel.outlet_code, {
@@ -1449,6 +1480,8 @@ async function loadDashboardData() {
         // Update statistics - use container counts if available, fallback to pallet counts
         document.getElementById('dash-total-outlets').textContent = outletMap.size
         document.getElementById('dash-total-pallets').textContent = totalPallets
+        document.getElementById('dash-tn-scanned').textContent = totalTNScanned // NEW: Total TN Scanned
+        document.getElementById('dash-outlet-loaded').textContent = outletsLoaded.size // NEW: Total Outlet Loaded
         document.getElementById('dash-loaded-pallets').textContent = totalLoadedContainers > 0 ? totalLoadedContainers : loadedPallets
         document.getElementById('dash-delivered-pallets').textContent = totalDeliveredContainers > 0 ? totalDeliveredContainers : deliveredPallets
         
@@ -2819,6 +2852,12 @@ function updateOutletScannedList() {
     const list = document.getElementById('outletScannedList')
     if (!list) return
     
+    // Update the header counter
+    const headerElement = list.closest('.mt-6')?.querySelector('h4')
+    if (headerElement) {
+        headerElement.textContent = `Scanned Pallets (${state.scannedItems.length})`
+    }
+    
     if (state.scannedItems.length === 0) {
         list.innerHTML = '<p class="text-gray-500 text-center py-4">No pallets scanned yet</p>'
         return
@@ -2890,9 +2929,9 @@ function showOutletCompletionModal() {
     const hasWarehouseCount = warehouseContainerCount && warehouseContainerCount > 0
     
     const modal = document.createElement('div')
-    modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50'
+    modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4'
     modal.innerHTML = `
-        <div class="bg-white rounded-lg p-6 w-full max-w-md">
+        <div class="bg-white rounded-lg p-6 w-full max-w-md max-h-[90vh] overflow-y-auto">
             <h3 class="text-xl font-bold mb-4 text-green-600">
                 <i class="fas fa-check-circle mr-2"></i>Complete Receipt
             </h3>
@@ -3052,10 +3091,53 @@ async function handleConfirmOutletCompletion(event) {
         return
     }
     
+    // Show double confirmation dialog
+    const palletIds = state.scannedItems.map(item => item.pallet_id)
+    showFinalConfirmationDialog(receiverName, containerCount, palletIds)
+}
+
+// NEW: Final confirmation dialog before submitting
+function showFinalConfirmationDialog(receiverName, containerCount, palletIds) {
+    const confirmModal = document.createElement('div')
+    confirmModal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60] p-4'
+    confirmModal.innerHTML = `
+        <div class="bg-white rounded-lg p-6 w-full max-w-md max-h-[90vh] overflow-y-auto">
+            <h3 class="text-xl font-bold mb-4 text-orange-600">
+                <i class="fas fa-exclamation-circle mr-2"></i>Final Confirmation
+            </h3>
+            <div class="mb-4 bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <p class="text-sm text-gray-700 mb-3">
+                    <strong>Please confirm the following details:</strong>
+                </p>
+                <div class="space-y-2 text-sm">
+                    <p><i class="fas fa-store mr-2 text-blue-600"></i><strong>Outlet:</strong> ${state.selectedOutlet.code_short} - ${state.selectedOutlet.name}</p>
+                    <p><i class="fas fa-pallet mr-2 text-blue-600"></i><strong>Pallets:</strong> ${palletIds.length} pallet(s)</p>
+                    <p><i class="fas fa-truck mr-2 text-blue-600"></i><strong>Containers:</strong> ${containerCount} container(s)</p>
+                    <p><i class="fas fa-user mr-2 text-blue-600"></i><strong>Received by:</strong> ${receiverName}</p>
+                </div>
+            </div>
+            <p class="text-sm text-gray-600 mb-4">
+                <i class="fas fa-info-circle mr-1"></i>
+                Once confirmed, this action cannot be undone. Are you sure you want to proceed?
+            </p>
+            <div class="flex space-x-3">
+                <button onclick="proceedWithOutletCompletion('${receiverName}', ${containerCount}, ${JSON.stringify(palletIds).replace(/"/g, '&quot;')})" 
+                    class="flex-1 bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg font-semibold">
+                    <i class="fas fa-check-circle mr-2"></i>YES - Proceed
+                </button>
+                <button onclick="this.closest('.fixed').remove()" 
+                    class="flex-1 bg-gray-300 hover:bg-gray-400 text-gray-800 px-4 py-2 rounded-lg font-semibold">
+                    <i class="fas fa-times mr-2"></i>NO - Cancel
+                </button>
+            </div>
+        </div>
+    `
+    document.body.appendChild(confirmModal)
+}
+
+// NEW: Proceed with actual submission after confirmation
+async function proceedWithOutletCompletion(receiverName, containerCount, palletIds) {
     try {
-        // Confirm all scanned pallets at once
-        const palletIds = state.scannedItems.map(item => item.pallet_id)
-        
         const response = await axios.post('/api/outlet/confirm-receipt-bulk', {
             outlet_code_short: state.selectedOutlet.code_short,
             pallet_ids: palletIds,
@@ -3065,9 +3147,8 @@ async function handleConfirmOutletCompletion(event) {
         
         showToast(`✓ Receipt completed! ${containerCount} container(s) with ${palletIds.length} pallet(s) received by ${receiverName}`, 'success')
         
-        // Close modal
-        const modal = document.querySelector('.fixed.inset-0')
-        if (modal) modal.remove()
+        // Close all modals
+        document.querySelectorAll('.fixed.inset-0').forEach(modal => modal.remove())
         
         // Clear scanned items
         state.scannedItems = []
@@ -3077,6 +3158,8 @@ async function handleConfirmOutletCompletion(event) {
         render()
     } catch (error) {
         showToast(error.response?.data?.error || 'Failed to confirm receipt', 'error')
+        // Close confirmation modal on error
+        document.querySelectorAll('.fixed[class*="z-[60]"]').forEach(modal => modal.remove())
     }
 }
 
