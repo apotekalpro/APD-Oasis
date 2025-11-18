@@ -4,6 +4,10 @@ import adapter from '@hono/vite-dev-server/cloudflare'
 import { defineConfig } from 'vite'
 
 export default defineConfig({
+  server: {
+    port: 5060,
+    host: '0.0.0.0'
+  },
   plugins: [
     build({
       outputDir: 'dist',
