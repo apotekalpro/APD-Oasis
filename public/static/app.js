@@ -2527,9 +2527,10 @@ function renderOutlet() {
                     </div>
                     
                     <!-- Container Count & Date Info -->
-                    <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 flex items-center justify-between flex-wrap gap-4">
-                        <div class="flex items-center gap-6 flex-wrap">
-                            <div>
+                    <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                        <!-- Mobile: Stack vertically, Desktop: Side by side -->
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-3">
+                            <div class="text-center md:text-left">
                                 <p class="text-sm text-gray-600 mb-1">
                                     <i class="fas fa-truck mr-1"></i>Container Loaded
                                 </p>
@@ -2537,7 +2538,7 @@ function renderOutlet() {
                                     ${state.selectedOutlet.container_count_loaded || 0}
                                 </p>
                             </div>
-                            <div class="border-l border-blue-300 pl-6">
+                            <div class="text-center md:text-left md:border-l md:border-blue-300 md:pl-4">
                                 <p class="text-sm text-gray-600 mb-1">
                                     <i class="fas fa-pallet mr-1"></i>Total TN
                                 </p>
@@ -2545,17 +2546,17 @@ function renderOutlet() {
                                     ${state.availablePallets.length + state.scannedItems.length}
                                 </p>
                             </div>
-                            <div class="border-l border-blue-300 pl-6">
+                            <div class="text-center md:text-left md:border-l md:border-blue-300 md:pl-4">
                                 <label class="text-sm text-gray-600 mb-1 block">
                                     <i class="fas fa-calendar mr-1"></i>Delivery Date
                                 </label>
                                 <input type="date" id="outletDeliveryDate" 
-                                    class="px-3 py-2 border-2 border-blue-300 rounded-lg font-semibold"
+                                    class="w-full px-3 py-2 border-2 border-blue-300 rounded-lg font-semibold text-center"
                                     value="${state.outletDeliveryDate || new Date().toISOString().split('T')[0]}"
                                     onchange="setOutletDeliveryDate(this.value)">
                             </div>
                         </div>
-                        <div class="text-xs text-gray-600">
+                        <div class="text-xs text-gray-600 text-center md:text-left border-t border-blue-200 pt-2">
                             <i class="fas fa-info-circle mr-1"></i>Driver: Check counts match your load
                         </div>
                     </div>
