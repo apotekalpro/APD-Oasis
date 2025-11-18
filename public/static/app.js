@@ -1559,9 +1559,13 @@ setInterval(() => {
 
 // ============ Warehouse Page ============
 function renderWarehouse() {
+    console.log('🏭 renderWarehouse() called')
     // Initialize warehouse delivery date if not set
     if (!state.warehouseDeliveryDate) {
         state.warehouseDeliveryDate = new Date().toISOString().split('T')[0]
+        console.log('📅 Initialized warehouse delivery date:', state.warehouseDeliveryDate)
+    } else {
+        console.log('📅 Using existing warehouse delivery date:', state.warehouseDeliveryDate)
     }
     
     return `
@@ -1662,7 +1666,9 @@ function renderWarehouse() {
 }
 
 function setWarehouseDeliveryDate(date) {
+    console.log('🗓️ Warehouse delivery date changed to:', date)
     state.warehouseDeliveryDate = date
+    console.log('✓ State updated, warehouseDeliveryDate =', state.warehouseDeliveryDate)
     loadWarehouseData()
 }
 
@@ -2522,13 +2528,21 @@ function renderOutlet() {
                     
                     <!-- Container Count & Date Info -->
                     <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 flex items-center justify-between flex-wrap gap-4">
-                        <div class="flex items-center gap-6">
+                        <div class="flex items-center gap-6 flex-wrap">
                             <div>
                                 <p class="text-sm text-gray-600 mb-1">
-                                    <i class="fas fa-truck mr-1"></i>Container Count Loaded
+                                    <i class="fas fa-truck mr-1"></i>Container Loaded
                                 </p>
                                 <p class="text-3xl font-bold text-blue-600">
                                     ${state.selectedOutlet.container_count_loaded || 0}
+                                </p>
+                            </div>
+                            <div class="border-l border-blue-300 pl-6">
+                                <p class="text-sm text-gray-600 mb-1">
+                                    <i class="fas fa-pallet mr-1"></i>Total TN
+                                </p>
+                                <p class="text-3xl font-bold text-green-600">
+                                    ${state.availablePallets.length + state.scannedItems.length}
                                 </p>
                             </div>
                             <div class="border-l border-blue-300 pl-6">
@@ -2542,7 +2556,7 @@ function renderOutlet() {
                             </div>
                         </div>
                         <div class="text-xs text-gray-600">
-                            <i class="fas fa-info-circle mr-1"></i>Driver: Check container count matches your load
+                            <i class="fas fa-info-circle mr-1"></i>Driver: Check counts match your load
                         </div>
                     </div>
                 </div>
@@ -3520,7 +3534,14 @@ function render() {
             case 'warehouse':
                 loadWarehouseData()
                 // Update scanned items list to show persistent items
-                setTimeout(() => updateScannedItemsList(), 200)
+                setTimeout(() => {
+                    updateScannedItemsList()
+                    // 🐛 DEBUG: Verify date input after page load
+                    const dateInput = document.getElementById('warehouseDeliveryDate')
+                    console.log('🔍 After page load - Date input element:', dateInput)
+                    console.log('🔍 After page load - Date input value:', dateInput?.value)
+                    console.log('🔍 After page load - State date:', state.warehouseDeliveryDate)
+                }, 200)
                 break
             case 'outlet':
                 // Outlet page uses manual two-step process: find outlet, then scan pallets
