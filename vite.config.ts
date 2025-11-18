@@ -7,9 +7,10 @@ export default defineConfig({
   plugins: [
     build({
       outputDir: 'dist',
-      // Configure _routes.json to exclude static assets
+      // Configure _routes.json to only route API requests through worker
       routes: {
-        exclude: ['/static/*', '/favicon.ico', '/index.html']
+        include: ['/api/*'],
+        exclude: ['/static/*', '/', '/index.html']
       }
     }),
     devServer({

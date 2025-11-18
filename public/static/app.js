@@ -125,6 +125,7 @@ function getDefaultPage() {
     switch(state.user.role) {
         case 'admin': return 'dashboard'
         case 'warehouse': return 'dashboard'
+        case 'warehouse_staff': return 'dashboard'
         case 'warehouse_supervisor': return 'dashboard'
         case 'driver': return 'dashboard'
         case 'outlet': return 'outlet'
@@ -329,8 +330,9 @@ function renderNavBar() {
     return `
         <nav class="bg-blue-600 text-white shadow-lg sticky top-0 z-40">
             <div class="container mx-auto px-4 py-3">
-                <div class="flex justify-between items-center">
-                    <div class="flex items-center space-x-4">
+                <!-- First Row: App Info and Logout -->
+                <div class="flex justify-between items-center mb-3">
+                    <div class="flex items-center space-x-3">
                         <i class="fas fa-truck text-2xl"></i>
                         <div>
                             <h1 class="text-xl font-bold">APD OASIS</h1>
@@ -338,53 +340,54 @@ function renderNavBar() {
                         </div>
                     </div>
                     
-                    <div class="flex space-x-2">
-                        ${showAllTabs && state.user.role === 'admin' ? `
-                            <button onclick="navigateTo('admin')" 
-                                class="px-4 py-2 rounded ${state.currentPage === 'admin' ? 'bg-blue-800' : 'bg-blue-500 hover:bg-blue-700'}">
-                                <i class="fas fa-cog mr-2"></i>Admin
-                            </button>
-                            <button onclick="navigateTo('import')" 
-                                class="px-4 py-2 rounded ${state.currentPage === 'import' ? 'bg-blue-800' : 'bg-blue-500 hover:bg-blue-700'}">
-                                <i class="fas fa-upload mr-2"></i>Import
-                            </button>
-                        ` : ''}
-                        
-                        ${['admin', 'warehouse', 'driver'].includes(state.user.role) ? `
-                            <button onclick="navigateTo('dashboard')" 
-                                class="px-4 py-2 rounded ${state.currentPage === 'dashboard' ? 'bg-blue-800' : 'bg-blue-500 hover:bg-blue-700'}">
-                                <i class="fas fa-tachometer-alt mr-2"></i>Dashboard
-                            </button>
-                            <button onclick="navigateTo('warehouse')" 
-                                class="px-4 py-2 rounded ${state.currentPage === 'warehouse' ? 'bg-blue-800' : 'bg-blue-500 hover:bg-blue-700'}">
-                                <i class="fas fa-warehouse mr-2"></i>Warehouse
-                            </button>
-                        ` : ''}
-                        
-                        ${['admin', 'outlet', 'driver'].includes(state.user.role) ? `
-                            <button onclick="navigateTo('outlet')" 
-                                class="px-4 py-2 rounded ${state.currentPage === 'outlet' ? 'bg-blue-800' : 'bg-blue-500 hover:bg-blue-700'}">
-                                <i class="fas fa-store mr-2"></i>Outlet
-                            </button>
-                        ` : ''}
-                        
-                        ${showAllTabs ? `
-                            <button onclick="navigateTo('reports')" 
-                                class="px-4 py-2 rounded ${state.currentPage === 'reports' ? 'bg-blue-800' : 'bg-blue-500 hover:bg-blue-700'}">
-                                <i class="fas fa-chart-bar mr-2"></i>Reports
-                            </button>
-                            
-                            <button onclick="navigateTo('profile')" 
-                                class="px-4 py-2 rounded ${state.currentPage === 'profile' ? 'bg-blue-800' : 'bg-blue-500 hover:bg-blue-700'}">
-                                <i class="fas fa-user mr-2"></i>Profile
-                            </button>
-                        ` : ''}
-                        
-                        <button onclick="logout()" 
-                            class="px-4 py-2 bg-red-500 hover:bg-red-600 rounded">
-                            <i class="fas fa-sign-out-alt"></i>
+                    <button onclick="logout()" 
+                        class="px-4 py-2 bg-red-500 hover:bg-red-600 rounded">
+                        <i class="fas fa-sign-out-alt mr-2"></i>Logout
+                    </button>
+                </div>
+                
+                <!-- Second Row: Navigation Tabs -->
+                <div class="flex flex-wrap gap-2">
+                    ${showAllTabs && state.user.role === 'admin' ? `
+                        <button onclick="navigateTo('admin')" 
+                            class="flex-1 min-w-[120px] px-4 py-2 rounded ${state.currentPage === 'admin' ? 'bg-blue-800' : 'bg-blue-500 hover:bg-blue-700'}">
+                            <i class="fas fa-cog mr-2"></i>Admin
                         </button>
-                    </div>
+                        <button onclick="navigateTo('import')" 
+                            class="flex-1 min-w-[120px] px-4 py-2 rounded ${state.currentPage === 'import' ? 'bg-blue-800' : 'bg-blue-500 hover:bg-blue-700'}">
+                            <i class="fas fa-upload mr-2"></i>Import
+                        </button>
+                    ` : ''}
+                    
+                    ${['admin', 'warehouse', 'warehouse_staff', 'warehouse_supervisor', 'driver'].includes(state.user.role) ? `
+                        <button onclick="navigateTo('dashboard')" 
+                            class="flex-1 min-w-[120px] px-4 py-2 rounded ${state.currentPage === 'dashboard' ? 'bg-blue-800' : 'bg-blue-500 hover:bg-blue-700'}">
+                            <i class="fas fa-tachometer-alt mr-2"></i>Dashboard
+                        </button>
+                        <button onclick="navigateTo('warehouse')" 
+                            class="flex-1 min-w-[120px] px-4 py-2 rounded ${state.currentPage === 'warehouse' ? 'bg-blue-800' : 'bg-blue-500 hover:bg-blue-700'}">
+                            <i class="fas fa-warehouse mr-2"></i>Warehouse
+                        </button>
+                    ` : ''}
+                    
+                    ${['admin', 'warehouse_staff', 'warehouse_supervisor', 'outlet', 'driver'].includes(state.user.role) ? `
+                        <button onclick="navigateTo('outlet')" 
+                            class="flex-1 min-w-[120px] px-4 py-2 rounded ${state.currentPage === 'outlet' ? 'bg-blue-800' : 'bg-blue-500 hover:bg-blue-700'}">
+                            <i class="fas fa-store mr-2"></i>Outlet
+                        </button>
+                    ` : ''}
+                    
+                    ${showAllTabs ? `
+                        <button onclick="navigateTo('reports')" 
+                            class="flex-1 min-w-[120px] px-4 py-2 rounded ${state.currentPage === 'reports' ? 'bg-blue-800' : 'bg-blue-500 hover:bg-blue-700'}">
+                            <i class="fas fa-chart-bar mr-2"></i>Reports
+                        </button>
+                        
+                        <button onclick="navigateTo('profile')" 
+                            class="flex-1 min-w-[120px] px-4 py-2 rounded ${state.currentPage === 'profile' ? 'bg-blue-800' : 'bg-blue-500 hover:bg-blue-700'}">
+                            <i class="fas fa-user mr-2"></i>Profile
+                        </button>
+                    ` : ''}
                 </div>
             </div>
         </nav>
@@ -866,6 +869,25 @@ function renderImport() {
                     </ul>
                 </div>
                 
+                <div class="mb-4 bg-yellow-50 border-l-4 border-yellow-500 p-4">
+                    <div class="flex items-start">
+                        <i class="fas fa-exclamation-triangle text-yellow-500 mt-1 mr-3"></i>
+                        <div class="flex-1">
+                            <p class="font-semibold text-gray-800 mb-1">Re-importing Data?</p>
+                            <p class="text-sm text-gray-700 mb-3">
+                                If you're importing data that was already imported before, you need to clear the old data first to avoid duplicate errors.
+                            </p>
+                            <button onclick="confirmClearDatabase()" 
+                                class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg text-sm font-semibold">
+                                <i class="fas fa-trash-alt mr-2"></i>Clear All Data
+                            </button>
+                            <p class="text-xs text-gray-500 mt-2">
+                                <i class="fas fa-info-circle mr-1"></i>This will delete all parcels, transfers, and audit logs. Use before re-importing.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+                
                 <div class="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center">
                     <input type="file" id="excelFile" accept=".xlsx,.xls" class="hidden" onchange="handleFileSelect(event)">
                     <label for="excelFile" class="cursor-pointer">
@@ -966,6 +988,9 @@ function handleFileSelect(event) {
                 }
             }
             
+            console.log(`Parsed ${importData.length} rows from Excel`)
+            console.log('Sample rows:', importData.slice(0, 3))
+            
             if (importData.length === 0) {
                 showToast('No valid data found in Excel file', 'error')
                 return
@@ -975,16 +1000,19 @@ function handleFileSelect(event) {
             const preview = document.getElementById('importPreview')
             preview.classList.remove('hidden')
             
-            // Group by pallet ID for preview
+            // Group by pallet ID for preview (backend will also do this)
             const palletMap = new Map()
             importData.forEach(item => {
                 if (!palletMap.has(item.pallet_id)) {
                     palletMap.set(item.pallet_id, {
                         ...item,
-                        transfer_count: 0
+                        transfer_count: 0,
+                        transfer_numbers: new Set()
                     })
                 }
-                palletMap.get(item.pallet_id).transfer_count++
+                const pallet = palletMap.get(item.pallet_id)
+                pallet.transfer_numbers.add(item.transfer_number) // Use Set to avoid counting duplicates
+                pallet.transfer_count = pallet.transfer_numbers.size
             })
             
             const previewData = Array.from(palletMap.values()).slice(0, 10)
@@ -1078,7 +1106,33 @@ async function confirmImport() {
         cancelImport()
         navigateTo('warehouse')
     } catch (error) {
-        showToast(error.response?.data?.error || 'Import failed', 'error')
+        // Log full error details to console for debugging
+        console.error('❌ IMPORT ERROR - Full Details:', {
+            status: error.response?.status,
+            statusText: error.response?.statusText,
+            data: error.response?.data,
+            message: error.message
+        })
+        
+        // Show detailed error message to user
+        const errorData = error.response?.data
+        let errorMsg = 'Import failed'
+        
+        if (errorData) {
+            if (errorData.message) {
+                errorMsg = errorData.message
+                console.error('💥 Backend Error Message:', errorData.message)
+            } else if (errorData.error) {
+                errorMsg = errorData.error
+            }
+            
+            // Log stack trace if available
+            if (errorData.details) {
+                console.error('📋 Backend Stack Trace:', errorData.details)
+            }
+        }
+        
+        showToast(errorMsg, 'error')
         
         // Re-enable button on error
         if (confirmBtn) {
@@ -1092,6 +1146,40 @@ function cancelImport() {
     importData = []
     document.getElementById('excelFile').value = ''
     document.getElementById('importPreview').classList.add('hidden')
+}
+
+async function confirmClearDatabase() {
+    // Show confirmation dialog
+    const confirmed = confirm(
+        '⚠️ WARNING: This will permanently delete ALL data!\n\n' +
+        'This includes:\n' +
+        '• All parcels\n' +
+        '• All transfer details\n' +
+        '• All audit logs\n\n' +
+        'Are you absolutely sure you want to continue?'
+    )
+    
+    if (!confirmed) return
+    
+    try {
+        showToast('Clearing database...', 'info')
+        
+        const response = await axios.post('/api/admin/clear-database')
+        
+        if (response.data.success) {
+            showToast(
+                `✅ Database cleared successfully!\n` +
+                `Deleted: ${response.data.deleted.parcels} parcels, ` +
+                `${response.data.deleted.transfer_details} transfers, ` +
+                `${response.data.deleted.audit_logs} audit logs`,
+                'success'
+            )
+        }
+    } catch (error) {
+        console.error('❌ CLEAR DATABASE ERROR:', error.response?.data)
+        const errorMsg = error.response?.data?.message || 'Failed to clear database'
+        showToast(errorMsg, 'error')
+    }
 }
 
 // ============ Dashboard Page ============
@@ -1241,7 +1329,8 @@ function renderDashboard() {
                                 <th class="px-4 py-2 text-left">Outlet Code</th>
                                 <th class="px-4 py-2 text-left">Outlet Name</th>
                                 <th class="px-4 py-2 text-center">Total TN</th>
-                                <th class="px-4 py-2 text-center">Loaded</th>
+                                <th class="px-4 py-2 text-center">Loaded TN</th>
+                                <th class="px-4 py-2 text-center">Loaded Container</th>
                                 <th class="px-4 py-2 text-center">Delivered</th>
                                 <th class="px-4 py-2 text-center">Status</th>
                                 <th class="px-4 py-2 text-center">Loaded At</th>
@@ -1251,7 +1340,7 @@ function renderDashboard() {
                         </thead>
                         <tbody id="dash-outlet-table">
                             <tr>
-                                <td colspan="8" class="text-center py-4 text-gray-500">Loading...</td>
+                                <td colspan="10" class="text-center py-4 text-gray-500">Loading...</td>
                             </tr>
                         </tbody>
                     </table>
@@ -1383,7 +1472,7 @@ async function loadDashboardData() {
         // Update outlet table
         const tableBody = document.getElementById('dash-outlet-table')
         if (outletMap.size === 0) {
-            tableBody.innerHTML = '<tr><td colspan="9" class="text-center py-4 text-gray-500">No data available</td></tr>'
+            tableBody.innerHTML = '<tr><td colspan="10" class="text-center py-4 text-gray-500">No data available</td></tr>'
             return
         }
         
@@ -1430,6 +1519,9 @@ async function loadDashboardData() {
                     <td class="px-4 py-3 text-center">
                         <span class="text-green-600 font-semibold">${outlet.loaded}</span>
                         <span class="text-gray-400 text-sm"> (${loadedPercent}%)</span>
+                    </td>
+                    <td class="px-4 py-3 text-center">
+                        <span class="text-blue-600 font-bold text-lg">${outlet.container_count_loaded || '-'}</span>
                     </td>
                     <td class="px-4 py-3 text-center">
                         <span class="text-teal-600 font-semibold">${outlet.delivered}</span>
@@ -1572,6 +1664,14 @@ function renderWarehouse() {
 function setWarehouseDeliveryDate(date) {
     state.warehouseDeliveryDate = date
     loadWarehouseData()
+}
+
+function setOutletDeliveryDate(date) {
+    state.outletDeliveryDate = date
+    // Refresh outlet pallets if outlet is selected
+    if (state.selectedOutlet) {
+        loadOutletPallets()
+    }
 }
 
 async function loadWarehouseData() {
@@ -1724,11 +1824,50 @@ async function loadWarehouseData() {
     }
 }
 
+// Debounce scanner to prevent double-scan
+let warehouseScanTimeout = null
+
 async function handleWarehouseScan() {
     const input = document.getElementById('warehouseScanInput')
     const palletId = input.value.trim().toUpperCase()
     
     if (!palletId) return
+    
+    // Get selected delivery date (check both input field and state for APK compatibility)
+    const deliveryDateInput = document.getElementById('warehouseDeliveryDate')
+    const deliveryDate = deliveryDateInput?.value || state.warehouseDeliveryDate
+    
+    // 🐛 DEBUG: Log date selection details for APK debugging
+    console.log('=== WAREHOUSE SCAN DEBUG ===')
+    console.log('Input element exists:', !!deliveryDateInput)
+    console.log('Input element value:', deliveryDateInput?.value)
+    console.log('State delivery date:', state.warehouseDeliveryDate)
+    console.log('Final delivery date:', deliveryDate)
+    console.log('Pallet ID:', palletId)
+    console.log('===========================')
+    
+    if (!deliveryDate) {
+        console.error('❌ No delivery date found!')
+        playBeep(false)
+        showToast('⚠️ Please select a delivery date first', 'error')
+        input.value = ''
+        input.focus()
+        return
+    }
+    
+    // Clear input immediately to prevent scanner double-scan
+    input.value = ''
+    
+    // Debounce: prevent double-scan within 500ms
+    if (warehouseScanTimeout) {
+        console.log('Debounced duplicate scan')
+        return
+    }
+    warehouseScanTimeout = setTimeout(() => {
+        warehouseScanTimeout = null
+    }, 500)
+    
+    console.log('✓ Scanning with delivery date:', deliveryDate)
     
     // Check for duplicate scan in current session
     const alreadyScanned = state.scannedItems.find(item => item.pallet_id === palletId)
@@ -1741,10 +1880,21 @@ async function handleWarehouseScan() {
     }
     
     try {
-        // NEW: Scan pallet ID (scans entire pallet at once)
-        const response = await axios.post('/api/warehouse/scan-pallet', { pallet_id: palletId })
+        // 🐛 DEBUG: Log the API request payload
+        const payload = { 
+            pallet_id: palletId,
+            delivery_date: deliveryDate
+        }
+        console.log('📤 Sending API request:', payload)
+        
+        // NEW: Scan pallet ID (scans entire pallet at once) with delivery date validation
+        const response = await axios.post('/api/warehouse/scan-pallet', payload)
+        
+        // 🐛 DEBUG: Log the API response
+        console.log('📥 API response:', response.data)
         
         if (response.data.success) {
+            console.log('✅ Scan successful!')
             playBeep(true)
             const outletDisplay = response.data.outlet_code_short || response.data.outlet_code
             showToast(`✓ Pallet ${palletId} loaded - ${outletDisplay} (${response.data.transfer_count} transfers)`, 'success')
@@ -1756,6 +1906,7 @@ async function handleWarehouseScan() {
                 outlet_code_short: response.data.outlet_code_short,
                 outlet_name: response.data.outlet_name,
                 transfer_count: response.data.transfer_count,
+                delivery_date: deliveryDate,
                 time: new Date().toLocaleTimeString()
             })
             
@@ -1765,16 +1916,19 @@ async function handleWarehouseScan() {
             // Check if this outlet is now fully scanned
             checkOutletCompletionAndPromptContainerCount(response.data.outlet_code)
         } else {
+            console.error('❌ Scan failed:', response.data.error)
             playBeep(false)
             showToast(`✗ ${response.data.error}`, 'error')
         }
     } catch (error) {
+        console.error('❌ API error:', error)
+        console.error('Error response:', error.response?.data)
         playBeep(false)
         showToast(error.response?.data?.error || 'Scan failed', 'error')
     }
     
-    input.value = ''
-    input.focus()
+    // Re-focus input
+    setTimeout(() => input.focus(), 100)
 }
 
 function updateScannedItemsList() {
@@ -2021,8 +2175,8 @@ function confirmDeleteScannedItem(index, context) {
                     </p>
                 </div>
                 <p class="text-sm text-red-600 mt-2">
-                    <i class="fas fa-info-circle mr-1"></i>This will remove the item from your current session only.
-                    ${context === 'warehouse' ? 'The parcels will remain in "loaded" status in the database.' : 'The parcels will remain in "delivered" status in the database.'}
+                    <i class="fas fa-info-circle mr-1"></i>This will revert the pallet status back to pending.
+                    ${context === 'warehouse' ? 'The pallet will be removed from "loaded" status.' : 'The pallet will be removed from "delivered" status.'}
                 </p>
             </div>
             <div class="flex space-x-3">
@@ -2040,24 +2194,57 @@ function confirmDeleteScannedItem(index, context) {
     document.body.appendChild(modal)
 }
 
-function deleteScannedItem(index, context) {
+async function deleteScannedItem(index, context) {
     const item = state.scannedItems[index]
     if (!item) {
         showToast('Item not found', 'error')
         return
     }
     
-    // Remove from scanned items array
-    state.scannedItems.splice(index, 1)
-    
-    // Update the appropriate list
-    if (context === 'warehouse') {
-        updateScannedItemsList()
-    } else if (context === 'outlet') {
-        updateOutletScannedList()
+    try {
+        // Call backend API to revert pallet status
+        if (context === 'warehouse') {
+            const response = await axios.post('/api/warehouse/revert-pallet', {
+                pallet_id: item.pallet_id
+            })
+            
+            if (!response.data.success) {
+                showToast(response.data.error || 'Failed to revert pallet', 'error')
+                return
+            }
+        } else if (context === 'outlet') {
+            // For outlet, similar revert API call
+            const response = await axios.post('/api/outlet/revert-pallet', {
+                pallet_id: item.pallet_id,
+                outlet_code_short: state.selectedOutlet?.code_short
+            })
+            
+            if (!response.data.success) {
+                showToast(response.data.error || 'Failed to revert pallet', 'error')
+                return
+            }
+        }
+        
+        // Remove from scanned items array
+        state.scannedItems.splice(index, 1)
+        
+        // Update the appropriate list and data
+        if (context === 'warehouse') {
+            updateScannedItemsList()
+            // Refresh warehouse data to update outlet summary panel
+            await loadWarehouseData()
+        } else if (context === 'outlet') {
+            updateOutletScannedList()
+            updateOutletCompleteButton()
+            // Refresh outlet pallets list
+            await loadOutletPallets()
+        }
+        
+        showToast(`Pallet ${item.pallet_id} reverted to pending`, 'success')
+    } catch (error) {
+        console.error('Error reverting pallet:', error)
+        showToast(error.response?.data?.error || 'Failed to revert pallet', 'error')
     }
-    
-    showToast(`Scan removed: ${item.pallet_id}`, 'success')
 }
 
 // Show outlet details modal with all transfers
@@ -2320,7 +2507,7 @@ function renderOutlet() {
             ` : `
                 <!-- Step 2: Scan Pallet IDs -->
                 <div class="mb-6 bg-white rounded-lg shadow p-6">
-                    <div class="flex justify-between items-center">
+                    <div class="flex justify-between items-center mb-4">
                         <div>
                             <h3 class="text-2xl font-bold text-gray-800">
                                 ${state.selectedOutlet.code_short} - ${state.selectedOutlet.name}
@@ -2331,6 +2518,32 @@ function renderOutlet() {
                             class="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-lg">
                             <i class="fas fa-arrow-left mr-2"></i>Change Outlet
                         </button>
+                    </div>
+                    
+                    <!-- Container Count & Date Info -->
+                    <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 flex items-center justify-between flex-wrap gap-4">
+                        <div class="flex items-center gap-6">
+                            <div>
+                                <p class="text-sm text-gray-600 mb-1">
+                                    <i class="fas fa-truck mr-1"></i>Container Count Loaded
+                                </p>
+                                <p class="text-3xl font-bold text-blue-600">
+                                    ${state.selectedOutlet.container_count_loaded || 0}
+                                </p>
+                            </div>
+                            <div class="border-l border-blue-300 pl-6">
+                                <label class="text-sm text-gray-600 mb-1 block">
+                                    <i class="fas fa-calendar mr-1"></i>Delivery Date
+                                </label>
+                                <input type="date" id="outletDeliveryDate" 
+                                    class="px-3 py-2 border-2 border-blue-300 rounded-lg font-semibold"
+                                    value="${state.outletDeliveryDate || new Date().toISOString().split('T')[0]}"
+                                    onchange="setOutletDeliveryDate(this.value)">
+                            </div>
+                        </div>
+                        <div class="text-xs text-gray-600">
+                            <i class="fas fa-info-circle mr-1"></i>Driver: Check container count matches your load
+                        </div>
                     </div>
                 </div>
                 
@@ -2417,7 +2630,8 @@ async function handleFindOutletPallets() {
             state.selectedOutlet = {
                 code: response.data.outlet_code,
                 code_short: response.data.outlet_code_short,
-                name: response.data.outlet_name
+                name: response.data.outlet_name,
+                container_count_loaded: response.data.container_count_loaded // Store warehouse container count
             }
             state.availablePallets = response.data.pallets
             state.scannedItems = []
@@ -2445,6 +2659,10 @@ async function loadOutletPallets() {
         
         if (response.data.success) {
             state.availablePallets = response.data.pallets
+            // Update container count if it changed
+            if (response.data.container_count_loaded) {
+                state.selectedOutlet.container_count_loaded = response.data.container_count_loaded
+            }
             
             const palletsDiv = document.getElementById('availablePallets')
             if (!palletsDiv) return
@@ -2460,21 +2678,36 @@ async function loadOutletPallets() {
                 return
             }
             
-            palletsDiv.innerHTML = state.availablePallets.map(pallet => `
-                <div class="border-2 border-blue-300 rounded-lg p-4 bg-blue-50">
-                    <div class="flex items-center justify-between mb-2">
-                        <p class="font-bold text-lg">
-                            <i class="fas fa-pallet mr-2 text-blue-600"></i>${pallet.pallet_id}
-                        </p>
-                        <span class="px-2 py-1 bg-blue-500 text-white text-xs rounded font-semibold">
-                            ${pallet.status.toUpperCase()}
-                        </span>
+            // Filter out already scanned pallets
+            const unscannedPallets = state.availablePallets.filter(pallet => 
+                !state.scannedItems.find(s => s.pallet_id === pallet.pallet_id)
+            )
+            
+            if (unscannedPallets.length === 0) {
+                palletsDiv.innerHTML = `
+                    <div class="text-center py-6">
+                        <i class="fas fa-check-circle text-4xl text-green-500 mb-2"></i>
+                        <p class="font-semibold text-green-600">All Scanned!</p>
+                        <p class="text-xs text-gray-600">Complete receipt below</p>
                     </div>
-                    <p class="text-sm text-gray-600">
-                        <i class="fas fa-box mr-1"></i>${pallet.transfer_count} transfers
-                    </p>
-                </div>
-            `).join('')
+                `
+            } else {
+                palletsDiv.innerHTML = unscannedPallets.map(pallet => `
+                    <div class="border-2 border-blue-300 rounded-lg p-4 bg-blue-50">
+                        <div class="flex items-center justify-between mb-2">
+                            <p class="font-bold text-lg">
+                                <i class="fas fa-pallet mr-2 text-blue-600"></i>${pallet.pallet_id}
+                            </p>
+                            <span class="px-2 py-1 bg-blue-500 text-white text-xs rounded font-semibold">
+                                ${pallet.status.toUpperCase()}
+                            </span>
+                        </div>
+                        <p class="text-sm text-gray-600">
+                            <i class="fas fa-box mr-1"></i>${pallet.transfer_count} transfers
+                        </p>
+                    </div>
+                `).join('')
+            }
         }
     } catch (error) {
         console.error('Error loading pallets:', error)
@@ -2484,9 +2717,12 @@ async function loadOutletPallets() {
 function clearOutletSelection() {
     state.selectedOutlet = null
     state.availablePallets = []
-    state.scannedItems = []
+    state.scannedItems = [] // Clear scanned items when changing outlet
     render()
 }
+
+// Debounce scanner to prevent double-scan
+let outletScanTimeout = null
 
 // NEW: Step 2 - Scan pallet ID (validation only, no immediate delivery)
 async function handleOutletScanPallet() {
@@ -2494,6 +2730,18 @@ async function handleOutletScanPallet() {
     const palletId = input.value.trim().toUpperCase()
     
     if (!palletId || !state.selectedOutlet) return
+    
+    // Clear input immediately to prevent scanner double-scan
+    input.value = ''
+    
+    // Debounce: prevent double-scan within 500ms
+    if (outletScanTimeout) {
+        console.log('Debounced duplicate scan')
+        return
+    }
+    outletScanTimeout = setTimeout(() => {
+        outletScanTimeout = null
+    }, 500)
     
     // Check for duplicate scan in current session
     const alreadyScanned = state.scannedItems.find(item => item.pallet_id === palletId)
@@ -2525,6 +2773,10 @@ async function handleOutletScanPallet() {
             showToast(`✓ Pallet ${palletId} scanned (${response.data.transfer_count} transfers)`, 'success')
             updateOutletScannedList()
             updateOutletCompleteButton() // Update the complete button visibility
+            
+            // Remove scanned pallet from "Your Delivery" list
+            state.availablePallets = state.availablePallets.filter(p => p.pallet_id !== palletId)
+            loadOutletPallets() // Refresh the delivery list display
         } else {
             playBeep(false)
             showToast(`✗ ${response.data.error}`, 'error')
@@ -2534,8 +2786,8 @@ async function handleOutletScanPallet() {
         showToast(error.response?.data?.error || 'Scan failed', 'error')
     }
     
-    input.value = ''
-    input.focus()
+    // Re-focus input
+    setTimeout(() => input.focus(), 100)
 }
 
 function updateOutletScannedList() {
@@ -2608,6 +2860,10 @@ function showOutletCompletionModal() {
     const scannedCount = state.scannedItems.length
     const totalTransfers = state.scannedItems.reduce((sum, item) => sum + item.transfer_count, 0)
     
+    // Check if warehouse already set container count
+    const warehouseContainerCount = state.selectedOutlet.container_count_loaded
+    const hasWarehouseCount = warehouseContainerCount && warehouseContainerCount > 0
+    
     const modal = document.createElement('div')
     modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50'
     modal.innerHTML = `
@@ -2623,6 +2879,7 @@ function showOutletCompletionModal() {
                         <i class="fas fa-pallet mr-1"></i>${scannedCount} pallet(s) scanned
                         <br>
                         <i class="fas fa-box mr-1"></i>${totalTransfers} total transfers
+                        ${hasWarehouseCount ? `<br><i class="fas fa-truck mr-1"></i>${warehouseContainerCount} container(s) loaded at warehouse` : ''}
                     </p>
                 </div>
                 
@@ -2658,19 +2915,71 @@ function showOutletCompletionModal() {
                     </div>
                 `}
                 
-                <div class="mb-4">
-                    <label class="block text-sm font-medium mb-2">
-                        How many containers were delivered? <span class="text-red-500">*</span>
-                        <span class="text-xs text-gray-500 block mt-1">
-                            (Multiple pallets may be in one container)
-                        </span>
-                    </label>
-                    <input type="number" id="container_count_outlet" required 
-                        min="1" max="${scannedCount}"
-                        class="w-full px-3 py-2 border rounded-lg text-center text-xl font-bold"
-                        placeholder="${scannedCount}"
-                        value="${scannedCount}">
-                </div>
+                ${hasWarehouseCount ? `
+                    <!-- Warehouse already set container count -->
+                    ${unscannedPallets.length === 0 ? `
+                        <!-- All pallets scanned - Read-only -->
+                        <div class="mb-4 bg-blue-50 border border-blue-300 rounded-lg p-4">
+                            <p class="text-sm font-semibold text-blue-800 mb-2">
+                                <i class="fas fa-lock mr-1"></i>Container Count: Auto-filled (Read-Only)
+                            </p>
+                            <p class="text-xs text-blue-700 mb-2">
+                                All pallets scanned! Container count from warehouse: <strong>${warehouseContainerCount}</strong>
+                            </p>
+                            <div class="text-center">
+                                <span class="text-3xl font-bold text-blue-600">${warehouseContainerCount}</span>
+                                <span class="text-sm text-blue-600 ml-2">container(s)</span>
+                            </div>
+                            <input type="hidden" id="container_count_outlet" value="${warehouseContainerCount}">
+                        </div>
+                    ` : `
+                        <!-- Incomplete - Allow editing -->
+                        <div class="mb-4 bg-yellow-50 border border-yellow-300 rounded-lg p-4">
+                            <p class="text-sm font-semibold text-yellow-800 mb-2">
+                                <i class="fas fa-edit mr-1"></i>Container Count: Editable (Incomplete Receipt)
+                            </p>
+                            <p class="text-xs text-yellow-700 mb-2">
+                                Warehouse loaded <strong>${warehouseContainerCount}</strong> containers, but you're receiving <strong>${scannedCount}/${totalPallets} pallets</strong>. Adjust if needed.
+                            </p>
+                            <input type="number" id="container_count_outlet" required 
+                                min="1" max="${warehouseContainerCount}"
+                                class="w-full px-3 py-2 border-2 border-yellow-400 rounded-lg text-center text-xl font-bold"
+                                value="${warehouseContainerCount}">
+                        </div>
+                    `}
+                ` : `
+                    <!-- No warehouse count - Always allow manual entry -->
+                    ${unscannedPallets.length === 0 ? `
+                        <!-- All pallets scanned - Suggest count equals pallet count -->
+                        <div class="mb-4 bg-green-50 border border-green-300 rounded-lg p-4">
+                            <p class="text-sm font-semibold text-green-800 mb-2">
+                                <i class="fas fa-check-circle mr-1"></i>Container Count (All Pallets Scanned)
+                            </p>
+                            <p class="text-xs text-green-700 mb-2">
+                                Enter number of containers delivered (default: ${scannedCount})
+                            </p>
+                            <input type="number" id="container_count_outlet" required 
+                                min="1" max="${scannedCount}"
+                                class="w-full px-3 py-2 border-2 border-green-400 rounded-lg text-center text-xl font-bold"
+                                value="${scannedCount}">
+                        </div>
+                    ` : `
+                        <!-- Incomplete - Allow manual entry -->
+                        <div class="mb-4">
+                            <label class="block text-sm font-medium mb-2">
+                                How many containers were delivered? <span class="text-red-500">*</span>
+                                <span class="text-xs text-gray-500 block mt-1">
+                                    (Receiving ${scannedCount}/${totalPallets} pallets)
+                                </span>
+                            </label>
+                            <input type="number" id="container_count_outlet" required 
+                                min="1" max="${scannedCount}"
+                                class="w-full px-3 py-2 border rounded-lg text-center text-xl font-bold"
+                                placeholder="${scannedCount}"
+                                value="${scannedCount}">
+                        </div>
+                    `}
+                `}
                 
                 <div class="mb-4">
                     <label class="block text-sm font-medium mb-2">Receiver Name/Signature <span class="text-red-500">*</span></label>
@@ -2865,8 +3174,12 @@ async function loadDeliveryReport() {
                             <th class="border px-4 py-2">Outlet</th>
                             <th class="border px-4 py-2">Pallet ID</th>
                             <th class="border px-4 py-2">Transfer Count</th>
+                            <th class="border px-4 py-2">Loaded By (Warehouse)</th>
+                            <th class="border px-4 py-2">Driver Signature</th>
+                            <th class="border px-4 py-2">Loaded At</th>
+                            <th class="border px-4 py-2">Unloaded By (Driver)</th>
+                            <th class="border px-4 py-2">Outlet Signature</th>
                             <th class="border px-4 py-2">Delivered At</th>
-                            <th class="border px-4 py-2">Received By</th>
                             <th class="border px-4 py-2">Status</th>
                         </tr>
                     </thead>
@@ -2874,10 +3187,14 @@ async function loadDeliveryReport() {
                         ${deliveries.map(d => `
                             <tr>
                                 <td class="border px-4 py-2">${d.outlet_code} - ${d.outlet_name}</td>
-                                <td class="border px-4 py-2">${d.pallet_id}</td>
+                                <td class="border px-4 py-2 font-mono">${d.pallet_id}</td>
                                 <td class="border px-4 py-2 text-center">${d.total_count}</td>
-                                <td class="border px-4 py-2">${formatDate(d.delivered_at)}</td>
+                                <td class="border px-4 py-2">${d.scanned_loading_by_name || '-'}</td>
+                                <td class="border px-4 py-2">${d.loaded_by_name || '-'}</td>
+                                <td class="border px-4 py-2">${formatDate(d.loaded_at)}</td>
+                                <td class="border px-4 py-2">${d.scanned_unloading_by_name || '-'}</td>
                                 <td class="border px-4 py-2">${d.received_by_name || '-'}</td>
+                                <td class="border px-4 py-2">${formatDate(d.delivered_at)}</td>
                                 <td class="border px-4 py-2">
                                     <span class="px-2 py-1 bg-green-100 text-green-800 rounded text-sm">
                                         ${d.status}
@@ -2960,8 +3277,12 @@ async function exportReport() {
             'Outlet Name': d.outlet_name,
             'Pallet ID': d.pallet_id,
             'Transfer Count': d.total_count,
+            'Loaded By (Warehouse)': d.scanned_loading_by_name || '-',
+            'Driver Signature': d.loaded_by_name || '-',
+            'Loaded At': formatDate(d.loaded_at),
+            'Unloaded By (Driver)': d.scanned_unloading_by_name || '-',
+            'Outlet Signature': d.received_by_name || '-',
             'Delivered At': formatDate(d.delivered_at),
-            'Received By': d.received_by_name || '-',
             'Status': d.status
         }))
         const ws1 = XLSX.utils.json_to_sheet(deliveriesData)
@@ -3198,10 +3519,18 @@ function render() {
                 break
             case 'warehouse':
                 loadWarehouseData()
+                // Update scanned items list to show persistent items
+                setTimeout(() => updateScannedItemsList(), 200)
                 break
             case 'outlet':
                 // Outlet page uses manual two-step process: find outlet, then scan pallets
-                // No auto-load needed
+                // Update scanned items list if outlet is already selected
+                if (state.selectedOutlet) {
+                    setTimeout(() => {
+                        updateOutletScannedList()
+                        updateOutletCompleteButton()
+                    }, 200)
+                }
                 break
         }
     }, 100)

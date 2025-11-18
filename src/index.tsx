@@ -403,16 +403,25 @@ app.post('/api/import', authMiddleware, async (c) => {
       }
       
       const palletId = String(row.pallet_id).trim()
+      const transferNumber = String(row.transfer_number).trim()
+      
       if (!parcelMap.has(palletId)) {
         parcelMap.set(palletId, {
           outlet_code: String(row.outlet_code).trim(),  // Ensure string
           outlet_code_short: String(row.outlet_code_short || row.outlet_code).trim(),  // Short code for display
           outlet_name: String(row.outlet_name).trim(),
           pallet_id: palletId,
-          transfer_numbers: []
+          transfer_numbers: [],
+          transfer_numbers_set: new Set() // Use Set to prevent duplicates
         })
       }
-      parcelMap.get(palletId).transfer_numbers.push(String(row.transfer_number).trim())
+      
+      const parcel = parcelMap.get(palletId)!
+      // Only add if not already in set (automatic deduplication)
+      if (!parcel.transfer_numbers_set.has(transferNumber)) {
+        parcel.transfer_numbers_set.add(transferNumber)
+        parcel.transfer_numbers.push(transferNumber)
+      }
     })
     
     // Insert parcels and transfer details
@@ -519,7 +528,116 @@ app.post('/api/import', authMiddleware, async (c) => {
     })
   } catch (error) {
     console.error('Import error:', error)
-    return c.json({ error: 'Import failed' }, 500)
+    const errorMessage = error instanceof Error ? error.message : String(error)
+    const errorStack = error instanceof Error ? error.stack : undefined
+    return c.json({ 
+      error: 'Import failed', 
+      message: errorMessage,
+      details: errorStack 
+    }, 500)
+  }
+})
+
+// Clear all database data (admin function)
+app.post('/api/admin/clear-database', authMiddleware, async (c) => {
+  try {
+    console.log('\n=== CLEARING DATABASE ===')
+    
+    let totalDeleted = {
+      audit_logs: 0,
+      transfer_details: 0,
+      parcels: 0,
+      imports: 0
+    }
+    
+    // Delete in correct order (foreign key constraints)
+    // First count records, then delete all
+    
+    // 1. Delete audit_logs (using created_at >= minimum date to match all records)
+    console.log('Counting audit_logs...')
+    const auditCountResponse = await supabaseRequest(c, 'audit_logs?select=id')
+    const auditList = await auditCountResponse.json()
+    console.log(`  Found ${auditList.length} audit logs to delete`)
+    
+    if (auditList.length > 0) {
+      console.log('Deleting audit_logs...')
+      const auditDeleteResponse = await supabaseRequest(c, 'audit_logs?created_at=gte.2000-01-01', {
+        method: 'DELETE',
+        headers: {
+          'Prefer': 'return=representation'
+        }
+      })
+      totalDeleted.audit_logs = auditList.length
+      console.log(`  ✓ Deleted ${totalDeleted.audit_logs} audit logs`)
+    }
+    
+    // 2. Delete transfer_details
+    console.log('Counting transfer_details...')
+    const transferCountResponse = await supabaseRequest(c, 'transfer_details?select=id')
+    const transferList = await transferCountResponse.json()
+    console.log(`  Found ${transferList.length} transfer details to delete`)
+    
+    if (transferList.length > 0) {
+      console.log('Deleting transfer_details...')
+      const transferDeleteResponse = await supabaseRequest(c, 'transfer_details?created_at=gte.2000-01-01', {
+        method: 'DELETE',
+        headers: {
+          'Prefer': 'return=representation'
+        }
+      })
+      totalDeleted.transfer_details = transferList.length
+      console.log(`  ✓ Deleted ${totalDeleted.transfer_details} transfer details`)
+    }
+    
+    // 3. Delete parcels
+    console.log('Counting parcels...')
+    const parcelCountResponse = await supabaseRequest(c, 'parcels?select=id')
+    const parcelList = await parcelCountResponse.json()
+    console.log(`  Found ${parcelList.length} parcels to delete`)
+    
+    if (parcelList.length > 0) {
+      console.log('Deleting parcels...')
+      const parcelDeleteResponse = await supabaseRequest(c, 'parcels?created_at=gte.2000-01-01', {
+        method: 'DELETE',
+        headers: {
+          'Prefer': 'return=representation'
+        }
+      })
+      totalDeleted.parcels = parcelList.length
+      console.log(`  ✓ Deleted ${totalDeleted.parcels} parcels`)
+    }
+    
+    // 4. Delete imports
+    console.log('Counting imports...')
+    const importCountResponse = await supabaseRequest(c, 'imports?select=id')
+    const importList = await importCountResponse.json()
+    console.log(`  Found ${importList.length} imports to delete`)
+    
+    if (importList.length > 0) {
+      console.log('Deleting imports...')
+      const importDeleteResponse = await supabaseRequest(c, 'imports?created_at=gte.2000-01-01', {
+        method: 'DELETE',
+        headers: {
+          'Prefer': 'return=representation'
+        }
+      })
+      totalDeleted.imports = importList.length
+      console.log(`  ✓ Deleted ${totalDeleted.imports} imports`)
+    }
+    
+    console.log('=== DATABASE CLEARED SUCCESSFULLY ===\n')
+    
+    return c.json({
+      success: true,
+      deleted: totalDeleted
+    })
+  } catch (error) {
+    console.error('Clear database error:', error)
+    const errorMessage = error instanceof Error ? error.message : String(error)
+    return c.json({
+      error: 'Failed to clear database',
+      message: errorMessage
+    }, 500)
   }
 })
 
@@ -613,7 +731,25 @@ app.get('/api/warehouse/transfers', authMiddleware, async (c) => {
 app.post('/api/warehouse/scan-pallet', authMiddleware, async (c) => {
   try {
     const user = c.get('user')
-    const { pallet_id } = await c.req.json()
+    const { pallet_id, delivery_date } = await c.req.json()
+    
+    // 🐛 DEBUG: Server-side logging for APK debugging
+    console.log('=== SERVER SCAN DEBUG ===')
+    console.log('User:', user.username, '(', user.full_name, ')')
+    console.log('Pallet ID:', pallet_id)
+    console.log('Delivery date received:', delivery_date)
+    console.log('Delivery date type:', typeof delivery_date)
+    console.log('========================')
+    
+    // Validate delivery date is provided
+    if (!delivery_date) {
+      console.error('❌ SERVER: No delivery date in request!')
+      return c.json({ 
+        success: false, 
+        error: 'Delivery date is required',
+        pallet_id 
+      })
+    }
     
     // First check if pallet exists at all
     const allParcelsResponse = await supabaseRequest(c, `parcels?pallet_id=eq.${pallet_id}&select=*`)
@@ -636,6 +772,30 @@ app.post('/api/warehouse/scan-pallet', authMiddleware, async (c) => {
         success: false, 
         error: 'Pallet ID not found in system',
         pallet_id 
+      })
+    }
+    
+    // Validate delivery date matches pallet's delivery date
+    const parcelDeliveryDate = allParcels[0].delivery_date
+    if (parcelDeliveryDate !== delivery_date) {
+      // Log error - wrong delivery date
+      await supabaseRequest(c, 'error_parcels', {
+        method: 'POST',
+        body: JSON.stringify({
+          transfer_number: pallet_id,
+          scanned_by: user.id,
+          scanned_by_name: user.full_name,
+          error_type: 'wrong_delivery_date',
+          error_message: `Pallet belongs to delivery date ${parcelDeliveryDate}, but you selected ${delivery_date}`
+        })
+      })
+      
+      return c.json({ 
+        success: false, 
+        error: `Wrong delivery date! This pallet is for ${parcelDeliveryDate}, but you selected ${delivery_date}`,
+        pallet_id,
+        expected_date: parcelDeliveryDate,
+        selected_date: delivery_date
       })
     }
     
@@ -713,6 +873,67 @@ app.post('/api/warehouse/scan-pallet', authMiddleware, async (c) => {
   } catch (error) {
     console.error('Scan pallet error:', error)
     return c.json({ error: 'Scan failed' }, 500)
+  }
+})
+
+// NEW: Revert/unscan a pallet (revert status back to pending)
+app.post('/api/warehouse/revert-pallet', authMiddleware, async (c) => {
+  try {
+    const user = c.get('user')
+    const { pallet_id } = await c.req.json()
+    
+    console.log(`Reverting pallet ${pallet_id} back to pending status`)
+    
+    // Find the pallet
+    const parcelResponse = await supabaseRequest(c, `parcels?pallet_id=eq.${pallet_id}&status=eq.loaded&select=*`)
+    const parcels = await parcelResponse.json()
+    
+    if (!parcels || parcels.length === 0) {
+      return c.json({ 
+        success: false, 
+        error: 'Pallet not found or not in loaded status',
+        pallet_id 
+      })
+    }
+    
+    const parcel = parcels[0]
+    
+    // Get all transfer details for this pallet
+    const transfersResponse = await supabaseRequest(c, `transfer_details?parcel_id=eq.${parcel.id}&select=*`)
+    const transfers = await transfersResponse.json()
+    
+    // Revert all transfers back to pending
+    for (const transfer of transfers) {
+      await supabaseRequest(c, `transfer_details?id=eq.${transfer.id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({
+          is_scanned_loading: false,
+          scanned_loading_at: null,
+          scanned_loading_by: null,
+          status: 'pending'
+        })
+      })
+    }
+    
+    // Revert parcel back to pending
+    await supabaseRequest(c, `parcels?id=eq.${parcel.id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({
+        status: 'pending',
+        scanned_count: 0
+      })
+    })
+    
+    console.log(`✓ Pallet ${pallet_id} reverted to pending`)
+    
+    return c.json({ 
+      success: true, 
+      pallet_id,
+      outlet_code: parcel.outlet_code
+    })
+  } catch (error) {
+    console.error('Revert pallet error:', error)
+    return c.json({ error: 'Revert failed' }, 500)
   }
 })
 
@@ -820,12 +1041,15 @@ app.post('/api/warehouse/complete', authMiddleware, async (c) => {
     const { outlet_code, signature_name } = await c.req.json()
     
     // Update all loaded parcels for this outlet
+    // loaded_by: warehouse staff who did the scanning/loading
+    // loaded_by_name: driver signature who acknowledged and received the load
     await supabaseRequest(c, `parcels?outlet_code=eq.${outlet_code}&status=eq.loaded`, {
       method: 'PATCH',
       body: JSON.stringify({
         loaded_at: new Date().toISOString(),
-        loaded_by: user.id,
-        loaded_by_name: signature_name || user.full_name
+        loaded_by: user.id,  // Warehouse staff who did loading
+        loaded_by_name: signature_name || user.full_name,  // Driver signature who confirmed
+        scanned_loading_by_name: user.full_name  // Track warehouse staff name separately
       })
     })
     
@@ -976,11 +1200,15 @@ app.post('/api/outlet/find-pallets', authMiddleware, async (c) => {
     // Get outlet info from first parcel
     const firstParcel = parcels[0]
     
+    // Get container_count_loaded from first parcel (all pallets in same outlet should have same count)
+    const containerCountLoaded = firstParcel.container_count_loaded
+    
     return c.json({
       success: true,
       outlet_code: firstParcel.outlet_code,
       outlet_code_short: firstParcel.outlet_code_short,
       outlet_name: firstParcel.outlet_name,
+      container_count_loaded: containerCountLoaded, // Include warehouse container count
       pallets: parcels.map((p: any) => ({
         id: p.id,
         pallet_id: p.pallet_id,
@@ -1073,6 +1301,29 @@ app.post('/api/outlet/scan-pallet', authMiddleware, async (c) => {
   } catch (error) {
     console.error('Scan pallet error:', error)
     return c.json({ error: 'Scan failed' }, 500)
+  }
+})
+
+// NEW: Revert outlet pallet scan (remove from scanned list before confirmation)
+app.post('/api/outlet/revert-pallet', authMiddleware, async (c) => {
+  try {
+    const user = c.get('user')
+    const { pallet_id, outlet_code_short } = await c.req.json()
+    
+    console.log(`Reverting outlet pallet scan for ${pallet_id} at outlet ${outlet_code_short}`)
+    
+    // For outlet context: Since scanning doesn't immediately change database status,
+    // this is primarily a client-side list removal
+    // The pallet remains in "loaded" status until confirmation
+    
+    return c.json({ 
+      success: true,
+      pallet_id,
+      message: 'Pallet removed from scan list (remains in loaded status)'
+    })
+  } catch (error) {
+    console.error('Revert outlet pallet error:', error)
+    return c.json({ error: 'Revert failed' }, 500)
   }
 })
 
@@ -1360,12 +1611,15 @@ app.post('/api/outlet/complete', authMiddleware, async (c) => {
     const { outlet_code, signature_name } = await c.req.json()
     
     // Update all delivered parcels for this outlet
+    // delivered_by: driver/warehouse staff who did the scanning/unloading
+    // received_by_name: outlet staff signature who acknowledged and received the delivery
     await supabaseRequest(c, `parcels?outlet_code=eq.${outlet_code}&status=eq.delivered`, {
       method: 'PATCH',
       body: JSON.stringify({
         delivered_at: new Date().toISOString(),
-        delivered_by: user.id,
-        received_by_name: signature_name
+        delivered_by: user.id,  // Driver/warehouse staff who did unloading
+        scanned_unloading_by_name: user.full_name,  // Track driver name separately
+        received_by_name: signature_name  // Outlet staff signature who confirmed
       })
     })
     
