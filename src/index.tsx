@@ -1452,6 +1452,35 @@ app.post('/api/outlet/confirm-receipt-bulk', authMiddleware, async (c) => {
           })
         })
         
+        // 🔄 CONTAINER RECYCLING: Check if pallet ID starts with 'A' (recyclable container)
+        if (pallet_id.toUpperCase().startsWith('A')) {
+          try {
+            console.log(`♻️ Detected recyclable container: ${pallet_id} - Adding to inventory at outlet ${outlet_code_short}`)
+            
+            // Add container to inventory
+            await supabaseRequest(c, 'container_inventory', {
+              method: 'POST',
+              body: JSON.stringify({
+                container_id: pallet_id,
+                outlet_code: parcel.outlet_code,
+                outlet_name: parcel.outlet_name,
+                status: 'at_outlet',
+                delivered_at: new Date().toISOString(),
+                delivered_by: user.id,
+                delivered_by_name: user.full_name,
+                delivery_date: parcel.delivery_date,
+                original_outlet_code: parcel.outlet_code,
+                original_outlet_name: parcel.outlet_name
+              })
+            })
+            
+            console.log(`✓ Container ${pallet_id} added to inventory at ${outlet_code_short}`)
+          } catch (containerError) {
+            // Log error but don't fail the delivery confirmation
+            console.error(`⚠️ Failed to add container ${pallet_id} to inventory:`, containerError)
+          }
+        }
+        
         successCount++
         console.log(`✓ Pallet ${pallet_id} confirmed as delivered`)
       } catch (error) {
@@ -1626,6 +1655,218 @@ app.post('/api/outlet/complete', authMiddleware, async (c) => {
     return c.json({ success: true })
   } catch (error) {
     return c.json({ error: 'Failed to complete unloading' }, 500)
+  }
+})
+
+// ============ Container Management Routes ============
+
+// Get containers by outlet
+app.get('/api/containers/by-outlet/:outlet_code', authMiddleware, async (c) => {
+  try {
+    const user = c.get('user')
+    let outlet_code = c.req.param('outlet_code')
+    
+    // If user is outlet role, force use their outlet_code
+    if (user.role === 'outlet' && user.outlet_code) {
+      outlet_code = user.outlet_code
+    }
+    
+    const response = await supabaseRequest(c, `container_inventory?outlet_code=eq.${outlet_code}&status=eq.at_outlet&select=*&order=delivered_at.desc`)
+    const containers = await response.json()
+    return c.json({ containers })
+  } catch (error) {
+    console.error('Failed to fetch containers:', error)
+    return c.json({ error: 'Failed to fetch containers' }, 500)
+  }
+})
+
+// Get all containers inventory (admin/warehouse view)
+app.get('/api/containers/inventory', authMiddleware, async (c) => {
+  try {
+    const user = c.get('user')
+    
+    // Only admin and warehouse roles can view all containers
+    if (!['admin', 'warehouse', 'warehouse_supervisor'].includes(user.role)) {
+      return c.json({ error: 'Forbidden' }, 403)
+    }
+    
+    const response = await supabaseRequest(c, 'container_inventory?select=*&order=delivered_at.desc')
+    const containers = await response.json()
+    return c.json({ containers })
+  } catch (error) {
+    console.error('Failed to fetch container inventory:', error)
+    return c.json({ error: 'Failed to fetch container inventory' }, 500)
+  }
+})
+
+// Scan container for collection
+app.post('/api/containers/scan-collect', authMiddleware, async (c) => {
+  try {
+    const user = c.get('user')
+    const { container_id, outlet_code } = await c.req.json()
+    
+    console.log(`🔍 Scanning container ${container_id} for collection at outlet ${outlet_code}`)
+    
+    // Find the container
+    const response = await supabaseRequest(c, `container_inventory?container_id=eq.${container_id}&status=eq.at_outlet&select=*`)
+    const containers = await response.json()
+    
+    if (!containers || containers.length === 0) {
+      console.log(`❌ Container ${container_id} not found in inventory`)
+      return c.json({ 
+        success: false, 
+        error: 'Container not found or already collected',
+        container_id 
+      })
+    }
+    
+    const container = containers[0]
+    
+    // Check if container belongs to this outlet
+    if (container.outlet_code !== outlet_code) {
+      console.log(`⚠️ Container ${container_id} belongs to ${container.outlet_code}, not ${outlet_code}`)
+      
+      // Return cross-outlet warning
+      return c.json({ 
+        success: false,
+        cross_outlet: true,
+        error: `This container belongs to ${container.outlet_name} (${container.outlet_code})`,
+        container_id,
+        current_outlet: container.outlet_code,
+        current_outlet_name: container.outlet_name,
+        scanning_outlet: outlet_code
+      })
+    }
+    
+    // Container belongs to this outlet - mark as ready for collection
+    console.log(`✓ Container ${container_id} validated for collection`)
+    
+    return c.json({ 
+      success: true, 
+      container_id,
+      outlet_code: container.outlet_code,
+      outlet_name: container.outlet_name,
+      delivered_at: container.delivered_at
+    })
+  } catch (error) {
+    console.error('Container scan error:', error)
+    return c.json({ error: 'Scan failed' }, 500)
+  }
+})
+
+// Collect container from wrong outlet (cross-outlet collection)
+app.post('/api/containers/collect-cross-outlet', authMiddleware, async (c) => {
+  try {
+    const user = c.get('user')
+    const { container_id, scanning_outlet } = await c.req.json()
+    
+    console.log(`♻️ Cross-outlet collection: Container ${container_id} from ${scanning_outlet} by ${user.full_name}`)
+    
+    // Find the container
+    const response = await supabaseRequest(c, `container_inventory?container_id=eq.${container_id}&status=eq.at_outlet&select=*`)
+    const containers = await response.json()
+    
+    if (!containers || containers.length === 0) {
+      return c.json({ 
+        success: false, 
+        error: 'Container not found or already collected',
+        container_id 
+      })
+    }
+    
+    const container = containers[0]
+    
+    // Update container status to collected (deducted from original outlet)
+    await supabaseRequest(c, `container_inventory?id=eq.${container.id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({
+        status: 'collected',
+        collected_at: new Date().toISOString(),
+        collected_by: user.id,
+        collected_by_name: user.full_name
+      })
+    })
+    
+    console.log(`✓ Container ${container_id} collected from ${container.outlet_code} (cross-outlet)`)
+    
+    return c.json({ 
+      success: true,
+      container_id,
+      original_outlet: container.outlet_code,
+      original_outlet_name: container.outlet_name,
+      scanning_outlet
+    })
+  } catch (error) {
+    console.error('Cross-outlet collection error:', error)
+    return c.json({ error: 'Collection failed' }, 500)
+  }
+})
+
+// Complete container collection
+app.post('/api/containers/complete-collection', authMiddleware, async (c) => {
+  try {
+    const user = c.get('user')
+    const { outlet_code, container_ids, signature_name } = await c.req.json()
+    
+    console.log(`📦 Completing collection for outlet ${outlet_code}: ${container_ids.length} containers by ${signature_name}`)
+    
+    if (!container_ids || container_ids.length === 0) {
+      return c.json({ error: 'No container IDs provided' }, 400)
+    }
+    
+    let successCount = 0
+    let errorCount = 0
+    const errors = []
+    
+    // Process each container
+    for (const container_id of container_ids) {
+      try {
+        // Find the container at this outlet
+        const response = await supabaseRequest(c, `container_inventory?container_id=eq.${container_id}&outlet_code=eq.${outlet_code}&status=eq.at_outlet&select=*`)
+        const containers = await response.json()
+        
+        if (!containers || containers.length === 0) {
+          errorCount++
+          errors.push(`${container_id}: not found or already collected`)
+          continue
+        }
+        
+        const container = containers[0]
+        
+        // Update container status to collected
+        await supabaseRequest(c, `container_inventory?id=eq.${container.id}`, {
+          method: 'PATCH',
+          body: JSON.stringify({
+            status: 'collected',
+            collected_at: new Date().toISOString(),
+            collected_by: user.id,
+            collected_by_name: user.full_name,
+            collection_signature: signature_name
+          })
+        })
+        
+        successCount++
+        console.log(`✓ Container ${container_id} collected from ${outlet_code}`)
+      } catch (error) {
+        errorCount++
+        errors.push(`${container_id}: ${error instanceof Error ? error.message : 'unknown error'}`)
+        console.error(`Error collecting container ${container_id}:`, error)
+      }
+    }
+    
+    console.log(`Collection complete: ${successCount} success, ${errorCount} errors`)
+    
+    return c.json({ 
+      success: true, 
+      total: container_ids.length,
+      success_count: successCount,
+      error_count: errorCount,
+      errors: errors.length > 0 ? errors : undefined,
+      signature_name
+    })
+  } catch (error) {
+    console.error('Complete collection error:', error)
+    return c.json({ error: 'Failed to complete collection' }, 500)
   }
 })
 
