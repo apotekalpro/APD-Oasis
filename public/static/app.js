@@ -1611,6 +1611,7 @@ function renderWarehouse() {
                                 class="w-full px-4 py-3 border-4 border-blue-500 rounded-lg text-lg scan-input"
                                 placeholder="Scan or enter Pallet ID..."
                                 autofocus
+                                onkeydown="if(event.key==='Enter' || event.keyCode===13) { event.preventDefault(); handleWarehouseScan(); }"
                                 onkeypress="if(event.key==='Enter') handleWarehouseScan()">
                         </div>
                         
@@ -2502,6 +2503,7 @@ function renderOutlet() {
                             class="w-full px-4 py-3 border-4 border-blue-500 rounded-lg text-lg scan-input"
                             placeholder="Scan or enter outlet code..."
                             autofocus
+                            onkeydown="if(event.key==='Enter' || event.keyCode===13) { event.preventDefault(); handleFindOutletPallets(); }"
                             onkeypress="if(event.key==='Enter') handleFindOutletPallets()">
                     </div>
                     
@@ -2586,6 +2588,7 @@ function renderOutlet() {
                                     class="w-full px-4 py-3 border-4 border-green-500 rounded-lg text-lg scan-input"
                                     placeholder="Scan or enter Pallet ID..."
                                     autofocus
+                                    onkeydown="if(event.key==='Enter' || event.keyCode===13) { event.preventDefault(); handleOutletScanPallet(); }"
                                     onkeypress="if(event.key==='Enter') handleOutletScanPallet()">
                             </div>
                             
@@ -3193,6 +3196,7 @@ function showContainerCollectionView() {
                         <input type="text" id="containerOutletCodeInput" 
                             placeholder="Enter outlet short code (e.g., MKC, JKJSTT1)"
                             class="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
+                            onkeydown="if(event.key==='Enter' || event.keyCode===13) { event.preventDefault(); findOutletContainers(); }"
                             onkeypress="if(event.key==='Enter') findOutletContainers()">
                         <button onclick="findOutletContainers()" 
                             class="bg-green-500 hover:bg-green-600 text-white px-6 py-2 rounded-lg">
@@ -3224,6 +3228,7 @@ function showContainerCollectionView() {
                                 <input type="text" id="containerScanInput" 
                                     placeholder="Scan or enter container ID (starts with A)"
                                     class="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
+                                    onkeydown="if(event.key==='Enter' || event.keyCode===13) { event.preventDefault(); handleContainerScan(); }"
                                     onkeypress="if(event.key==='Enter') handleContainerScan()"
                                     autofocus>
                                 <button onclick="handleContainerScan()" 
