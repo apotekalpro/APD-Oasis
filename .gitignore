@@ -44,3 +44,4 @@ pids/
 *.bak
 *.tar.gz
 *.zip
+android/release-key.jks
