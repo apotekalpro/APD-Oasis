@@ -1304,9 +1304,47 @@ function renderDashboard() {
                             <i class="fas fa-truck text-2xl text-teal-200"></i>
                         </div>
                         <p id="dash-delivered-pallets" class="text-2xl font-bold text-teal-600">-</p>
-                        </div>
-                        <i class="fas fa-truck text-4xl text-teal-200"></i>
                     </div>
+                </div>
+                
+                <div class="bg-white rounded-lg shadow-lg p-4">
+                    <div class="flex flex-col">
+                        <div class="flex items-center justify-between mb-2">
+                            <p class="text-gray-500 text-xs">Containers to Pickup</p>
+                            <i class="fas fa-hand-holding text-2xl text-amber-200"></i>
+                        </div>
+                        <p id="dash-containers-pickup" class="text-2xl font-bold text-amber-600">-</p>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Containers to Pickup Section -->
+            <div class="bg-white rounded-lg shadow-lg p-6 mb-6">
+                <div class="mb-4 flex items-center justify-between">
+                    <h3 class="text-xl font-bold">
+                        <i class="fas fa-hand-holding text-amber-600 mr-2"></i>
+                        Containers Available for Pickup
+                    </h3>
+                    <span id="dash-pickup-date" class="text-sm text-gray-500"></span>
+                </div>
+                
+                <div id="dash-containers-pickup-table" class="overflow-x-auto">
+                    <table class="w-full">
+                        <thead class="bg-gray-100">
+                            <tr>
+                                <th class="px-4 py-2 text-left">Outlet Code</th>
+                                <th class="px-4 py-2 text-left">Outlet Name</th>
+                                <th class="px-4 py-2 text-center">Containers Ready</th>
+                                <th class="px-4 py-2 text-center">Delivered Today</th>
+                                <th class="px-4 py-2 text-left">Status</th>
+                            </tr>
+                        </thead>
+                        <tbody id="dash-pickup-table-body">
+                            <tr>
+                                <td colspan="5" class="text-center py-4 text-gray-500">Loading...</td>
+                            </tr>
+                        </tbody>
+                    </table>
                 </div>
             </div>
             
@@ -1390,9 +1428,14 @@ async function loadDashboardData() {
         // Get selected date (default to today)
         const selectedDate = state.dashboardDate || new Date().toISOString().split('T')[0]
         
-        // Fetch parcels for selected date
-        const response = await axios.get(`/api/dashboard/parcels?delivery_date=${selectedDate}`)
-        const parcels = response.data.parcels || []
+        // Fetch parcels for selected date and container inventory
+        const [parcelsResponse, containersResponse] = await Promise.all([
+            axios.get(`/api/dashboard/parcels?delivery_date=${selectedDate}`),
+            axios.get('/api/containers/inventory')
+        ])
+        
+        const parcels = parcelsResponse.data.parcels || []
+        const allContainers = containersResponse.data.containers || []
         
         // Group by outlet
         const outletMap = new Map()
@@ -1477,6 +1520,29 @@ async function loadDashboardData() {
             }
         })
         
+        // Filter containers delivered on selected date
+        const containersDeliveredToday = allContainers.filter(c => {
+            if (!c.delivered_at) return false
+            const deliveredDate = new Date(c.delivered_at).toISOString().split('T')[0]
+            return deliveredDate === selectedDate
+        })
+        
+        // Count total containers available for pickup (status = 'delivered', not yet collected)
+        const containersForPickup = containersDeliveredToday.filter(c => c.status === 'delivered')
+        
+        // Group containers by outlet for pickup table
+        const pickupByOutlet = new Map()
+        containersForPickup.forEach(container => {
+            if (!pickupByOutlet.has(container.outlet_code)) {
+                pickupByOutlet.set(container.outlet_code, {
+                    outlet_code: container.outlet_code,
+                    outlet_name: container.outlet_name,
+                    containers: []
+                })
+            }
+            pickupByOutlet.get(container.outlet_code).containers.push(container)
+        })
+        
         // Update statistics - use container counts if available, fallback to pallet counts
         document.getElementById('dash-total-outlets').textContent = outletMap.size
         document.getElementById('dash-total-pallets').textContent = totalPallets
@@ -1484,6 +1550,48 @@ async function loadDashboardData() {
         document.getElementById('dash-outlet-loaded').textContent = outletsLoaded.size // NEW: Total Outlet Loaded
         document.getElementById('dash-loaded-pallets').textContent = totalLoadedContainers > 0 ? totalLoadedContainers : loadedPallets
         document.getElementById('dash-delivered-pallets').textContent = totalDeliveredContainers > 0 ? totalDeliveredContainers : deliveredPallets
+        document.getElementById('dash-containers-pickup').textContent = containersForPickup.length
+        
+        // Update pickup date display
+        const dateLabel = new Date(selectedDate).toLocaleDateString('en-US', { 
+            year: 'numeric', 
+            month: 'long', 
+            day: 'numeric' 
+        })
+        document.getElementById('dash-pickup-date').textContent = `As of ${dateLabel}`
+        
+        // Update containers pickup table
+        const pickupTableBody = document.getElementById('dash-pickup-table-body')
+        if (pickupByOutlet.size === 0) {
+            pickupTableBody.innerHTML = '<tr><td colspan=\"5\" class=\"text-center py-4 text-gray-500\">No containers available for pickup</td></tr>'
+        } else {
+            pickupTableBody.innerHTML = Array.from(pickupByOutlet.values())
+                .sort((a, b) => b.containers.length - a.containers.length)
+                .map(outlet => {
+                    const containerCount = outlet.containers.length
+                    return `
+                        <tr class=\"border-b hover:bg-gray-50\">
+                            <td class=\"px-4 py-3\">
+                                <span class=\"font-mono font-semibold\">${outlet.outlet_code}</span>
+                            </td>
+                            <td class=\"px-4 py-3\">${outlet.outlet_name}</td>
+                            <td class=\"px-4 py-3 text-center\">
+                                <span class=\"inline-block px-3 py-1 bg-amber-100 text-amber-800 rounded-full font-bold\">
+                                    ${containerCount}
+                                </span>
+                            </td>
+                            <td class=\"px-4 py-3 text-center\">
+                                <i class=\"fas fa-check-circle text-green-500\"></i> Yes
+                            </td>
+                            <td class=\"px-4 py-3\">
+                                <span class=\"inline-block px-2 py-1 bg-amber-100 text-amber-800 rounded text-xs font-semibold\">
+                                    <i class=\"fas fa-clock mr-1\"></i>Ready for Pickup
+                                </span>
+                            </td>
+                        </tr>
+                    `
+                }).join('')
+        }
         
         // Update loading progress - show percentage based on TN, but text shows containers
         const loadingPercent = totalPallets > 0 ? Math.round((loadedPallets / totalPallets) * 100) : 0
