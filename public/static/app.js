@@ -3382,8 +3382,9 @@ async function findOutletContainers() {
     
     try {
         // Get outlet info from outlets table (now has code_short after SQL update)
-        const outletsResponse = await axios.get('/api/outlets')
-        console.log('Outlets API response:', outletsResponse.data)
+        // Using v2 endpoint to bypass Cloudflare cache of broken v1 endpoint
+        const outletsResponse = await axios.get('/api/v2/outlets')
+        console.log('Outlets API v2 response:', outletsResponse.data)
         
         const outlets = outletsResponse.data.outlets || []
         console.log('Outlets array:', outlets, 'Is array:', Array.isArray(outlets))

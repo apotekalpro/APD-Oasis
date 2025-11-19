@@ -1669,10 +1669,10 @@ app.post('/api/outlet/complete', authMiddleware, async (c) => {
 
 // ============ Container Management Routes ============
 
-// Get all outlets (public endpoint for authenticated users)
+// Get all outlets (public endpoint for authenticated users) - FIXED VERSION
 app.get('/api/outlets', authMiddleware, async (c) => {
   try {
-    // Use select=* to get all columns, same as admin endpoint
+    // CRITICAL FIX: Must use outlet_code not code for ordering
     const response = await supabaseRequest(c, 'outlets?select=*&order=outlet_code.asc')
     
     if (!response.ok) {
@@ -1682,12 +1682,29 @@ app.get('/api/outlets', authMiddleware, async (c) => {
     }
     
     const outlets = await response.json()
-    console.log('Outlets fetched:', Array.isArray(outlets) ? outlets.length : 'not an array', outlets)
+    console.log('Outlets fetched (v1.0.4):', Array.isArray(outlets) ? outlets.length : 'not an array')
     
     // Supabase returns array directly
     return c.json({ outlets: Array.isArray(outlets) ? outlets : [] })
   } catch (error) {
     console.error('Failed to fetch outlets exception:', error)
+    return c.json({ error: 'Failed to fetch outlets', message: String(error) }, 500)
+  }
+})
+
+// NEW: Alternative outlets endpoint with different path (cache-busting)
+app.get('/api/v2/outlets', authMiddleware, async (c) => {
+  try {
+    const response = await supabaseRequest(c, 'outlets?select=*&order=outlet_code.asc')
+    
+    if (!response.ok) {
+      const errorText = await response.text()
+      return c.json({ error: 'Failed to fetch outlets', details: errorText }, 500)
+    }
+    
+    const outlets = await response.json()
+    return c.json({ outlets: Array.isArray(outlets) ? outlets : [], version: '1.0.4' })
+  } catch (error) {
     return c.json({ error: 'Failed to fetch outlets', message: String(error) }, 500)
   }
 })
