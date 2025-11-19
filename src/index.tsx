@@ -1660,6 +1660,18 @@ app.post('/api/outlet/complete', authMiddleware, async (c) => {
 
 // ============ Container Management Routes ============
 
+// Get all outlets (public endpoint for authenticated users)
+app.get('/api/outlets', authMiddleware, async (c) => {
+  try {
+    const response = await supabaseRequest(c, 'outlets?select=*&order=code.asc')
+    const outlets = await response.json()
+    return c.json({ outlets })
+  } catch (error) {
+    console.error('Failed to fetch outlets:', error)
+    return c.json({ error: 'Failed to fetch outlets' }, 500)
+  }
+})
+
 // Get containers by outlet
 app.get('/api/containers/by-outlet/:outlet_code', authMiddleware, async (c) => {
   try {
