@@ -1685,12 +1685,18 @@ app.get('/api/containers/inventory', authMiddleware, async (c) => {
   try {
     const user = c.get('user')
     
-    // Only admin and warehouse roles can view all containers
-    if (!['admin', 'warehouse', 'warehouse_supervisor'].includes(user.role)) {
+    // Allow admin, warehouse staff, warehouse supervisor, outlet users, and drivers to view containers
+    if (!['admin', 'warehouse', 'warehouse_staff', 'warehouse_supervisor', 'outlet', 'driver'].includes(user.role)) {
       return c.json({ error: 'Forbidden' }, 403)
     }
     
-    const response = await supabaseRequest(c, 'container_inventory?select=*&order=delivered_at.desc')
+    // If outlet user, filter to show only their outlet's containers
+    let query = 'container_inventory?select=*&order=delivered_at.desc'
+    if (user.role === 'outlet' && user.outlet_code) {
+      query = `container_inventory?outlet_code=eq.${user.outlet_code}&select=*&order=delivered_at.desc`
+    }
+    
+    const response = await supabaseRequest(c, query)
     const containers = await response.json()
     return c.json({ containers })
   } catch (error) {
