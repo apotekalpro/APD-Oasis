@@ -3381,16 +3381,18 @@ async function findOutletContainers() {
     }
     
     try {
-        // Find outlet info first
-        const outletResponse = await axios.post('/api/outlet/find-pallets', { 
-            outlet_code_short: outletCodeShort 
-        })
+        // Get outlet info from outlets list
+        const outletsResponse = await axios.get('/api/outlets')
+        const outlets = outletsResponse.data.outlets || []
         
-        if (outletResponse.data.success) {
+        // Find matching outlet by short code
+        const outlet = outlets.find(o => o.code_short === outletCodeShort)
+        
+        if (outlet) {
             state.selectedOutlet = {
-                code: outletResponse.data.outlet_code,
-                code_short: outletResponse.data.outlet_code_short,
-                name: outletResponse.data.outlet_name
+                code: outlet.code,
+                code_short: outlet.code_short,
+                name: outlet.name
             }
             state.scannedContainers = []
             state.availableContainers = []
@@ -3401,9 +3403,9 @@ async function findOutletContainers() {
             // Load containers
             await loadAvailableContainers()
             
-            showToast(`Outlet found: ${outletCodeShort}`, 'success')
+            showToast(`Outlet found: ${outlet.name}`, 'success')
         } else {
-            showToast(outletResponse.data.error || 'Outlet not found', 'error')
+            showToast(`Outlet ${outletCodeShort} not found`, 'error')
         }
     } catch (error) {
         console.error('Error finding outlet:', error)
@@ -3759,29 +3761,22 @@ async function loadContainerInventory() {
         })
         
         listDiv.innerHTML = Object.values(groupedByOutlet).map(group => `
-            <div class="border border-gray-200 rounded-lg p-3 md:p-4">
-                <div class="flex justify-between items-start md:items-center mb-3 gap-2">
+            <div class="border border-gray-200 rounded-lg p-4 md:p-5 hover:shadow-md transition-shadow">
+                <div class="flex justify-between items-center gap-3">
                     <div class="flex-1 min-w-0">
-                        <h4 class="font-semibold text-base md:text-lg truncate">${group.outlet_name}</h4>
-                        <p class="text-xs md:text-sm text-gray-500">Code: ${group.outlet_code}</p>
+                        <h4 class="font-bold text-lg md:text-xl text-gray-800 truncate mb-1">
+                            <i class="fas fa-store text-blue-600 mr-2"></i>${group.outlet_name}
+                        </h4>
+                        <p class="text-sm text-gray-500">
+                            <i class="fas fa-tag mr-1"></i>Code: <span class="font-mono font-semibold">${group.outlet_code}</span>
+                        </p>
                     </div>
-                    <div class="bg-blue-100 px-3 md:px-4 py-1.5 md:py-2 rounded-full flex-shrink-0">
-                        <span class="font-bold text-blue-800 text-sm md:text-base">${group.containers.length}</span>
-                        <span class="text-xs text-blue-600 ml-1 hidden sm:inline">containers</span>
-                    </div>
-                </div>
-                <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
-                    ${group.containers.map(c => `
-                        <div class="bg-gray-50 border border-gray-200 rounded p-2">
-                            <p class="font-mono text-xs md:text-sm font-bold truncate">${c.container_id}</p>
-                            <p class="text-xs text-gray-500">${formatDate(c.delivered_at)}</p>
-                            <span class="inline-block px-2 py-0.5 text-xs rounded mt-1 ${
-                                c.status === 'at_outlet' ? 'bg-green-100 text-green-800' :
-                                c.status === 'collected' ? 'bg-blue-100 text-blue-800' :
-                                'bg-gray-100 text-gray-800'
-                            }">${c.status}</span>
+                    <div class="bg-gradient-to-br from-blue-500 to-blue-600 text-white px-6 py-3 rounded-xl shadow-lg flex-shrink-0">
+                        <div class="text-center">
+                            <p class="text-3xl md:text-4xl font-bold">${group.containers.length}</p>
+                            <p class="text-xs uppercase tracking-wide opacity-90">Container${group.containers.length !== 1 ? 's' : ''}</p>
                         </div>
-                    `).join('')}
+                    </div>
                 </div>
             </div>
         `).join('')
@@ -4093,13 +4088,15 @@ async function loadErrorReport() {
 
 async function exportReport() {
     try {
-        const [deliveriesRes, errorsRes] = await Promise.all([
+        const [deliveriesRes, errorsRes, containersRes] = await Promise.all([
             axios.get('/api/reports/deliveries'),
-            axios.get('/api/reports/errors')
+            axios.get('/api/reports/errors'),
+            axios.get('/api/containers/inventory')
         ])
         
         const deliveries = deliveriesRes.data.deliveries
         const errors = errorsRes.data.errors
+        const containers = containersRes.data.containers || []
         
         // Create workbook
         const wb = XLSX.utils.book_new()
@@ -4121,6 +4118,19 @@ async function exportReport() {
         const ws1 = XLSX.utils.json_to_sheet(deliveriesData)
         XLSX.utils.book_append_sheet(wb, ws1, 'Deliveries')
         
+        // Container Inventory sheet
+        const containersData = containers.map(c => ({
+            'Container ID': c.container_id,
+            'Outlet Code': c.outlet_code,
+            'Outlet Name': c.outlet_name,
+            'Status': c.status,
+            'Delivered At': formatDate(c.delivered_at),
+            'Collected At': c.collected_at ? formatDate(c.collected_at) : '-',
+            'Collected By': c.collected_by_name || '-'
+        }))
+        const ws2 = XLSX.utils.json_to_sheet(containersData)
+        XLSX.utils.book_append_sheet(wb, ws2, 'Container Inventory')
+        
         // Errors sheet
         const errorsData = errors.map(e => ({
             'Transfer Number': e.transfer_number,
@@ -4130,8 +4140,8 @@ async function exportReport() {
             'Scanned By': e.scanned_by_name || '-',
             'Time': formatDate(e.created_at)
         }))
-        const ws2 = XLSX.utils.json_to_sheet(errorsData)
-        XLSX.utils.book_append_sheet(wb, ws2, 'Errors')
+        const ws3 = XLSX.utils.json_to_sheet(errorsData)
+        XLSX.utils.book_append_sheet(wb, ws3, 'Errors')
         
         // Download
         const filename = `APD_OASIS_Report_${new Date().toISOString().split('T')[0]}.xlsx`
@@ -4139,6 +4149,7 @@ async function exportReport() {
         
         showToast('Report exported successfully', 'success')
     } catch (error) {
+        console.error('Export error:', error)
         showToast('Failed to export report', 'error')
     }
 }
