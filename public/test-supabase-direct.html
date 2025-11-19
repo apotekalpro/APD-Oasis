@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Direct Supabase Test</title>
+</head>
+<body>
+    <h1>Direct Supabase Schema Test</h1>
+    <p>This will help us see what columns actually exist in your outlets table</p>
+    
+    <h2>Step 1: Get your Supabase URL and Key</h2>
+    <p>These are stored in Cloudflare environment variables. Let's test through the API.</p>
+    
+    <button onclick="testSchema()">Test Outlets Table Schema</button>
+    <button onclick="testSimpleQuery()">Test Simple Query (no order)</button>
+    <button onclick="testWithOrder()">Test With Order By outlet_code</button>
+    
+    <pre id="output"></pre>
+
+    <script>
+        const output = document.getElementById('output');
+        
+        async function testSchema() {
+            output.textContent = 'Testing schema...\n\n';
+            const token = localStorage.getItem('token');
+            
+            try {
+                // First let's see what the admin endpoint returns
+                const response = await fetch('/api/admin/outlets', {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                
+                const data = await response.json();
+                output.textContent += 'Admin outlets response:\n';
+                output.textContent += JSON.stringify(data, null, 2);
+                
+                if (data.outlets && data.outlets.length > 0) {
+                    output.textContent += '\n\n--- First outlet columns ---\n';
+                    output.textContent += Object.keys(data.outlets[0]).join(', ');
+                }
+            } catch (error) {
+                output.textContent += 'ERROR:\n' + JSON.stringify(error, null, 2);
+            }
+        }
+        
+        async function testSimpleQuery() {
+            output.textContent = 'Testing simple query (no ordering)...\n\n';
+            const token = localStorage.getItem('token');
+            
+            try {
+                const response = await fetch('/api/outlets', {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                
+                const data = await response.json();
+                output.textContent += 'Response:\n';
+                output.textContent += JSON.stringify(data, null, 2);
+                
+                if (data.error) {
+                    output.textContent += '\n\n--- ERROR DETAILS ---\n';
+                    output.textContent += 'This means the backend returned an error\n';
+                    output.textContent += 'Check Cloudflare deployment logs\n';
+                }
+            } catch (error) {
+                output.textContent += 'EXCEPTION:\n' + error.message;
+            }
+        }
+        
+        async function testWithOrder() {
+            output.textContent = 'This will show us the current public API behavior...\n\n';
+            const token = localStorage.getItem('token');
+            
+            try {
+                const response = await fetch('/api/outlets?' + Date.now(), {
+                    headers: { 
+                        'Authorization': `Bearer ${token}`,
+                        'Cache-Control': 'no-cache'
+                    }
+                });
+                
+                output.textContent += 'Status: ' + response.status + '\n';
+                output.textContent += 'Headers: ' + JSON.stringify([...response.headers.entries()]) + '\n\n';
+                
+                const data = await response.json();
+                output.textContent += 'Response:\n';
+                output.textContent += JSON.stringify(data, null, 2);
+            } catch (error) {
+                output.textContent += 'EXCEPTION:\n' + error.message;
+            }
+        }
+    </script>
+</body>
+</html>

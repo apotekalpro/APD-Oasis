@@ -54,6 +54,15 @@ async function authMiddleware(c: any, next: any) {
 
 // ============ API Routes ============
 
+// Version check endpoint (no auth required)
+app.get('/api/version', (c) => {
+  return c.json({ 
+    version: '1.0.4-fix-outlets-query',
+    timestamp: Date.now(),
+    message: 'Outlets query uses select=* with order=outlet_code.asc'
+  })
+})
+
 // Login endpoint
 app.post('/api/login', async (c) => {
   try {
