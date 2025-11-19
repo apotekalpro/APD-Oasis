@@ -1320,6 +1320,16 @@ function renderDashboard() {
                         <p id="dash-containers-pickup" class="text-2xl font-bold text-amber-600">-</p>
                     </div>
                 </div>
+                
+                <div class="bg-white rounded-lg shadow-lg p-4">
+                    <div class="flex flex-col">
+                        <div class="flex items-center justify-between mb-2">
+                            <p class="text-gray-500 text-xs">Returning to Warehouse</p>
+                            <i class="fas fa-undo-alt text-2xl text-purple-200"></i>
+                        </div>
+                        <p id="dash-containers-returning" class="text-2xl font-bold text-purple-600">-</p>
+                    </div>
+                </div>
             </div>
             
             <!-- Containers to Pickup Section -->
@@ -1346,6 +1356,41 @@ function renderDashboard() {
                         <tbody id="dash-pickup-table-body">
                             <tr>
                                 <td colspan="5" class="text-center py-4 text-gray-500">Loading...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            
+            <!-- Containers Returning to Warehouse Section -->
+            <div class="bg-white rounded-lg shadow-lg p-6 mb-6">
+                <div class="mb-4 flex items-center justify-between">
+                    <h3 class="text-xl font-bold">
+                        <i class="fas fa-undo-alt text-purple-600 mr-2"></i>
+                        Containers Returning to Warehouse
+                    </h3>
+                    <span id="dash-returning-date" class="text-sm text-gray-500"></span>
+                </div>
+                <p class="text-sm text-gray-600 mb-4">
+                    <i class="fas fa-info-circle mr-1"></i>
+                    Containers that have been picked up by drivers (signed off) and are on their way back to warehouse
+                </p>
+                
+                <div id="dash-containers-returning-table" class="overflow-x-auto">
+                    <table class="w-full">
+                        <thead class="bg-gray-100">
+                            <tr>
+                                <th class="px-4 py-2 text-left">Outlet Code</th>
+                                <th class="px-4 py-2 text-left">Outlet Name</th>
+                                <th class="px-4 py-2 text-center">Containers Collected</th>
+                                <th class="px-4 py-2 text-center">Collection Time</th>
+                                <th class="px-4 py-2 text-left">Collected By</th>
+                                <th class="px-4 py-2 text-left">Status</th>
+                            </tr>
+                        </thead>
+                        <tbody id="dash-returning-table-body">
+                            <tr>
+                                <td colspan="6" class="text-center py-4 text-gray-500">Loading...</td>
                             </tr>
                         </tbody>
                     </table>
@@ -1590,6 +1635,71 @@ async function loadDashboardData() {
                             <td class=\"px-4 py-3\">
                                 <span class=\"inline-block px-2 py-1 bg-amber-100 text-amber-800 rounded text-xs font-semibold\">
                                     <i class=\"fas fa-clock mr-1\"></i>Ready for Pickup
+                                </span>
+                            </td>
+                        </tr>
+                    `
+                }).join('')
+        }
+        
+        // Count containers returning to warehouse (status = 'collected')
+        const containersReturning = containersDeliveredToday.filter(c => c.status === 'collected')
+        
+        // Update containers returning statistic
+        document.getElementById('dash-containers-returning').textContent = containersReturning.length
+        document.getElementById('dash-returning-date').textContent = `As of ${dateLabel}`
+        
+        // Group returning containers by outlet
+        const returningByOutlet = new Map()
+        containersReturning.forEach(container => {
+            if (!returningByOutlet.has(container.outlet_code)) {
+                returningByOutlet.set(container.outlet_code, {
+                    outlet_code: container.outlet_code,
+                    outlet_name: container.outlet_name,
+                    containers: []
+                })
+            }
+            returningByOutlet.get(container.outlet_code).containers.push(container)
+        })
+        
+        // Update containers returning table
+        const returningTableBody = document.getElementById('dash-returning-table-body')
+        if (returningByOutlet.size === 0) {
+            returningTableBody.innerHTML = '<tr><td colspan=\"6\" class=\"text-center py-4 text-gray-500\">No containers returning to warehouse</td></tr>'
+        } else {
+            returningTableBody.innerHTML = Array.from(returningByOutlet.values())
+                .sort((a, b) => b.containers.length - a.containers.length)
+                .map(outlet => {
+                    const containerCount = outlet.containers.length
+                    // Get latest collection time
+                    const latestCollection = outlet.containers.reduce((latest, c) => {
+                        return !latest || new Date(c.collected_at) > new Date(latest.collected_at) ? c : latest
+                    }, null)
+                    
+                    const collectionTime = latestCollection?.collected_at ? 
+                        new Date(latestCollection.collected_at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : '-'
+                    const collectedBy = latestCollection?.collected_by_name || '-'
+                    
+                    return `
+                        <tr class=\"border-b hover:bg-gray-50\">
+                            <td class=\"px-4 py-3\">
+                                <span class=\"font-mono font-semibold\">${outlet.outlet_code}</span>
+                            </td>
+                            <td class=\"px-4 py-3\">${outlet.outlet_name}</td>
+                            <td class=\"px-4 py-3 text-center\">
+                                <span class=\"inline-block px-3 py-1 bg-purple-100 text-purple-800 rounded-full font-bold\">
+                                    ${containerCount}
+                                </span>
+                            </td>
+                            <td class=\"px-4 py-3 text-center text-sm\">
+                                ${collectionTime}
+                            </td>
+                            <td class=\"px-4 py-3 text-sm\">
+                                ${collectedBy}
+                            </td>
+                            <td class=\"px-4 py-3\">
+                                <span class=\"inline-block px-2 py-1 bg-purple-100 text-purple-800 rounded text-xs font-semibold\">
+                                    <i class=\"fas fa-truck mr-1\"></i>In Transit
                                 </span>
                             </td>
                         </tr>
@@ -3213,6 +3323,9 @@ async function handleConfirmOutletCompletion(event) {
 
 // NEW: Final confirmation dialog before submitting
 function showFinalConfirmationDialog(receiverName, containerCount, palletIds) {
+    // Store data in state for the confirmation handler
+    state.pendingOutletCompletion = { receiverName, containerCount, palletIds }
+    
     const confirmModal = document.createElement('div')
     confirmModal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60] p-4'
     confirmModal.innerHTML = `
@@ -3236,7 +3349,7 @@ function showFinalConfirmationDialog(receiverName, containerCount, palletIds) {
                 Once confirmed, this action cannot be undone. Are you sure you want to proceed?
             </p>
             <div class="flex space-x-3">
-                <button onclick="proceedWithOutletCompletion('${receiverName}', ${containerCount}, ${JSON.stringify(palletIds).replace(/"/g, '&quot;')})" 
+                <button onclick="proceedWithOutletCompletion()" 
                     class="flex-1 bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg font-semibold">
                     <i class="fas fa-check-circle mr-2"></i>YES - Proceed
                 </button>
@@ -3251,7 +3364,14 @@ function showFinalConfirmationDialog(receiverName, containerCount, palletIds) {
 }
 
 // NEW: Proceed with actual submission after confirmation
-async function proceedWithOutletCompletion(receiverName, containerCount, palletIds) {
+async function proceedWithOutletCompletion() {
+    if (!state.pendingOutletCompletion) {
+        showToast('No pending confirmation data', 'error')
+        return
+    }
+    
+    const { receiverName, containerCount, palletIds } = state.pendingOutletCompletion
+    
     try {
         const response = await axios.post('/api/outlet/confirm-receipt-bulk', {
             outlet_code_short: state.selectedOutlet.code_short,
@@ -3265,8 +3385,9 @@ async function proceedWithOutletCompletion(receiverName, containerCount, palletI
         // Close all modals
         document.querySelectorAll('.fixed.inset-0').forEach(modal => modal.remove())
         
-        // Clear scanned items
+        // Clear scanned items and pending data
         state.scannedItems = []
+        state.pendingOutletCompletion = null
         
         // Refresh pallets list
         await loadOutletPallets()
