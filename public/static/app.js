@@ -3323,7 +3323,7 @@ function showContainerCollectionView() {
                         
                         <!-- Available Containers at Outlet -->
                         <div class="bg-gray-50 rounded-lg p-3 md:p-4">
-                            <h4 class="font-semibold mb-3 text-sm md:text-base">
+                            <h4 class="font-semibold mb-3 text-sm md:text-base" data-available-count>
                                 <i class="fas fa-box mr-2"></i>Available Containers (${state.availableContainers?.length || 0})
                             </h4>
                             <div id="availableContainersList" class="space-y-2 max-h-48 md:max-h-64 overflow-y-auto">
@@ -3435,29 +3435,22 @@ async function loadAvailableContainers() {
     try {
         const response = await axios.get(`/api/containers/by-outlet/${state.selectedOutlet.code}`)
         
-        state.availableContainers = response.data.containers || []
+        // Get all containers from API
+        const allContainers = response.data.containers || []
         
-        const listDiv = document.getElementById('availableContainersList')
-        if (!listDiv) return
+        // Filter out already scanned containers
+        const scannedIds = (state.scannedContainers || []).map(c => c.container_id)
+        state.availableContainers = allContainers.filter(c => !scannedIds.includes(c.container_id))
         
-        if (state.availableContainers.length === 0) {
-            listDiv.innerHTML = `
-                <div class="text-center py-6">
-                    <i class="fas fa-check-circle text-3xl text-green-500 mb-2"></i>
-                    <p class="text-sm text-gray-600">No containers at this outlet</p>
-                </div>
-            `
-        } else {
-            listDiv.innerHTML = state.availableContainers.map(container => `
-                <div class="bg-white border border-gray-200 rounded p-3">
-                    <p class="font-mono font-bold text-gray-800">${container.container_id}</p>
-                    <p class="text-xs text-gray-500">Delivered: ${formatDate(container.delivered_at)}</p>
-                </div>
-            `).join('')
-        }
-        
-        // Update scanned list
+        // Update the UI
+        updateAvailableContainersList()
         updateScannedContainersList()
+        
+        // Update the header count in the view
+        const headerElement = document.querySelector('[data-available-count]')
+        if (headerElement) {
+            headerElement.textContent = `Available Containers (${state.availableContainers.length})`
+        }
     } catch (error) {
         console.error('Error loading containers:', error)
         showToast('Failed to load containers', 'error')
@@ -3518,8 +3511,11 @@ async function handleContainerScan() {
             updateAvailableContainersList()
             updateScannedContainersList()
             
-            // Update header counts
-            showContainerCollectionView()
+            // Update header count
+            const headerElement = document.querySelector('[data-available-count]')
+            if (headerElement) {
+                headerElement.textContent = `Available Containers (${state.availableContainers.length})`
+            }
         } else if (response.data.cross_outlet) {
             // Cross-outlet validation - ask for confirmation
             showCrossOutletConfirmation(response.data)
@@ -3801,7 +3797,11 @@ function updateAvailableContainersList() {
     const listDiv = document.getElementById('availableContainersList')
     if (!listDiv) return
     
-    if (state.availableContainers.length === 0) {
+    // Filter out scanned containers
+    const scannedIds = (state.scannedContainers || []).map(c => c.container_id)
+    const actuallyAvailable = (state.availableContainers || []).filter(c => !scannedIds.includes(c.container_id))
+    
+    if (actuallyAvailable.length === 0) {
         listDiv.innerHTML = `
             <div class="text-center py-6">
                 <i class="fas fa-check-circle text-3xl text-green-500 mb-2"></i>
@@ -3809,12 +3809,18 @@ function updateAvailableContainersList() {
             </div>
         `
     } else {
-        listDiv.innerHTML = state.availableContainers.map(container => `
+        listDiv.innerHTML = actuallyAvailable.map(container => `
             <div class="bg-white border border-gray-200 rounded p-3">
                 <p class="font-mono font-bold text-gray-800">${container.container_id}</p>
                 <p class="text-xs text-gray-500">Delivered: ${formatDate(container.delivered_at)}</p>
             </div>
         `).join('')
+    }
+    
+    // Update header count
+    const headerElement = document.querySelector('[data-available-count]')
+    if (headerElement) {
+        headerElement.textContent = `Available Containers (${actuallyAvailable.length})`
     }
 }
 
