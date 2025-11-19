@@ -1663,12 +1663,23 @@ app.post('/api/outlet/complete', authMiddleware, async (c) => {
 // Get all outlets (public endpoint for authenticated users)
 app.get('/api/outlets', authMiddleware, async (c) => {
   try {
-    const response = await supabaseRequest(c, 'outlets?select=outlet_code,code_short,outlet_name&order=outlet_code.asc')
-    const data = await response.json()
-    return c.json({ outlets: Array.isArray(data) ? data : [] })
+    // Use select=* to get all columns, same as admin endpoint
+    const response = await supabaseRequest(c, 'outlets?select=*&order=outlet_code.asc')
+    
+    if (!response.ok) {
+      const errorText = await response.text()
+      console.error('Supabase error:', errorText)
+      return c.json({ error: 'Failed to fetch outlets', details: errorText }, 500)
+    }
+    
+    const outlets = await response.json()
+    console.log('Outlets fetched:', Array.isArray(outlets) ? outlets.length : 'not an array', outlets)
+    
+    // Supabase returns array directly
+    return c.json({ outlets: Array.isArray(outlets) ? outlets : [] })
   } catch (error) {
-    console.error('Failed to fetch outlets:', error)
-    return c.json({ error: 'Failed to fetch outlets' }, 500)
+    console.error('Failed to fetch outlets exception:', error)
+    return c.json({ error: 'Failed to fetch outlets', message: String(error) }, 500)
   }
 })
 
