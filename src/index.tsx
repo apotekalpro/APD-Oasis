@@ -1663,12 +1663,24 @@ app.post('/api/outlet/complete', authMiddleware, async (c) => {
 // Get all outlets (public endpoint for authenticated users)
 app.get('/api/outlets', authMiddleware, async (c) => {
   try {
-    const response = await supabaseRequest(c, 'outlets?select=*&order=code.asc')
-    const outlets = await response.json()
-    return c.json({ outlets })
+    const response = await supabaseRequest(c, 'outlets?select=outlet_code,code_short,outlet_name&order=outlet_code.asc')
+    const data = await response.json()
+    return c.json({ outlets: Array.isArray(data) ? data : [] })
   } catch (error) {
     console.error('Failed to fetch outlets:', error)
     return c.json({ error: 'Failed to fetch outlets' }, 500)
+  }
+})
+
+// Get all parcels (public endpoint for authenticated users)
+app.get('/api/parcels', authMiddleware, async (c) => {
+  try {
+    const response = await supabaseRequest(c, 'parcels?select=outlet_code,outlet_code_short,outlet_name&order=outlet_code.asc')
+    const parcels = await response.json()
+    return c.json({ parcels })
+  } catch (error) {
+    console.error('Failed to fetch parcels:', error)
+    return c.json({ error: 'Failed to fetch parcels' }, 500)
   }
 })
 

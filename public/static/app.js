@@ -3381,18 +3381,31 @@ async function findOutletContainers() {
     }
     
     try {
-        // Get outlet info from parcels (which have both outlet_code and outlet_code_short)
-        const parcelsResponse = await axios.get('/api/parcels')
-        const parcels = parcelsResponse.data.parcels || []
+        // Get outlet info from outlets table (now has code_short after SQL update)
+        const outletsResponse = await axios.get('/api/outlets')
+        console.log('Outlets API response:', outletsResponse.data)
         
-        // Find a parcel with matching outlet_code_short to get outlet info
-        const parcel = parcels.find(p => p.outlet_code_short === outletCodeShort)
+        const outlets = outletsResponse.data.outlets || []
+        console.log('Outlets array:', outlets, 'Is array:', Array.isArray(outlets))
         
-        if (parcel) {
+        if (!Array.isArray(outlets)) {
+            console.error('Outlets is not an array:', typeof outlets, outlets)
+            showToast('Invalid data format from server', 'error')
+            return
+        }
+        
+        // Find outlet by code_short
+        console.log('Looking for code_short:', outletCodeShort)
+        const outlet = outlets.find(o => {
+            console.log('Checking outlet:', o.code_short, 'against', outletCodeShort)
+            return o.code_short === outletCodeShort
+        })
+        
+        if (outlet) {
             state.selectedOutlet = {
-                code: parcel.outlet_code,
-                code_short: parcel.outlet_code_short,
-                name: parcel.outlet_name
+                code: outlet.outlet_code,
+                code_short: outlet.code_short,
+                name: outlet.outlet_name
             }
             state.scannedContainers = []
             state.availableContainers = []
@@ -3403,9 +3416,10 @@ async function findOutletContainers() {
             // Load containers
             await loadAvailableContainers()
             
-            showToast(`Outlet found: ${parcel.outlet_name}`, 'success')
+            showToast(`Outlet found: ${outlet.outlet_name}`, 'success')
         } else {
-            showToast(`Outlet ${outletCodeShort} not found. Please check if this outlet has received deliveries.`, 'error')
+            console.log('No matching outlet found in', outlets.length, 'outlets')
+            showToast(`Outlet ${outletCodeShort} not found. Available outlets: ${outlets.length}`, 'error')
         }
     } catch (error) {
         console.error('Error finding outlet:', error)
