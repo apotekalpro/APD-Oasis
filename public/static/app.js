@@ -3335,20 +3335,14 @@ function showContainerCollectionView() {
                     <!-- Scanned Containers List -->
                     <div>
                         <div class="bg-white border border-gray-200 rounded-lg p-3 md:p-4">
-                            <h4 class="font-semibold mb-3 text-sm md:text-base">
+                            <h4 class="font-semibold mb-3 text-sm md:text-base" data-scanned-count>
                                 <i class="fas fa-check-circle text-green-600 mr-2"></i>
                                 Scanned Containers (${state.scannedContainers?.length || 0})
                             </h4>
                             <div id="scannedContainersList" class="space-y-2 max-h-48 md:max-h-64 overflow-y-auto mb-4">
                                 <p class="text-gray-500 text-center py-4 text-sm">No containers scanned yet</p>
                             </div>
-                            
-                            ${state.scannedContainers?.length > 0 ? `
-                                <button onclick="completeContainerCollection()" 
-                                    class="w-full bg-green-500 hover:bg-green-600 active:bg-green-700 text-white font-bold py-3 rounded-lg shadow-md">
-                                    <i class="fas fa-check-circle mr-2"></i>Complete Collection (${state.scannedContainers.length})
-                                </button>
-                            ` : ''}
+                            <!-- Complete Collection button will be dynamically inserted here -->
                         </div>
                     </div>
                 </div>
@@ -3601,29 +3595,63 @@ function updateScannedContainersList() {
     if (!listDiv) return
     
     if (!state.scannedContainers || state.scannedContainers.length === 0) {
-        listDiv.innerHTML = `<p class="text-gray-500 text-center py-4">No containers scanned yet</p>`
-        return
+        listDiv.innerHTML = `<p class="text-gray-500 text-center py-4 text-sm">No containers scanned yet</p>`
+    } else {
+        listDiv.innerHTML = state.scannedContainers.map((container, index) => `
+            <div class="bg-green-50 border border-green-200 rounded p-3">
+                <div class="flex justify-between items-start">
+                    <div>
+                        <p class="font-mono font-bold text-gray-800">${container.container_id}</p>
+                        ${container.cross_outlet ? `
+                            <p class="text-xs text-orange-600 font-semibold">
+                                <i class="fas fa-exchange-alt mr-1"></i>From: ${container.outlet_name}
+                            </p>
+                        ` : ''}
+                        <p class="text-xs text-gray-500">Ready for collection</p>
+                    </div>
+                    <button onclick="removeScannedContainer(${index})" 
+                        class="text-red-500 hover:text-red-700">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+            </div>
+        `).join('')
     }
     
-    listDiv.innerHTML = state.scannedContainers.map((container, index) => `
-        <div class="bg-green-50 border border-green-200 rounded p-3">
-            <div class="flex justify-between items-start">
-                <div>
-                    <p class="font-mono font-bold text-gray-800">${container.container_id}</p>
-                    ${container.cross_outlet ? `
-                        <p class="text-xs text-orange-600 font-semibold">
-                            <i class="fas fa-exchange-alt mr-1"></i>From: ${container.outlet_name}
-                        </p>
-                    ` : ''}
-                    <p class="text-xs text-gray-500">Ready for collection</p>
-                </div>
-                <button onclick="removeScannedContainer(${index})" 
-                    class="text-red-500 hover:text-red-700">
-                    <i class="fas fa-times"></i>
-                </button>
-            </div>
-        </div>
-    `).join('')
+    // Update the Complete Collection button
+    updateCompleteCollectionButton()
+}
+
+// Update Complete Collection button visibility and count
+function updateCompleteCollectionButton() {
+    // Update scanned count header
+    const scannedHeader = document.querySelector('[data-scanned-count]')
+    if (scannedHeader) {
+        scannedHeader.textContent = `Scanned Containers (${state.scannedContainers?.length || 0})`
+        scannedHeader.innerHTML = `<i class="fas fa-check-circle text-green-600 mr-2"></i>Scanned Containers (${state.scannedContainers?.length || 0})`
+    }
+    
+    // Find or create the button container
+    const scannedDiv = document.getElementById('scannedContainersList')
+    if (!scannedDiv) return
+    
+    const parentDiv = scannedDiv.parentElement
+    if (!parentDiv) return
+    
+    // Remove existing button if any
+    const existingButton = parentDiv.querySelector('.complete-collection-btn')
+    if (existingButton) {
+        existingButton.remove()
+    }
+    
+    // Add button if there are scanned containers
+    if (state.scannedContainers && state.scannedContainers.length > 0) {
+        const button = document.createElement('button')
+        button.className = 'complete-collection-btn w-full bg-green-500 hover:bg-green-600 active:bg-green-700 text-white font-bold py-3 rounded-lg shadow-md'
+        button.onclick = completeContainerCollection
+        button.innerHTML = `<i class="fas fa-check-circle mr-2"></i>Complete Collection (${state.scannedContainers.length})`
+        parentDiv.appendChild(button)
+    }
 }
 
 // Remove container from scanned list
