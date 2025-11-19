@@ -3506,11 +3506,20 @@ async function handleContainerScan() {
                 delivered_at: response.data.delivered_at
             })
             
+            // Remove from available containers list
+            state.availableContainers = state.availableContainers.filter(
+                c => c.container_id !== containerId
+            )
+            
             playBeep(true)
             showToast(`✓ Container ${containerId} ready for collection`, 'success')
             
-            // Update UI
-            loadAvailableContainers()
+            // Update UI - both available and scanned lists
+            updateAvailableContainersList()
+            updateScannedContainersList()
+            
+            // Update header counts
+            showContainerCollectionView()
         } else if (response.data.cross_outlet) {
             // Cross-outlet validation - ask for confirmation
             showCrossOutletConfirmation(response.data)
@@ -3628,34 +3637,35 @@ function removeScannedContainer(index) {
     showContainerCollectionView() // Refresh to update button
 }
 
-// Complete container collection
+// Complete container collection - Step 1: Show signature modal
 async function completeContainerCollection() {
     if (!state.scannedContainers || state.scannedContainers.length === 0) {
         showToast('No containers scanned', 'warning')
         return
     }
     
-    // Show signature modal
+    // Show signature modal (Step 1)
     const modal = document.createElement('div')
     modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50'
     modal.innerHTML = `
         <div class="bg-white rounded-lg p-6 max-w-md mx-4">
             <h3 class="text-xl font-bold mb-4">
-                <i class="fas fa-signature text-blue-600 mr-2"></i>Complete Collection
+                <i class="fas fa-signature text-blue-600 mr-2"></i>Sign Collection
             </h3>
-            <p class="mb-4">Collecting <strong>${state.scannedContainers.length}</strong> container(s) from <strong>${state.selectedOutlet.name}</strong></p>
+            <p class="mb-4">Ready to collect <strong>${state.scannedContainers.length}</strong> container(s) from <strong>${state.selectedOutlet.name}</strong></p>
             
             <div class="mb-4">
                 <label class="block text-sm font-medium mb-2">Collector Name/Signature</label>
                 <input type="text" id="collectionSignature" 
                     placeholder="Enter your name"
-                    class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                    class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                    onkeydown="if(event.key==='Enter') { event.preventDefault(); document.getElementById('btnProceedToConfirm').click(); }">
             </div>
             
             <div class="flex gap-3">
-                <button onclick="confirmContainerCollection(); this.closest('.fixed').remove()" 
-                    class="flex-1 bg-green-500 hover:bg-green-600 text-white py-2 rounded-lg font-semibold">
-                    <i class="fas fa-check-circle mr-2"></i>Confirm & Sign
+                <button id="btnProceedToConfirm" onclick="showCollectionConfirmation(); this.closest('.fixed').remove()" 
+                    class="flex-1 bg-blue-500 hover:bg-blue-600 text-white py-2 rounded-lg font-semibold">
+                    <i class="fas fa-arrow-right mr-2"></i>Proceed
                 </button>
                 <button onclick="this.closest('.fixed').remove()" 
                     class="flex-1 bg-gray-300 hover:bg-gray-400 text-gray-800 py-2 rounded-lg font-semibold">
@@ -3671,16 +3681,89 @@ async function completeContainerCollection() {
     }, 100)
 }
 
-// Confirm container collection
-async function confirmContainerCollection() {
+// Step 2: Show double confirmation dialog (like receiving workflow)
+function showCollectionConfirmation() {
     const signature = document.getElementById('collectionSignature')?.value.trim()
     
     if (!signature) {
         showToast('Please enter collector name', 'error')
+        // Reopen the signature modal
+        setTimeout(() => completeContainerCollection(), 100)
         return
     }
     
+    // Store signature in state temporarily
+    state.tempCollectionSignature = signature
+    
+    // Show confirmation dialog with summary
+    const modal = document.createElement('div')
+    modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4'
+    modal.innerHTML = `
+        <div class="bg-white rounded-lg p-4 md:p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <h3 class="text-lg md:text-xl font-bold mb-3 md:mb-4 text-orange-600">
+                <i class="fas fa-exclamation-triangle mr-2"></i>Confirm Container Collection
+            </h3>
+            
+            <div class="bg-blue-50 border border-blue-200 rounded-lg p-3 md:p-4 mb-4">
+                <p class="font-semibold text-blue-900 mb-2 text-sm md:text-base">
+                    <i class="fas fa-store mr-2"></i>Outlet: ${state.selectedOutlet.name}
+                </p>
+                <p class="text-xs md:text-sm text-blue-800">Code: ${state.selectedOutlet.code_short}</p>
+                <p class="text-xs md:text-sm text-blue-800">
+                    <i class="fas fa-signature mr-1"></i>Collector: ${signature}
+                </p>
+            </div>
+            
+            <div class="mb-4">
+                <p class="font-semibold mb-2 text-sm md:text-base">
+                    <i class="fas fa-box-open mr-2"></i>Containers to Collect: ${state.scannedContainers.length}
+                </p>
+                <div class="bg-gray-50 rounded p-2 md:p-3 max-h-48 md:max-h-64 overflow-y-auto">
+                    ${state.scannedContainers.map(c => `
+                        <div class="text-xs md:text-sm py-1.5 border-b border-gray-200 last:border-0">
+                            <span class="font-mono font-semibold">${c.container_id}</span>
+                            ${c.cross_outlet ? `<span class="text-orange-600 ml-2">(Cross-outlet)</span>` : ''}
+                        </div>
+                    `).join('')}
+                </div>
+            </div>
+            
+            <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-3 md:p-4 mb-4">
+                <p class="text-yellow-800 font-semibold mb-2 text-sm md:text-base">
+                    <i class="fas fa-question-circle mr-2"></i>Are you sure?
+                </p>
+                <p class="text-xs md:text-sm text-yellow-700">
+                    This action will mark ${state.scannedContainers.length} container(s) as collected from ${state.selectedOutlet.name}.
+                </p>
+            </div>
+            
+            <div class="flex gap-2 md:gap-3">
+                <button onclick="finalConfirmContainerCollection(); this.closest('.fixed').remove()" 
+                    class="flex-1 bg-green-500 hover:bg-green-600 text-white py-2.5 md:py-3 rounded-lg font-bold text-sm md:text-base shadow-lg">
+                    <i class="fas fa-check-double mr-2"></i>YES - CONFIRM COLLECTION
+                </button>
+                <button onclick="this.closest('.fixed').remove()" 
+                    class="flex-1 bg-red-500 hover:bg-red-600 text-white py-2.5 md:py-3 rounded-lg font-bold text-sm md:text-base shadow-lg">
+                    <i class="fas fa-times mr-2"></i>NO - CANCEL
+                </button>
+            </div>
+        </div>
+    `
+    document.body.appendChild(modal)
+}
+
+// Step 3: Final confirmation and API call
+async function finalConfirmContainerCollection() {
+    const signature = state.tempCollectionSignature
+    
+    if (!signature) {
+        showToast('Missing collector signature', 'error')
+        return
+    }
+
     try {
+        // Show loading state
+        showToast('Processing collection...', 'info')
         const containerIds = state.scannedContainers.map(c => c.container_id)
         
         const response = await axios.post('/api/containers/complete-collection', {
@@ -3691,6 +3774,9 @@ async function confirmContainerCollection() {
         
         if (response.data.success) {
             showToast(`✓ ${response.data.success_count} container(s) collected successfully!`, 'success')
+            
+            // Clear temp signature
+            delete state.tempCollectionSignature
             
             // Reset state
             state.scannedContainers = []
@@ -3705,6 +3791,30 @@ async function confirmContainerCollection() {
     } catch (error) {
         console.error('Collection error:', error)
         showToast(error.response?.data?.error || 'Failed to complete collection', 'error')
+        // Clear temp signature on error
+        delete state.tempCollectionSignature
+    }
+}
+
+// Helper function to update available containers list only
+function updateAvailableContainersList() {
+    const listDiv = document.getElementById('availableContainersList')
+    if (!listDiv) return
+    
+    if (state.availableContainers.length === 0) {
+        listDiv.innerHTML = `
+            <div class="text-center py-6">
+                <i class="fas fa-check-circle text-3xl text-green-500 mb-2"></i>
+                <p class="text-sm text-gray-600">All containers scanned!</p>
+            </div>
+        `
+    } else {
+        listDiv.innerHTML = state.availableContainers.map(container => `
+            <div class="bg-white border border-gray-200 rounded p-3">
+                <p class="font-mono font-bold text-gray-800">${container.container_id}</p>
+                <p class="text-xs text-gray-500">Delivered: ${formatDate(container.delivered_at)}</p>
+            </div>
+        `).join('')
     }
 }
 
