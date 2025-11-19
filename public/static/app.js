@@ -404,7 +404,8 @@ function renderNavBar() {
 // ============ Admin Page ============
 function renderAdmin() {
     return `
-        <div class="container mx-auto px-4 py-6">
+        <div class="h-full flex flex-col">
+        <div class="container mx-auto px-4 py-6 flex-1 overflow-y-auto">
             <h2 class="text-3xl font-bold mb-6 text-gray-800">
                 <i class="fas fa-cog text-blue-600 mr-3"></i>Admin Configuration
             </h2>
@@ -453,6 +454,7 @@ function renderAdmin() {
                     </div>
                 </div>
             </div>
+        </div>
         </div>
     `
 }
@@ -853,7 +855,8 @@ async function handleAddOutlet(event) {
 // ============ Import Page ============
 function renderImport() {
     return `
-        <div class="container mx-auto px-4 py-6">
+        <div class="h-full flex flex-col">
+        <div class="container mx-auto px-4 py-6 flex-1 overflow-y-auto">
             <h2 class="text-3xl font-bold mb-6 text-gray-800">
                 <i class="fas fa-upload text-blue-600 mr-3"></i>Import Pick & Pack Report
             </h2>
@@ -1718,7 +1721,8 @@ function renderWarehouse() {
     }
     
     return `
-        <div class="container mx-auto px-4 py-6">
+        <div class="h-full flex flex-col">
+        <div class="container mx-auto px-4 py-6 flex-1 overflow-y-auto">
             <h2 class="text-3xl font-bold mb-6 text-gray-800">
                 <i class="fas fa-warehouse text-blue-600 mr-3"></i>Warehouse Loading
             </h2>
@@ -2621,7 +2625,8 @@ async function deleteTransfer(transferId, outletCode) {
 // ============ Outlet Page ============
 function renderOutlet() {
     return `
-        <div class="container mx-auto px-4 py-6">
+        <div class="h-full flex flex-col">
+        <div class="container mx-auto px-4 py-6 flex-1 overflow-y-auto">
             <h2 class="text-3xl font-bold mb-6 text-gray-800">
                 <i class="fas fa-store text-blue-600 mr-3"></i>Outlet Unloading
             </h2>
@@ -2774,6 +2779,7 @@ function renderOutlet() {
                     </div>
                 </div>
             `}
+        </div>
         </div>
     `
 }
@@ -3334,7 +3340,8 @@ async function handleCompleteUnloading(event) {
 // ============ Container Collection Page ============
 function renderContainers() {
     return `
-        <div class="container mx-auto px-4 py-6">
+        <div class="h-full flex flex-col">
+        <div class="container mx-auto px-4 py-6 flex-1 overflow-y-auto">
             <h2 class="text-2xl md:text-3xl font-bold mb-6 text-gray-800">
                 <i class="fas fa-recycle text-green-600 mr-2"></i>Container Collection & Management
             </h2>
@@ -3365,6 +3372,7 @@ function renderContainers() {
                     <p class="text-xs md:text-sm text-gray-400 mt-2">Manage recyclable containers (Pallet IDs starting with "A")</p>
                 </div>
             </div>
+        </div>
         </div>
     `
 }
@@ -4065,7 +4073,8 @@ async function loadContainerInventory() {
 // ============ Reports Page ============
 function renderReports() {
     return `
-        <div class="container mx-auto px-4 py-6">
+        <div class="h-full flex flex-col">
+        <div class="container mx-auto px-4 py-6 flex-1 overflow-y-auto">
             <h2 class="text-3xl font-bold mb-6 text-gray-800">
                 <i class="fas fa-chart-bar text-blue-600 mr-3"></i>Reports & Analytics
             </h2>
@@ -4425,7 +4434,8 @@ async function exportReport() {
 // ============ Profile Page ============
 function renderProfile() {
     return `
-        <div class="container mx-auto px-4 py-6">
+        <div class="h-full flex flex-col">
+        <div class="container mx-auto px-4 py-6 flex-1 overflow-y-auto">
             <h2 class="text-3xl font-bold mb-6 text-gray-800">
                 <i class="fas fa-user text-blue-600 mr-3"></i>My Profile
             </h2>
