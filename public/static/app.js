@@ -3381,18 +3381,18 @@ async function findOutletContainers() {
     }
     
     try {
-        // Get outlet info from outlets list
-        const outletsResponse = await axios.get('/api/outlets')
-        const outlets = outletsResponse.data.outlets || []
+        // Get outlet info from parcels (which have both outlet_code and outlet_code_short)
+        const parcelsResponse = await axios.get('/api/parcels')
+        const parcels = parcelsResponse.data.parcels || []
         
-        // Find matching outlet by short code
-        const outlet = outlets.find(o => o.code_short === outletCodeShort)
+        // Find a parcel with matching outlet_code_short to get outlet info
+        const parcel = parcels.find(p => p.outlet_code_short === outletCodeShort)
         
-        if (outlet) {
+        if (parcel) {
             state.selectedOutlet = {
-                code: outlet.code,
-                code_short: outlet.code_short,
-                name: outlet.name
+                code: parcel.outlet_code,
+                code_short: parcel.outlet_code_short,
+                name: parcel.outlet_name
             }
             state.scannedContainers = []
             state.availableContainers = []
@@ -3403,9 +3403,9 @@ async function findOutletContainers() {
             // Load containers
             await loadAvailableContainers()
             
-            showToast(`Outlet found: ${outlet.name}`, 'success')
+            showToast(`Outlet found: ${parcel.outlet_name}`, 'success')
         } else {
-            showToast(`Outlet ${outletCodeShort} not found`, 'error')
+            showToast(`Outlet ${outletCodeShort} not found. Please check if this outlet has received deliveries.`, 'error')
         }
     } catch (error) {
         console.error('Error finding outlet:', error)
