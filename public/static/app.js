@@ -1216,34 +1216,35 @@ function renderDashboard() {
     }
     
     return `
-        <div class="container mx-auto px-4 py-6">
-            <h2 class="text-3xl font-bold mb-6 text-gray-800">
-                <i class="fas fa-tachometer-alt text-blue-600 mr-3"></i>Live Dashboard
-            </h2>
-            
-            <!-- Date Selection Tabs -->
-            <div class="bg-white rounded-lg shadow-lg mb-6 p-4">
-                <div class="flex items-center justify-between flex-wrap gap-3">
-                    <div class="flex gap-2">
-                        <button onclick="setDashboardDate('${yesterdayStr}')" 
-                            class="px-4 py-2 rounded-lg font-semibold transition ${selectedDate === yesterdayStr ? 'bg-blue-600 text-white' : 'bg-gray-200 hover:bg-gray-300 text-gray-700'}">
-                            <i class="fas fa-chevron-left mr-2"></i>Yesterday (${formatDateLabel(yesterdayStr)})
-                        </button>
-                        <button onclick="setDashboardDate('${todayStr}')" 
-                            class="px-4 py-2 rounded-lg font-semibold transition ${selectedDate === todayStr ? 'bg-blue-600 text-white' : 'bg-gray-200 hover:bg-gray-300 text-gray-700'}">
-                            <i class="fas fa-calendar-day mr-2"></i>Today (${formatDateLabel(todayStr)})
-                        </button>
-                        <button onclick="setDashboardDate('${tomorrowStr}')" 
-                            class="px-4 py-2 rounded-lg font-semibold transition ${selectedDate === tomorrowStr ? 'bg-blue-600 text-white' : 'bg-gray-200 hover:bg-gray-300 text-gray-700'}">
-                            Tomorrow (${formatDateLabel(tomorrowStr)})<i class="fas fa-chevron-right ml-2"></i>
+        <div class="h-full flex flex-col">
+            <div class="container mx-auto px-3 py-4 flex-1 overflow-y-auto">
+                <h2 class="text-xl md:text-3xl font-bold mb-4 text-gray-800">
+                    <i class="fas fa-tachometer-alt text-blue-600 mr-2"></i>Live Dashboard
+                </h2>
+                
+                <!-- Date Selection Tabs -->
+                <div class="bg-white rounded-lg shadow-lg mb-4 p-3">
+                    <div class="flex items-center justify-between flex-wrap gap-2">
+                        <div class="flex gap-1.5 flex-wrap">
+                            <button onclick="setDashboardDate('${yesterdayStr}')" 
+                                class="px-2 py-1 text-xs rounded-lg font-semibold transition ${selectedDate === yesterdayStr ? 'bg-blue-600 text-white' : 'bg-gray-200 hover:bg-gray-300 text-gray-700'}">
+                                <i class="fas fa-chevron-left mr-1"></i>Yesterday<br/><span class="text-[9px]">(${formatDateLabel(yesterdayStr)})</span>
+                            </button>
+                            <button onclick="setDashboardDate('${todayStr}')" 
+                                class="px-2 py-1 text-xs rounded-lg font-semibold transition ${selectedDate === todayStr ? 'bg-blue-600 text-white' : 'bg-gray-200 hover:bg-gray-300 text-gray-700'}">
+                                <i class="fas fa-calendar-day mr-1"></i>Today<br/><span class="text-[9px]">(${formatDateLabel(todayStr)})</span>
+                            </button>
+                            <button onclick="setDashboardDate('${tomorrowStr}')" 
+                                class="px-2 py-1 text-xs rounded-lg font-semibold transition ${selectedDate === tomorrowStr ? 'bg-blue-600 text-white' : 'bg-gray-200 hover:bg-gray-300 text-gray-700'}">
+                                Tomorrow<br/><span class="text-[9px]">(${formatDateLabel(tomorrowStr)})</span><i class="fas fa-chevron-right ml-1"></i>
+                            </button>
+                        </div>
+                        <button onclick="loadDashboardData()" 
+                            class="bg-green-500 hover:bg-green-600 text-white px-3 py-1.5 text-xs md:text-sm rounded-lg">
+                            <i class="fas fa-sync mr-1"></i>Refresh
                         </button>
                     </div>
-                    <button onclick="loadDashboardData()" 
-                        class="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg">
-                        <i class="fas fa-sync mr-2"></i>Refresh
-                    </button>
                 </div>
-            </div>
             
             <!-- Statistics Cards -->
             <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-6">
