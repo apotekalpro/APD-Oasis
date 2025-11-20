@@ -31,10 +31,8 @@ jobs:
       - name: Install dependencies
         run: npm install
       
-      - name: Copy public files to dist for Capacitor
-        run: |
-          mkdir -p dist
-          cp -r public/* dist/
+      - name: Build web app
+        run: npm run build
       
       - name: Sync Capacitor
         run: npx cap sync android
