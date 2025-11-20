@@ -2829,7 +2829,8 @@ function renderOutlet() {
                     </div>
                 </div>
                 
-                <div class="grid lg:grid-cols-3 gap-6">
+                <!-- Mobile: Stack vertically, Desktop: Side-by-side grid -->
+                <div class="flex flex-col lg:grid lg:grid-cols-3 gap-6">
                     <!-- Scanning Panel -->
                     <div class="lg:col-span-2">
                         <div class="bg-white rounded-lg shadow-lg p-6">
@@ -2874,11 +2875,11 @@ function renderOutlet() {
                         </div>
                     </div>
                     
-                    <!-- Available Pallets -->
+                    <!-- Available Pallets (Your Deliveries) - Now properly scrollable on mobile -->
                     <div class="lg:col-span-1">
                         <div class="bg-white rounded-lg shadow-lg p-6">
                             <h3 class="text-xl font-bold mb-4">Your Deliveries</h3>
-                            <div id="availablePallets" class="space-y-3">
+                            <div id="availablePallets" class="space-y-3 max-h-96 overflow-y-auto">
                                 <p class="text-gray-500 text-center py-4">Loading...</p>
                             </div>
                             
@@ -3296,7 +3297,24 @@ function showOutletCompletionModal() {
     
     // CRITICAL FIX: Attach event listener after modal is added to DOM (for Android WebView compatibility)
     const form = modal.querySelector('form')
-    form.addEventListener('submit', handleConfirmOutletCompletion)
+    if (form) {
+        form.addEventListener('submit', function(e) {
+            e.preventDefault()
+            e.stopPropagation()
+            handleConfirmOutletCompletion(e)
+        })
+        
+        // Also prevent default form submission via button clicks
+        const submitBtn = modal.querySelector('#confirmSignBtn')
+        if (submitBtn) {
+            submitBtn.addEventListener('click', function(e) {
+                e.preventDefault()
+                e.stopPropagation()
+                const event = new Event('submit', { cancelable: true, bubbles: true })
+                form.dispatchEvent(event)
+            })
+        }
+    }
 }
 
 // NEW: Handle completion confirmation with bulk update
@@ -3354,11 +3372,11 @@ function showFinalConfirmationDialog(receiverName, containerCount, palletIds) {
                 Once confirmed, this action cannot be undone. Are you sure you want to proceed?
             </p>
             <div class="flex space-x-3">
-                <button onclick="proceedWithOutletCompletion()" 
+                <button id="yesProceedBtn"
                     class="flex-1 bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg font-semibold">
                     <i class="fas fa-check-circle mr-2"></i>YES - Proceed
                 </button>
-                <button onclick="this.closest('.fixed').remove()" 
+                <button id="noCancelBtn"
                     class="flex-1 bg-gray-300 hover:bg-gray-400 text-gray-800 px-4 py-2 rounded-lg font-semibold">
                     <i class="fas fa-times mr-2"></i>NO - Cancel
                 </button>
@@ -3366,6 +3384,26 @@ function showFinalConfirmationDialog(receiverName, containerCount, palletIds) {
         </div>
     `
     document.body.appendChild(confirmModal)
+    
+    // CRITICAL: Attach event listeners after modal is added to DOM (Android WebView compatibility)
+    const yesBtn = confirmModal.querySelector('#yesProceedBtn')
+    const noBtn = confirmModal.querySelector('#noCancelBtn')
+    
+    if (yesBtn) {
+        yesBtn.addEventListener('click', function(e) {
+            e.preventDefault()
+            e.stopPropagation()
+            proceedWithOutletCompletion()
+        })
+    }
+    
+    if (noBtn) {
+        noBtn.addEventListener('click', function(e) {
+            e.preventDefault()
+            e.stopPropagation()
+            confirmModal.remove()
+        })
+    }
 }
 
 // NEW: Proceed with actual submission after confirmation
