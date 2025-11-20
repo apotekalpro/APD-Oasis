@@ -2736,8 +2736,8 @@ async function deleteTransfer(transferId, outletCode) {
 // ============ Outlet Page ============
 function renderOutlet() {
     return `
-        <div class="h-full flex flex-col">
-        <div class="container mx-auto px-4 py-6 flex-1 overflow-y-auto">
+        <div class="h-full flex flex-col overflow-hidden">
+        <div class="container mx-auto px-4 py-6 pb-20 flex-1 overflow-y-auto overflow-x-hidden">
             <h2 class="text-3xl font-bold mb-6 text-gray-800">
                 <i class="fas fa-store text-blue-600 mr-3"></i>Outlet Unloading
             </h2>
@@ -2875,11 +2875,11 @@ function renderOutlet() {
                         </div>
                     </div>
                     
-                    <!-- Available Pallets (Your Deliveries) - Now properly scrollable on mobile -->
+                    <!-- Available Pallets (Your Deliveries) - Fully scrollable on mobile -->
                     <div class="lg:col-span-1">
                         <div class="bg-white rounded-lg shadow-lg p-6">
                             <h3 class="text-xl font-bold mb-4">Your Deliveries</h3>
-                            <div id="availablePallets" class="space-y-3 max-h-96 overflow-y-auto">
+                            <div id="availablePallets" class="space-y-3">
                                 <p class="text-gray-500 text-center py-4">Loading...</p>
                             </div>
                             
@@ -3337,6 +3337,13 @@ async function handleConfirmOutletCompletion(event) {
     if (state.scannedItems.length === 0) {
         showToast('No pallets to confirm', 'error')
         return
+    }
+    
+    // CRITICAL FIX: Close the completion modal BEFORE showing confirmation dialog
+    // This prevents the confirmation dialog from appearing behind the completion modal
+    const completionModal = document.querySelector('.fixed.inset-0.z-50')
+    if (completionModal) {
+        completionModal.style.display = 'none' // Hide but don't remove (we'll remove both later)
     }
     
     // Show double confirmation dialog
