@@ -2736,8 +2736,8 @@ async function deleteTransfer(transferId, outletCode) {
 // ============ Outlet Page ============
 function renderOutlet() {
     return `
-        <div class="h-full flex flex-col overflow-hidden">
-        <div class="container mx-auto px-4 py-6 pb-20 flex-1 overflow-y-auto overflow-x-hidden">
+        <div class="min-h-full flex flex-col">
+        <div class="container mx-auto px-4 py-6 pb-24 flex-1">
             <h2 class="text-3xl font-bold mb-6 text-gray-800">
                 <i class="fas fa-store text-blue-600 mr-3"></i>Outlet Unloading
             </h2>
@@ -2891,6 +2891,8 @@ function renderOutlet() {
                     </div>
                 </div>
             `}
+            <!-- Extra spacing at bottom to ensure full content visibility -->
+            <div class="h-16"></div>
         </div>
         </div>
     `
@@ -3408,6 +3410,13 @@ function showFinalConfirmationDialog(receiverName, containerCount, palletIds) {
         noBtn.addEventListener('click', function(e) {
             e.preventDefault()
             e.stopPropagation()
+            
+            // CRITICAL FIX: Show the completion modal again when user clicks NO
+            const completionModal = document.querySelector('.fixed.inset-0.z-50')
+            if (completionModal) {
+                completionModal.style.display = 'flex' // Show it again
+            }
+            
             confirmModal.remove()
         })
     }
