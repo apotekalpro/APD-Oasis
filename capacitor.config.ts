@@ -5,10 +5,9 @@ const config: CapacitorConfig = {
   appName: 'APD Oasis',
   webDir: 'dist',
   server: {
-    // Load assets from APK, not from external server
-    // API calls will go to production backend
-    cleartext: true,
-    allowNavigation: ['*']
+    // Load assets from APK
+    hostname: 'app',
+    androidScheme: 'http'
   },
   android: {
     buildOptions: {
