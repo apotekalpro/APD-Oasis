@@ -2736,8 +2736,8 @@ async function deleteTransfer(transferId, outletCode) {
 // ============ Outlet Page ============
 function renderOutlet() {
     return `
-        <div class="min-h-full flex flex-col">
-        <div class="container mx-auto px-4 py-6 pb-24 flex-1">
+        <div class="h-full flex flex-col">
+        <div class="container mx-auto px-4 py-6 pb-24 flex-1 overflow-y-auto" style="max-height: 100vh;">
             <h2 class="text-3xl font-bold mb-6 text-gray-800">
                 <i class="fas fa-store text-blue-600 mr-3"></i>Outlet Unloading
             </h2>
