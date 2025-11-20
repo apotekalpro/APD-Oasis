@@ -4168,7 +4168,7 @@ function showContainerInventoryView() {
                 <span>Container Inventory</span>
             </h3>
             
-            <div id="containerInventoryList" class="space-y-3 md:space-y-4">
+            <div id="containerInventoryList" class="space-y-3 md:space-y-4 overflow-y-auto" style="max-height: 60vh;">
                 <p class="text-gray-500 text-center py-6 md:py-8 text-sm md:text-base">Loading inventory...</p>
             </div>
             
