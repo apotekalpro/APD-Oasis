@@ -16,7 +16,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '18'
+          node-version: '20'
           cache: 'npm'
       
       - name: Setup Java 17
@@ -38,6 +38,11 @@ jobs:
       
       - name: Sync Capacitor
         run: npx cap sync android
+      
+      - name: Ensure Android assets are up-to-date (backup sync)
+        run: |
+          rm -rf android/app/src/main/assets/public
+          cp -r dist/* android/app/src/main/assets/
       
       - name: Grant execute permission for gradlew
         run: chmod +x android/gradlew

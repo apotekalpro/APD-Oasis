@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Check Deployment Status</title>
+    <style>
+        body { font-family: monospace; padding: 20px; }
+        .status { padding: 10px; margin: 10px 0; border-radius: 5px; }
+        .success { background: #d4edda; }
+        .error { background: #f8d7da; }
+        .warning { background: #fff3cd; }
+    </style>
+</head>
+<body>
+    <h1>APD-OASIS Deployment Status</h1>
+    <button onclick="checkAll()">Check All Endpoints</button>
+    <div id="results"></div>
+
+    <script>
+        async function checkAll() {
+            const results = document.getElementById('results');
+            results.innerHTML = '<p>Checking...</p>';
+            
+            const checks = [];
+            const token = localStorage.getItem('token');
+            
+            // Check 1: Version endpoint (no auth required)
+            checks.push(
+                fetch('/api/version?' + Date.now())
+                    .then(r => r.json())
+                    .then(d => ({
+                        name: 'Version Endpoint',
+                        status: 'success',
+                        data: d
+                    }))
+                    .catch(e => ({
+                        name: 'Version Endpoint',
+                        status: 'error',
+                        error: e.message
+                    }))
+            );
+            
+            // Check 2: V2 Outlets endpoint
+            checks.push(
+                fetch('/api/v2/outlets?' + Date.now(), {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                })
+                    .then(r => r.json())
+                    .then(d => ({
+                        name: 'V2 Outlets Endpoint',
+                        status: 'success',
+                        data: d
+                    }))
+                    .catch(e => ({
+                        name: 'V2 Outlets Endpoint',
+                        status: 'error',
+                        error: e.message
+                    }))
+            );
+            
+            // Check 3: Old outlets endpoint (for comparison)
+            checks.push(
+                fetch('/api/outlets?' + Date.now(), {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                })
+                    .then(r => r.json())
+                    .then(d => ({
+                        name: 'Original Outlets Endpoint',
+                        status: 'success',
+                        data: d
+                    }))
+                    .catch(e => ({
+                        name: 'Original Outlets Endpoint',
+                        status: 'error',
+                        error: e.message
+                    }))
+            );
+            
+            const allResults = await Promise.all(checks);
+            
+            results.innerHTML = allResults.map(r => {
+                const className = r.status === 'success' ? 'success' : 'error';
+                return `
+                    <div class="status ${className}">
+                        <h3>${r.name}: ${r.status.toUpperCase()}</h3>
+                        <pre>${JSON.stringify(r.data || r.error, null, 2)}</pre>
+                    </div>
+                `;
+            }).join('');
+            
+            // Analysis
+            const v2Works = allResults[1].status === 'success';
+            const v1Works = allResults[2].status === 'success';
+            
+            let analysis = '<h2>Analysis:</h2>';
+            if (v2Works) {
+                analysis += '<div class="status success">✅ V2 endpoint is deployed! Use this for container collection.</div>';
+            } else {
+                analysis += '<div class="status error">❌ V2 endpoint not yet deployed. Wait 1-2 more minutes.</div>';
+            }
+            
+            if (v1Works) {
+                analysis += '<div class="status warning">⚠️ V1 endpoint still has old code. This is expected during transition.</div>';
+            }
+            
+            results.innerHTML += analysis;
+        }
+        
+        // Auto-check on load if token exists
+        if (localStorage.getItem('token')) {
+            checkAll();
+        } else {
+            document.getElementById('results').innerHTML = '<div class="status error">Please login first to get a token</div>';
+        }
+    </script>
+</body>
+</html>

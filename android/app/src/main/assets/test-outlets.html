@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Outlets API</title>
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+</head>
+<body>
+    <h1>Outlets API Test</h1>
+    <p><strong>Build Version:</strong> 1763526550</p>
+    <button onclick="testAPI()">Test /api/outlets</button>
+    <button onclick="location.reload()">Hard Refresh</button>
+    <pre id="output"></pre>
+
+    <script>
+        async function testAPI() {
+            const output = document.getElementById('output');
+            const token = localStorage.getItem('token');
+            
+            if (!token) {
+                output.textContent = 'ERROR: No token found. Please login first at the main app.';
+                return;
+            }
+
+            try {
+                output.textContent = 'Fetching /api/outlets...\n\n';
+                
+                const response = await axios.get('/api/outlets', {
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+                
+                output.textContent += 'SUCCESS!\n\n';
+                output.textContent += 'Response data:\n';
+                output.textContent += JSON.stringify(response.data, null, 2);
+                output.textContent += '\n\n---\n\n';
+                output.textContent += `Type of response.data: ${typeof response.data}\n`;
+                output.textContent += `Type of response.data.outlets: ${typeof response.data.outlets}\n`;
+                output.textContent += `Is response.data.outlets an array? ${Array.isArray(response.data.outlets)}\n`;
+                
+                if (Array.isArray(response.data.outlets)) {
+                    output.textContent += `\nOutlets count: ${response.data.outlets.length}\n\n`;
+                    output.textContent += 'First 3 outlets:\n';
+                    output.textContent += JSON.stringify(response.data.outlets.slice(0, 3), null, 2);
+                    
+                    // Test finding JKJTPL1
+                    output.textContent += '\n\n---\n\nSearching for JKJTPL1:\n';
+                    const found = response.data.outlets.find(o => o.code_short === 'JKJTPL1');
+                    if (found) {
+                        output.textContent += 'FOUND!\n';
+                        output.textContent += JSON.stringify(found, null, 2);
+                    } else {
+                        output.textContent += 'NOT FOUND\n';
+                        output.textContent += 'All code_short values:\n';
+                        output.textContent += response.data.outlets.map(o => o.code_short).join(', ');
+                    }
+                }
+                
+            } catch (error) {
+                output.textContent += 'ERROR:\n';
+                output.textContent += JSON.stringify(error.response?.data || error.message, null, 2);
+            }
+        }
+    </script>
+</body>
+</html>
