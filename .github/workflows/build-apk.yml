@@ -31,8 +31,12 @@ jobs:
       - name: Install dependencies
         run: npm install
       
-      - name: Build web app
+      - name: Build web app (worker)
         run: npm run build
+      
+      - name: Copy public files to dist
+        run: |
+          cp -r public/* dist/
       
       - name: Sync Capacitor
         run: npx cap sync android
