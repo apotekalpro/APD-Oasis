@@ -1221,7 +1221,7 @@ function renderDashboard() {
     
     return `
         <div class="h-full flex flex-col">
-            <div class="container mx-auto px-3 py-4 flex-1 overflow-y-auto">
+            <div class="container mx-auto px-3 py-4 flex-1 overflow-y-auto" style="max-height: 100vh;">
                 <h2 class="text-xl md:text-3xl font-bold mb-4 text-gray-800">
                     <i class="fas fa-tachometer-alt text-blue-600 mr-2"></i>Live Dashboard
                 </h2>
@@ -1833,7 +1833,7 @@ function renderWarehouse() {
     
     return `
         <div class="h-full flex flex-col">
-        <div class="container mx-auto px-4 py-6 flex-1 overflow-y-auto">
+        <div class="container mx-auto px-4 py-6 flex-1 overflow-y-auto" style="max-height: 100vh;">
             <h2 class="text-3xl font-bold mb-6 text-gray-800">
                 <i class="fas fa-warehouse text-blue-600 mr-3"></i>Warehouse Loading
             </h2>
@@ -3521,7 +3521,7 @@ async function handleCompleteUnloading(event) {
 function renderContainers() {
     return `
         <div class="h-full flex flex-col">
-        <div class="container mx-auto px-4 py-6 flex-1 overflow-y-auto">
+        <div class="container mx-auto px-4 py-6 flex-1 overflow-y-auto" style="max-height: 100vh;">
             <h2 class="text-2xl md:text-3xl font-bold mb-6 text-gray-800">
                 <i class="fas fa-recycle text-green-600 mr-2"></i>Container Collection & Management
             </h2>
