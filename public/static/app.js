@@ -4162,18 +4162,18 @@ function showContainerInventoryView() {
     const content = document.getElementById('containerContent')
     
     content.innerHTML = `
-        <div class="bg-white rounded-lg shadow-lg p-4 md:p-6">
+        <div class="bg-white rounded-lg shadow-lg p-4 md:p-6 pb-20">
             <h3 class="text-xl md:text-2xl font-bold mb-4 md:mb-6 flex items-center">
                 <i class="fas fa-warehouse text-blue-600 mr-2"></i>
                 <span>Container Inventory</span>
             </h3>
             
-            <div id="containerInventoryList" class="space-y-3 md:space-y-4 overflow-y-auto" style="max-height: 60vh;">
+            <div id="containerInventoryList" class="space-y-3 md:space-y-4">
                 <p class="text-gray-500 text-center py-6 md:py-8 text-sm md:text-base">Loading inventory...</p>
             </div>
             
             <button onclick="loadContainerInventory()" 
-                class="w-full mt-4 bg-blue-500 hover:bg-blue-600 active:bg-blue-700 text-white px-4 py-2.5 md:py-2 rounded-lg shadow-md text-sm md:text-base">
+                class="w-full mt-4 mb-8 bg-blue-500 hover:bg-blue-600 active:bg-blue-700 text-white px-4 py-2.5 md:py-2 rounded-lg shadow-md text-sm md:text-base">
                 <i class="fas fa-sync mr-2"></i>Refresh Inventory
             </button>
         </div>
