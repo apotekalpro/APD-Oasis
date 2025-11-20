@@ -71,6 +71,7 @@ function isSupervisor() {
 const isMobile = window.location.origin.startsWith('capacitor://') || 
                  window.location.origin.startsWith('file://') ||
                  window.location.origin.includes('localhost') ||
+                 window.location.hostname === 'app' ||
                  window.location.protocol === 'capacitor:' ||
                  window.location.protocol === 'file:'
 
