@@ -34,9 +34,12 @@ jobs:
       - name: Build web app (worker)
         run: npm run build
       
-      - name: Copy public files to dist
+      - name: Prepare dist directory for Capacitor
         run: |
-          cp -r public/* dist/
+          cp index.html dist/
+          mkdir -p dist/static
+          cp -r public/static/* dist/static/
+          cp -r public/downloads dist/ 2>/dev/null || true
       
       - name: Sync Capacitor
         run: npx cap sync android
