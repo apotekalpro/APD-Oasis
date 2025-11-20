@@ -3280,7 +3280,7 @@ function showOutletCompletionModal() {
                 </div>
                 
                 <div class="flex space-x-3">
-                    <button type="submit" class="flex-1 bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg font-semibold">
+                    <button type="submit" id="confirmSignBtn" class="flex-1 bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg font-semibold">
                         <i class="fas fa-signature mr-2"></i>Confirm & Sign
                     </button>
                     <button type="button" onclick="cancelOutletCompletion()" 
@@ -3292,6 +3292,10 @@ function showOutletCompletionModal() {
         </div>
     `
     document.body.appendChild(modal)
+    
+    // CRITICAL FIX: Attach event listener after modal is added to DOM (for Android WebView compatibility)
+    const form = modal.querySelector('form')
+    form.addEventListener('submit', handleConfirmOutletCompletion)
 }
 
 // NEW: Handle completion confirmation with bulk update
