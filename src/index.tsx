@@ -384,19 +384,118 @@ app.post('/api/import', authMiddleware, async (c) => {
     
     console.log('Import record created:', importId)
     
-    // CRITICAL: Return immediately with import_id
-    // Process data in background (no subrequest limit in subsequent calls)
+    // NOW SAFE: Process data in chunks (frontend sends 15 rows at a time)
+    // With 15 rows = ~3-5 pallets, total subrequests = 1 (import) + 2 (batch inserts) = 3-4 total
+    // This is WELL BELOW the 50 subrequest limit!
+    
+    // Group by Pallet ID
+    const parcelMap = new Map()
+    
+    data.forEach((row: any, index: number) => {
+      // Skip rows with missing required data
+      if (!row.pallet_id || !row.transfer_number || !row.outlet_code || !row.outlet_name) {
+        console.log(`Row ${index}: SKIPPED - Missing data`)
+        return
+      }
+      
+      // Skip header rows
+      const outletCode = String(row.outlet_code).trim().toUpperCase()
+      const outletName = String(row.outlet_name).trim().toUpperCase()
+      if (outletCode === 'STORE CODE' && outletName === 'STORE NAME') {
+        return
+      }
+      
+      const palletId = String(row.pallet_id).trim()
+      const transferNumber = String(row.transfer_number).trim()
+      
+      if (!parcelMap.has(palletId)) {
+        parcelMap.set(palletId, {
+          outlet_code: String(row.outlet_code).trim(),
+          outlet_code_short: String(row.outlet_code_short || row.outlet_code).trim(),
+          outlet_name: String(row.outlet_name).trim(),
+          pallet_id: palletId,
+          transfer_numbers: [],
+          transfer_numbers_set: new Set()
+        })
+      }
+      
+      const parcel = parcelMap.get(palletId)!
+      if (!parcel.transfer_numbers_set.has(transferNumber)) {
+        parcel.transfer_numbers_set.add(transferNumber)
+        parcel.transfer_numbers.push(transferNumber)
+      }
+    })
+    
+    const parcels = Array.from(parcelMap.values())
+    console.log(`Grouped into ${parcels.length} parcels`)
+    
+    // Batch insert parcels (1 API call)
+    const parcelRecords = parcels.map(parcel => ({
+      import_id: importId,
+      delivery_date: delivery_date || new Date().toISOString().split('T')[0],
+      outlet_code: parcel.outlet_code,
+      outlet_code_short: parcel.outlet_code_short,
+      outlet_name: parcel.outlet_name,
+      pallet_id: parcel.pallet_id,
+      transfer_numbers: parcel.transfer_numbers,
+      total_count: parcel.transfer_numbers.length,
+      status: 'pending'
+    }))
+    
+    const batchParcelResponse = await supabaseRequest(c, 'parcels', {
+      method: 'POST',
+      body: JSON.stringify(parcelRecords)
+    })
+    
+    const insertedParcels = await batchParcelResponse.json()
+    console.log(`✓ ${insertedParcels.length} parcels inserted`)
+    
+    if (!Array.isArray(insertedParcels) || insertedParcels.length === 0) {
+      throw new Error('Failed to insert parcels')
+    }
+    
+    // Batch insert transfer details (1 API call)
+    const allTransferDetails: any[] = []
+    
+    insertedParcels.forEach((insertedParcel, index) => {
+      const parcel = parcels[index]
+      const transferDetails = parcel.transfer_numbers.map((tn: string) => ({
+        parcel_id: insertedParcel.id,
+        transfer_number: tn,
+        delivery_date: delivery_date || new Date().toISOString().split('T')[0],
+        outlet_code: parcel.outlet_code,
+        outlet_code_short: parcel.outlet_code_short,
+        outlet_name: parcel.outlet_name,
+        pallet_id: parcel.pallet_id,
+        status: 'pending'
+      }))
+      allTransferDetails.push(...transferDetails)
+    })
+    
+    const batchTransferResponse = await supabaseRequest(c, 'transfer_details', {
+      method: 'POST',
+      body: JSON.stringify(allTransferDetails)
+    })
+    
+    const insertedTransfers = await batchTransferResponse.json()
+    console.log(`✓ ${insertedTransfers.length} transfer details inserted`)
+    
+    // Update import record with total
+    await supabaseRequest(c, `imports?id=eq.${importId}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ 
+        total_parcels: insertedParcels.length,
+        status: 'active'
+      })
+    })
+    
     return c.json({
       success: true,
       import_id: importId,
-      message: `Import started. Processing ${data.length} rows...`,
-      status: 'processing',
-      rows_received: data.length,
-      note: 'Data will be processed asynchronously. Check import status shortly.'
+      total_parcels: insertedParcels.length,
+      total_transfers: insertedTransfers.length,
+      message: `Successfully imported ${insertedParcels.length} parcels`
     })
-    
-    // Note: The actual data processing would happen in a separate endpoint
-    // or background job (Cloudflare Queue, Durable Object, or client-side chunking)
     
   } catch (error) {
     console.error('Import error:', error)

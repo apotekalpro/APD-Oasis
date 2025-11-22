@@ -1113,23 +1113,68 @@ async function confirmImport() {
             return
         }
         
-        // SOLUTION: Use DIRECT Supabase API (bypass Cloudflare Workers entirely)
-        // This eliminates the 50-subrequest limit issue
+        // SOLUTION: Chunked upload to avoid "Too Many Subrequests" error
+        // Process data in small chunks (15 rows per chunk = ~4-5 pallets per chunk)
+        // Each chunk is a separate API request with its own subrequest budget
         
-        console.log('🚀 Starting direct Supabase import...')
-        console.log(`Processing ${importData.length} rows in one batch`)
+        console.log('🚀 Starting chunked import...')
+        console.log(`Total rows: ${importData.length}`)
         
-        const response = await axios.post('/api/import', {
-            data: importData,
-            import_date: new Date().toISOString().split('T')[0],
-            delivery_date: deliveryDate
-        })
+        const CHUNK_SIZE = 15  // 15 rows per chunk (small enough to stay under limit)
+        const chunks = []
         
-        console.log('✅ Import response:', response.data)
+        // Split data into chunks
+        for (let i = 0; i < importData.length; i += CHUNK_SIZE) {
+            chunks.push(importData.slice(i, i + CHUNK_SIZE))
+        }
+        
+        console.log(`Split into ${chunks.length} chunks of ~${CHUNK_SIZE} rows each`)
+        
+        // Update button to show progress
+        let processedChunks = 0
+        let totalParcelsCreated = 0
+        
+        // Process chunks sequentially (one at a time to avoid overwhelming the server)
+        for (let i = 0; i < chunks.length; i++) {
+            const chunk = chunks[i]
+            
+            // Update progress
+            if (confirmBtn) {
+                confirmBtn.innerHTML = `<i class="fas fa-spinner fa-spin mr-2"></i>Processing chunk ${i + 1}/${chunks.length}...`
+            }
+            
+            console.log(`📦 Processing chunk ${i + 1}/${chunks.length} (${chunk.length} rows)...`)
+            
+            try {
+                const response = await axios.post('/api/import', {
+                    data: chunk,
+                    import_date: new Date().toISOString().split('T')[0],
+                    delivery_date: deliveryDate
+                })
+                
+                console.log(`✅ Chunk ${i + 1} response:`, response.data)
+                
+                // Track progress
+                processedChunks++
+                totalParcelsCreated += (response.data.total_parcels || response.data.rows_received || chunk.length)
+                
+                // Small delay between chunks to avoid rate limiting
+                if (i < chunks.length - 1) {
+                    await new Promise(resolve => setTimeout(resolve, 500))  // 500ms delay
+                }
+                
+            } catch (chunkError) {
+                console.error(`❌ Chunk ${i + 1} failed:`, chunkError)
+                showToast(`Chunk ${i + 1}/${chunks.length} failed. Stopping import.`, 'error')
+                throw chunkError  // Stop processing and show error
+            }
+        }
+        
+        console.log(`✅ All ${chunks.length} chunks processed successfully!`)
+        console.log(`✅ Total parcels created: ${totalParcelsCreated}`)
         
         // Show success message with option to view warehouse
-        const totalParcels = response.data.total_parcels || response.data.rows_received || importData.length
-        const successMsg = `Successfully imported ${totalParcels} rows for ${deliveryDate}!`
+        const successMsg = `Successfully imported ${totalParcelsCreated} parcels for ${deliveryDate}! (Processed ${chunks.length} chunks)`
         showToast(successMsg, 'success')
         
         // Update UI to show success state
