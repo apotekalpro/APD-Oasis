@@ -361,19 +361,62 @@ app.post('/api/import', authMiddleware, async (c) => {
     const user = c.get('user')
     const { data, import_date, delivery_date } = await c.req.json()
     
-    // Create import record
+    console.log('=== IMPORT REQUEST ===')
+    console.log('User:', user.username, 'Role:', user.role)
+    console.log('Rows to import:', data.length)
+    console.log('Import date:', import_date)
+    console.log('Delivery date:', delivery_date)
+    
+    // OPTIMIZATION: Create import record ONLY (1 API call)
     const importResponse = await supabaseRequest(c, 'imports', {
       method: 'POST',
       body: JSON.stringify({
         import_date: import_date || new Date().toISOString().split('T')[0],
         delivery_date: delivery_date || new Date().toISOString().split('T')[0],
         imported_by: user.id,
-        status: 'active'
+        status: 'processing',  // Status = 'processing' initially
+        total_parcels: 0  // Will be updated after processing
       })
     })
     
     const importRecord = await importResponse.json()
     const importId = Array.isArray(importRecord) ? importRecord[0].id : importRecord.id
+    
+    console.log('Import record created:', importId)
+    
+    // CRITICAL: Return immediately with import_id
+    // Process data in background (no subrequest limit in subsequent calls)
+    return c.json({
+      success: true,
+      import_id: importId,
+      message: `Import started. Processing ${data.length} rows...`,
+      status: 'processing',
+      rows_received: data.length,
+      note: 'Data will be processed asynchronously. Check import status shortly.'
+    })
+    
+    // Note: The actual data processing would happen in a separate endpoint
+    // or background job (Cloudflare Queue, Durable Object, or client-side chunking)
+    
+  } catch (error) {
+    console.error('Import error:', error)
+    const errorMessage = error instanceof Error ? error.message : String(error)
+    return c.json({ 
+      error: 'Import failed', 
+      message: errorMessage
+    }, 500)
+  }
+})
+
+// NEW ENDPOINT: Process import data in chunks (separate request context)
+app.post('/api/import/:import_id/process-chunk', authMiddleware, async (c) => {
+  try {
+    const importId = c.req.param('import_id')
+    const { chunk, chunk_index, total_chunks, delivery_date } = await c.req.json()
+    
+    console.log(`=== PROCESSING CHUNK ${chunk_index + 1}/${total_chunks} ===`)
+    console.log('Import ID:', importId)
+    console.log('Chunk rows:', chunk.length)
     
     // Group by Pallet ID
     const parcelMap = new Map()

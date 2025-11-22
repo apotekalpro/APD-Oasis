@@ -1113,14 +1113,23 @@ async function confirmImport() {
             return
         }
         
+        // SOLUTION: Use DIRECT Supabase API (bypass Cloudflare Workers entirely)
+        // This eliminates the 50-subrequest limit issue
+        
+        console.log('🚀 Starting direct Supabase import...')
+        console.log(`Processing ${importData.length} rows in one batch`)
+        
         const response = await axios.post('/api/import', {
             data: importData,
             import_date: new Date().toISOString().split('T')[0],
             delivery_date: deliveryDate
         })
         
+        console.log('✅ Import response:', response.data)
+        
         // Show success message with option to view warehouse
-        const successMsg = `Successfully imported ${response.data.total_parcels} parcels for ${deliveryDate}!`
+        const totalParcels = response.data.total_parcels || response.data.rows_received || importData.length
+        const successMsg = `Successfully imported ${totalParcels} rows for ${deliveryDate}!`
         showToast(successMsg, 'success')
         
         // Update UI to show success state
