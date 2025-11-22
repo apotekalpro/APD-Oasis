@@ -1278,16 +1278,26 @@ function renderDashboard() {
         state.dashboardDate = new Date().toISOString().split('T')[0] // Today
     }
     
-    // Calculate yesterday, today, tomorrow
+    // Calculate 5 days: 2 days before, today, 2 days after
     const today = new Date()
+    
+    const twoDaysBeforeYesterday = new Date(today)
+    twoDaysBeforeYesterday.setDate(twoDaysBeforeYesterday.getDate() - 2)
+    
     const yesterday = new Date(today)
     yesterday.setDate(yesterday.getDate() - 1)
+    
     const tomorrow = new Date(today)
     tomorrow.setDate(tomorrow.getDate() + 1)
     
+    const twoDaysAfterTomorrow = new Date(today)
+    twoDaysAfterTomorrow.setDate(twoDaysAfterTomorrow.getDate() + 2)
+    
+    const twoDaysBeforeYesterdayStr = twoDaysBeforeYesterday.toISOString().split('T')[0]
     const yesterdayStr = yesterday.toISOString().split('T')[0]
     const todayStr = today.toISOString().split('T')[0]
     const tomorrowStr = tomorrow.toISOString().split('T')[0]
+    const twoDaysAfterTomorrowStr = twoDaysAfterTomorrow.toISOString().split('T')[0]
     
     const selectedDate = state.dashboardDate
     
@@ -1304,10 +1314,14 @@ function renderDashboard() {
                     <i class="fas fa-tachometer-alt text-blue-600 mr-2"></i>Live Dashboard
                 </h2>
                 
-                <!-- Date Selection Tabs -->
+                <!-- Date Selection Tabs (5 Days) -->
                 <div class="bg-white rounded-lg shadow-lg mb-4 p-3">
                     <div class="flex items-center justify-between flex-wrap gap-2">
                         <div class="flex gap-1.5 flex-wrap">
+                            <button onclick="setDashboardDate('${twoDaysBeforeYesterdayStr}')" 
+                                class="px-2 py-1 text-[10px] rounded-lg font-semibold transition ${selectedDate === twoDaysBeforeYesterdayStr ? 'bg-blue-600 text-white' : 'bg-gray-200 hover:bg-gray-300 text-gray-700'}">
+                                <i class="fas fa-angle-double-left mr-1"></i>-2 Days<br/><span class="text-[8px]">(${formatDateLabel(twoDaysBeforeYesterdayStr)})</span>
+                            </button>
                             <button onclick="setDashboardDate('${yesterdayStr}')" 
                                 class="px-2 py-1 text-xs rounded-lg font-semibold transition ${selectedDate === yesterdayStr ? 'bg-blue-600 text-white' : 'bg-gray-200 hover:bg-gray-300 text-gray-700'}">
                                 <i class="fas fa-chevron-left mr-1"></i>Yesterday<br/><span class="text-[9px]">(${formatDateLabel(yesterdayStr)})</span>
@@ -1319,6 +1333,10 @@ function renderDashboard() {
                             <button onclick="setDashboardDate('${tomorrowStr}')" 
                                 class="px-2 py-1 text-xs rounded-lg font-semibold transition ${selectedDate === tomorrowStr ? 'bg-blue-600 text-white' : 'bg-gray-200 hover:bg-gray-300 text-gray-700'}">
                                 Tomorrow<br/><span class="text-[9px]">(${formatDateLabel(tomorrowStr)})</span><i class="fas fa-chevron-right ml-1"></i>
+                            </button>
+                            <button onclick="setDashboardDate('${twoDaysAfterTomorrowStr}')" 
+                                class="px-2 py-1 text-[10px] rounded-lg font-semibold transition ${selectedDate === twoDaysAfterTomorrowStr ? 'bg-blue-600 text-white' : 'bg-gray-200 hover:bg-gray-300 text-gray-700'}">
+                                +2 Days<br/><span class="text-[8px]">(${formatDateLabel(twoDaysAfterTomorrowStr)})</span><i class="fas fa-angle-double-right ml-1"></i>
                             </button>
                         </div>
                         <button onclick="loadDashboardData()" 
