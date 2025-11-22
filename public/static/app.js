@@ -45,7 +45,8 @@ const state = {
     transfers: [],
     scannedItems: [],
     selectedOutlet: null,
-    errors: []
+    errors: [],
+    cachedContainerInventory: null // OPTIMIZATION: Cache for container inventory API
 }
 
 // Permission helper functions
@@ -1478,11 +1479,21 @@ async function loadDashboardData() {
         // Get selected date (default to today)
         const selectedDate = state.dashboardDate || new Date().toISOString().split('T')[0]
         
-        // Fetch parcels for selected date and container inventory
-        const [parcelsResponse, containersResponse] = await Promise.all([
-            axios.get(`/api/dashboard/parcels?delivery_date=${selectedDate}`),
-            axios.get('/api/containers/inventory')
-        ])
+        // OPTIMIZATION: Cache container inventory to reduce subrequests
+        let containersResponse
+        if (state.cachedContainerInventory && Date.now() - state.cachedContainerInventory.timestamp < 30000) {
+            // Use cached data if less than 30 seconds old
+            containersResponse = state.cachedContainerInventory
+        } else {
+            containersResponse = await axios.get('/api/containers/inventory')
+            state.cachedContainerInventory = {
+                ...containersResponse,
+                timestamp: Date.now()
+            }
+        }
+        
+        // Fetch parcels for selected date
+        const parcelsResponse = await axios.get(`/api/dashboard/parcels?delivery_date=${selectedDate}`)
         
         const parcels = parcelsResponse.data.parcels || []
         const allContainers = containersResponse.data.containers || []
@@ -4185,7 +4196,17 @@ function showContainerInventoryView() {
 // Load container inventory
 async function loadContainerInventory() {
     try {
-        const response = await axios.get('/api/containers/inventory')
+        // OPTIMIZATION: Use cached data if available
+        let response
+        if (state.cachedContainerInventory && Date.now() - state.cachedContainerInventory.timestamp < 30000) {
+            response = state.cachedContainerInventory
+        } else {
+            response = await axios.get('/api/containers/inventory')
+            state.cachedContainerInventory = {
+                ...response,
+                timestamp: Date.now()
+            }
+        }
         const containers = response.data.containers || []
         
         const listDiv = document.getElementById('containerInventoryList')
@@ -4357,7 +4378,17 @@ async function loadDeliveryReport() {
 
 async function loadContainerReport() {
     try {
-        const response = await axios.get('/api/containers/inventory')
+        // OPTIMIZATION: Use cached data if available
+        let response
+        if (state.cachedContainerInventory && Date.now() - state.cachedContainerInventory.timestamp < 30000) {
+            response = state.cachedContainerInventory
+        } else {
+            response = await axios.get('/api/containers/inventory')
+            state.cachedContainerInventory = {
+                ...response,
+                timestamp: Date.now()
+            }
+        }
         const containers = response.data.containers || []
         
         const content = document.getElementById('reportContent')
