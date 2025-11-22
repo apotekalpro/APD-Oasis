@@ -2024,6 +2024,24 @@ async function loadWarehouseData() {
         
         console.log('Loaded parcels:', state.parcels.length)
         
+        // IMPORTANT: Load previously scanned pallets (status='loaded' but not confirmed yet)
+        // This allows users to see scanned list even after logout/refresh/user change
+        const scannedParcels = state.parcels.filter(p => p.status === 'loaded')
+        if (scannedParcels.length > 0 && state.scannedItems.length === 0) {
+            console.log(`📦 Restoring ${scannedParcels.length} previously scanned pallets`)
+            state.scannedItems = scannedParcels.map(p => ({
+                pallet_id: p.pallet_id,
+                outlet_code: p.outlet_code,
+                outlet_code_short: p.outlet_code_short,
+                outlet_name: p.outlet_name,
+                transfer_count: p.total_count,
+                delivery_date: p.delivery_date,
+                time: p.loaded_at ? new Date(p.loaded_at).toLocaleTimeString() : 'Previously scanned'
+            }))
+            updateScannedItemsList()
+            console.log('✅ Scanned items restored from database')
+        }
+        
         // Group by outlet - using parcels instead of transfers for accurate pallet counting
         const outletMap = new Map()
         state.parcels.forEach(parcel => {
@@ -3018,6 +3036,23 @@ async function loadOutletPallets() {
             // Update container count if it changed
             if (response.data.container_count_loaded) {
                 state.selectedOutlet.container_count_loaded = response.data.container_count_loaded
+            }
+            
+            // IMPORTANT: Restore previously scanned pallets (status='scanned_unloading')
+            // This allows outlet users to see scanned list after logout/refresh
+            const scannedPallets = state.availablePallets.filter(p => p.status === 'scanned_unloading')
+            if (scannedPallets.length > 0 && state.scannedItems.length === 0) {
+                console.log(`📦 Restoring ${scannedPallets.length} previously scanned pallets for outlet`)
+                state.scannedItems = scannedPallets.map(p => ({
+                    pallet_id: p.pallet_id,
+                    outlet_code: state.selectedOutlet.code,
+                    outlet_code_short: state.selectedOutlet.code_short,
+                    outlet_name: state.selectedOutlet.name,
+                    transfer_count: p.transfer_count,
+                    time: 'Previously scanned'
+                }))
+                updateOutletScannedList()
+                console.log('✅ Outlet scanned items restored from database')
             }
             
             const palletsDiv = document.getElementById('availablePallets')
