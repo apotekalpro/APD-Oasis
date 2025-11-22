@@ -1114,9 +1114,27 @@ async function confirmImport() {
             delivery_date: deliveryDate
         })
         
-        showToast(`Successfully imported ${response.data.total_parcels} parcels for ${deliveryDate}`, 'success')
+        // Show success message with option to view warehouse
+        const successMsg = `Successfully imported ${response.data.total_parcels} parcels for ${deliveryDate}!`
+        showToast(successMsg, 'success')
+        
+        // Update UI to show success state
+        if (confirmBtn) {
+            confirmBtn.disabled = false
+            confirmBtn.innerHTML = '<i class="fas fa-check-circle mr-2"></i>Import Complete!'
+            confirmBtn.classList.remove('bg-blue-500', 'hover:bg-blue-600')
+            confirmBtn.classList.add('bg-green-500', 'hover:bg-green-600')
+            
+            // Add "Go to Warehouse" button next to it
+            const warehouseBtn = document.createElement('button')
+            warehouseBtn.className = 'ml-3 px-6 py-2 bg-purple-500 hover:bg-purple-600 text-white rounded-lg'
+            warehouseBtn.innerHTML = '<i class="fas fa-warehouse mr-2"></i>Go to Warehouse'
+            warehouseBtn.onclick = () => navigateTo('warehouse')
+            confirmBtn.parentElement.appendChild(warehouseBtn)
+        }
+        
         cancelImport()
-        navigateTo('warehouse')
+        // Don't auto-navigate to prevent triggering additional API calls that cause "Too Many Subrequests"
     } catch (error) {
         // Log full error details to console for debugging
         console.error('❌ IMPORT ERROR - Full Details:', {
@@ -1825,11 +1843,13 @@ async function loadDashboardData() {
 }
 
 // Auto-refresh dashboard every 30 seconds
-setInterval(() => {
-    if (state.currentPage === 'dashboard') {
-        loadDashboardData()
-    }
-}, 30000)
+// Auto-refresh dashboard disabled to prevent "Too Many Subrequests" errors
+// Dashboard will only load when user navigates to it or manually refreshes
+// setInterval(() => {
+//     if (state.currentPage === 'dashboard') {
+//         loadDashboardData()
+//     }
+// }, 30000)
 
 // ============ Warehouse Page ============
 function renderWarehouse() {
