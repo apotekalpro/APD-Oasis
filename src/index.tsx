@@ -433,7 +433,7 @@ app.post('/api/import', authMiddleware, async (c) => {
       }
     })
     
-    // Insert parcels and transfer details
+    // Insert parcels and transfer details IN BULK (reduces API calls)
     const parcels = Array.from(parcelMap.values())
     console.log('\n=== PARCELS TO INSERT ===')
     console.log('Total parcels:', parcels.length)
@@ -447,40 +447,40 @@ app.post('/api/import', authMiddleware, async (c) => {
       })
     })
     
-    let totalCreated = 0
+    // OPTIMIZATION 1: Batch insert all parcels at once (1 API call instead of N)
+    const parcelRecords = parcels.map(parcel => ({
+      import_id: importId,
+      delivery_date: delivery_date || new Date().toISOString().split('T')[0],
+      outlet_code: parcel.outlet_code,
+      outlet_code_short: parcel.outlet_code_short,
+      outlet_name: parcel.outlet_name,
+      pallet_id: parcel.pallet_id,
+      transfer_numbers: parcel.transfer_numbers,
+      total_count: parcel.transfer_numbers.length,
+      status: 'pending'
+    }))
     
-    for (const parcel of parcels) {
-      console.log(`\nInserting parcel: ${parcel.pallet_id}...`)
-      const parcelResponse = await supabaseRequest(c, 'parcels', {
-        method: 'POST',
-        body: JSON.stringify({
-          import_id: importId,
-          delivery_date: delivery_date || new Date().toISOString().split('T')[0],
-          outlet_code: parcel.outlet_code,
-          outlet_code_short: parcel.outlet_code_short,
-          outlet_name: parcel.outlet_name,
-          pallet_id: parcel.pallet_id,
-          transfer_numbers: parcel.transfer_numbers,
-          total_count: parcel.transfer_numbers.length,
-          status: 'pending'
-        })
-      })
-      
-      console.log(`  Response status: ${parcelResponse.status}`)
-      const parcelRecord = await parcelResponse.json()
-      console.log(`  Response body:`, parcelRecord)
-      
-      if (parcelRecord.error || parcelRecord.message) {
-        console.error(`  ❌ ERROR inserting parcel:`, parcelRecord)
-        throw new Error(`Failed to insert parcel: ${parcelRecord.error || parcelRecord.message}`)
-      }
-      
-      const parcelId = Array.isArray(parcelRecord) ? parcelRecord[0].id : parcelRecord.id
-      console.log(`  Parcel ID: ${parcelId}`)
-      
-      // Insert transfer details
+    console.log(`\nBatch inserting ${parcelRecords.length} parcels...`)
+    const batchParcelResponse = await supabaseRequest(c, 'parcels', {
+      method: 'POST',
+      body: JSON.stringify(parcelRecords)
+    })
+    
+    console.log(`Batch parcel response status: ${batchParcelResponse.status}`)
+    const insertedParcels = await batchParcelResponse.json()
+    console.log(`✓ ${insertedParcels.length} parcels inserted in batch`)
+    
+    if (!Array.isArray(insertedParcels) || insertedParcels.length === 0) {
+      throw new Error('Failed to insert parcels in batch')
+    }
+    
+    // OPTIMIZATION 2: Batch insert all transfer details at once (1 API call instead of N)
+    const allTransferDetails: any[] = []
+    
+    insertedParcels.forEach((insertedParcel, index) => {
+      const parcel = parcels[index]
       const transferDetails = parcel.transfer_numbers.map((tn: string) => ({
-        parcel_id: parcelId,
+        parcel_id: insertedParcel.id,
         transfer_number: tn,
         delivery_date: delivery_date || new Date().toISOString().split('T')[0],
         outlet_code: parcel.outlet_code,
@@ -489,37 +489,20 @@ app.post('/api/import', authMiddleware, async (c) => {
         pallet_id: parcel.pallet_id,
         status: 'pending'
       }))
-      
-      console.log(`  Inserting ${transferDetails.length} transfer details...`)
-      console.log(`  Sample transfer detail:`, transferDetails[0])
-      
-      const transferResponse = await supabaseRequest(c, 'transfer_details', {
-        method: 'POST',
-        body: JSON.stringify(transferDetails)
-      })
-      
-      console.log(`  Transfer response status: ${transferResponse.status}`)
-      
-      let transferResult
-      try {
-        transferResult = await transferResponse.json()
-        console.log(`  Transfer response body:`, transferResult)
-      } catch (jsonError) {
-        const responseText = await transferResponse.text()
-        console.error(`  ❌ ERROR parsing transfer response:`, responseText)
-        throw new Error(`Failed to parse transfer_details response: ${responseText}`)
-      }
-      
-      if (transferResponse.status !== 201 && transferResponse.status !== 200) {
-        console.error(`  ❌ ERROR inserting transfer_details:`, transferResult)
-        throw new Error(`Failed to insert transfer_details: ${JSON.stringify(transferResult)}`)
-      }
-      
-      console.log(`  ✓ ${transferDetails.length} transfer details inserted`)
-      
-      totalCreated++
-      console.log(`  ✓ Parcel inserted successfully`)
-    }
+      allTransferDetails.push(...transferDetails)
+    })
+    
+    console.log(`\nBatch inserting ${allTransferDetails.length} transfer details...`)
+    const batchTransferResponse = await supabaseRequest(c, 'transfer_details', {
+      method: 'POST',
+      body: JSON.stringify(allTransferDetails)
+    })
+    
+    console.log(`Batch transfer response status: ${batchTransferResponse.status}`)
+    const insertedTransfers = await batchTransferResponse.json()
+    console.log(`✓ ${insertedTransfers.length} transfer details inserted in batch`)
+    
+    const totalCreated = insertedParcels.length
     
     console.log(`\n=== IMPORT COMPLETE ===`)
     console.log(`Total parcels created: ${totalCreated}`)
