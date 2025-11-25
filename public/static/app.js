@@ -1902,49 +1902,50 @@ function renderWarehouse() {
     
     return `
         <div class="h-full flex flex-col">
-        <div class="container mx-auto px-4 py-6 flex-1 overflow-y-auto" style="max-height: 100vh;">
-            <h2 class="text-3xl font-bold mb-6 text-gray-800">
-                <i class="fas fa-warehouse text-blue-600 mr-3"></i>Warehouse Loading
+        <div class="container mx-auto px-2 py-2 flex-1 overflow-y-auto" style="max-height: 100vh;">
+            <!-- Mobile-optimized header - smaller on small screens -->
+            <h2 class="text-lg sm:text-2xl md:text-3xl font-bold mb-2 sm:mb-4 md:mb-6 text-gray-800">
+                <i class="fas fa-warehouse text-blue-600 mr-2"></i>Warehouse Loading
             </h2>
             
-            <!-- Delivery Date Selection -->
-            <div class="bg-white rounded-lg shadow-lg mb-6 p-4">
-                <div class="flex items-center gap-4 flex-wrap">
-                    <label class="font-semibold text-gray-700">
-                        <i class="fas fa-calendar mr-2"></i>Delivery Date:
+            <!-- Delivery Date Selection - Compact for mobile -->
+            <div class="bg-white rounded-lg shadow-lg mb-3 sm:mb-4 md:mb-6 p-2 sm:p-3 md:p-4">
+                <div class="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-4">
+                    <label class="text-sm sm:text-base font-semibold text-gray-700 whitespace-nowrap">
+                        <i class="fas fa-calendar mr-1 sm:mr-2"></i>Delivery Date:
                     </label>
                     <input type="date" id="warehouseDeliveryDate" 
-                        class="px-4 py-2 border-2 border-blue-300 rounded-lg font-semibold"
+                        class="w-full sm:w-auto px-3 py-2 border-2 border-blue-300 rounded-lg text-sm sm:text-base font-semibold"
                         value="${state.warehouseDeliveryDate}"
                         onchange="setWarehouseDeliveryDate(this.value)">
-                    <p class="text-sm text-gray-600">
+                    <p class="text-xs sm:text-sm text-gray-600 hidden sm:block">
                         <i class="fas fa-info-circle mr-1"></i>
                         Select the delivery date to view and load parcels
                     </p>
                 </div>
             </div>
             
-            <div class="grid lg:grid-cols-3 gap-6">
-                <!-- Scanning Panel -->
+            <div class="grid lg:grid-cols-3 gap-3 sm:gap-4 md:gap-6">
+                <!-- Scanning Panel - Mobile optimized -->
                 <div class="lg:col-span-2">
-                    <div class="bg-white rounded-lg shadow-lg p-6">
-                        <h3 class="text-xl font-bold mb-4">
+                    <div class="bg-white rounded-lg shadow-lg p-3 sm:p-4 md:p-6">
+                        <h3 class="text-base sm:text-lg md:text-xl font-bold mb-2 sm:mb-3 md:mb-4">
                             <i class="fas fa-pallet mr-2 text-blue-600"></i>Scan Pallet ID
                         </h3>
                         
-                        <div class="mb-4">
+                        <div class="mb-3 sm:mb-4">
                             <input type="text" id="warehouseScanInput" 
-                                class="w-full px-4 py-3 border-4 border-blue-500 rounded-lg text-lg scan-input"
-                                placeholder="Scan or enter Pallet ID..."
+                                class="w-full px-3 py-2 sm:px-4 sm:py-3 border-4 border-blue-500 rounded-lg text-base sm:text-lg scan-input"
+                                placeholder="Scan Pallet ID..."
                                 autofocus
                                 onkeydown="if(event.key==='Enter' || event.keyCode===13) { event.preventDefault(); handleWarehouseScan(); }"
                                 onkeypress="if(event.key==='Enter') handleWarehouseScan()">
                         </div>
                         
-                        <div class="bg-blue-50 border-l-4 border-blue-500 p-3 mb-4">
-                            <p class="text-sm text-blue-800">
-                                <i class="fas fa-info-circle mr-2"></i>
-                                <strong>New!</strong> Scan Pallet ID to mark all transfers in that pallet as loaded at once.
+                        <div class="bg-blue-50 border-l-4 border-blue-500 p-2 sm:p-3 mb-3 sm:mb-4">
+                            <p class="text-xs sm:text-sm text-blue-800">
+                                <i class="fas fa-info-circle mr-1 sm:mr-2"></i>
+                                <strong>New!</strong> Scan Pallet ID to mark all transfers as loaded.
                             </p>
                         </div>
                         
@@ -2824,43 +2825,44 @@ async function deleteTransfer(transferId, outletCode) {
 function renderOutlet() {
     return `
         <div class="h-full flex flex-col">
-        <div class="container mx-auto px-4 py-6 pb-24 flex-1 overflow-y-auto" style="max-height: 100vh;">
-            <h2 class="text-3xl font-bold mb-6 text-gray-800">
-                <i class="fas fa-store text-blue-600 mr-3"></i>Outlet Unloading
+        <div class="container mx-auto px-2 py-2 pb-20 flex-1 overflow-y-auto" style="max-height: 100vh;">
+            <!-- Mobile-optimized header -->
+            <h2 class="text-lg sm:text-2xl md:text-3xl font-bold mb-2 sm:mb-4 md:mb-6 text-gray-800">
+                <i class="fas fa-store text-blue-600 mr-2"></i>Outlet Unloading
             </h2>
             
             ${!state.selectedOutlet ? `
-                <!-- Step 1: Scan Outlet Code -->
-                <div class="bg-white rounded-lg shadow-lg p-8 max-w-2xl mx-auto">
-                    <div class="text-center mb-6">
-                        <div class="bg-blue-100 rounded-full w-20 h-20 flex items-center justify-center mx-auto mb-4">
-                            <i class="fas fa-store text-4xl text-blue-600"></i>
+                <!-- Step 1: Scan Outlet Code - Mobile optimized -->
+                <div class="bg-white rounded-lg shadow-lg p-4 sm:p-6 md:p-8 max-w-2xl mx-auto">
+                    <div class="text-center mb-4 sm:mb-6">
+                        <div class="bg-blue-100 rounded-full w-16 h-16 sm:w-20 sm:h-20 flex items-center justify-center mx-auto mb-3 sm:mb-4">
+                            <i class="fas fa-store text-3xl sm:text-4xl text-blue-600"></i>
                         </div>
-                        <h3 class="text-2xl font-bold mb-2">Step 1: Identify Your Outlet</h3>
-                        <p class="text-gray-600">Scan or enter your outlet short code</p>
+                        <h3 class="text-lg sm:text-xl md:text-2xl font-bold mb-2">Step 1: Identify Your Outlet</h3>
+                        <p class="text-sm sm:text-base text-gray-600">Scan or enter your outlet short code</p>
                     </div>
                     
-                    <div class="mb-4">
-                        <label class="block text-sm font-medium text-gray-700 mb-2">
-                            Outlet Short Code (e.g., MKC, JBB, JKJSTT1)
+                    <div class="mb-3 sm:mb-4">
+                        <label class="block text-xs sm:text-sm font-medium text-gray-700 mb-2">
+                            Outlet Short Code (e.g., MKC, JBB)
                         </label>
                         <input type="text" id="outletCodeInput" 
-                            class="w-full px-4 py-3 border-4 border-blue-500 rounded-lg text-lg scan-input"
-                            placeholder="Scan or enter outlet code..."
+                            class="w-full px-3 py-2 sm:px-4 sm:py-3 border-4 border-blue-500 rounded-lg text-base sm:text-lg scan-input"
+                            placeholder="Scan outlet code..."
                             autofocus
                             onkeydown="if(event.key==='Enter' || event.keyCode===13) { event.preventDefault(); handleFindOutletPallets(); }"
                             onkeypress="if(event.key==='Enter') handleFindOutletPallets()">
                     </div>
                     
                     <button onclick="handleFindOutletPallets()" 
-                        class="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-4 rounded-lg text-lg">
+                        class="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 sm:py-4 rounded-lg text-base sm:text-lg">
                         <i class="fas fa-search mr-2"></i>Find My Pallets
                     </button>
                     
-                    <div class="mt-6 bg-blue-50 border-l-4 border-blue-500 p-4">
-                        <p class="text-sm text-blue-800">
-                            <i class="fas fa-info-circle mr-2"></i>
-                            <strong>Tip:</strong> Your outlet code is the short name before the dash in your store name (e.g., if your store is "MKC - Central Store", enter "MKC")
+                    <div class="mt-4 sm:mt-6 bg-blue-50 border-l-4 border-blue-500 p-3 sm:p-4">
+                        <p class="text-xs sm:text-sm text-blue-800">
+                            <i class="fas fa-info-circle mr-1 sm:mr-2"></i>
+                            <strong>Tip:</strong> Your outlet code is the short name (e.g., "MKC")
                         </p>
                     </div>
                 </div>
