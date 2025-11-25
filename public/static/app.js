@@ -360,6 +360,9 @@ function renderNavBar() {
                             class="flex-1 min-w-[120px] px-4 py-2 rounded ${state.currentPage === 'admin' ? 'bg-blue-800' : 'bg-blue-500 hover:bg-blue-700'}">
                             <i class="fas fa-cog mr-2"></i>Admin
                         </button>
+                    ` : ''}
+                    
+                    ${showAllTabs && ['admin', 'warehouse_supervisor'].includes(state.user.role) ? `
                         <button onclick="navigateTo('import')" 
                             class="flex-1 min-w-[120px] px-4 py-2 rounded ${state.currentPage === 'import' ? 'bg-blue-800' : 'bg-blue-500 hover:bg-blue-700'}">
                             <i class="fas fa-upload mr-2"></i>Import

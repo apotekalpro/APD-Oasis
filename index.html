@@ -27,9 +27,23 @@
             -webkit-tap-highlight-color: transparent;
         }
         
-        body {
+        html, body {
+            height: 100%;
+            width: 100%;
+            position: fixed;
+            overflow: hidden;
             overscroll-behavior: contain;
             -webkit-overflow-scrolling: touch;
+        }
+        
+        /* Fix for inconsistent viewport on Android */
+        #app {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            overflow: hidden;
         }
         
         /* Prevent zoom on input focus */
@@ -47,6 +61,14 @@
         .scroll-container {
             -webkit-overflow-scrolling: touch;
             overflow-y: auto;
+        }
+        
+        /* Fix for Zebra/Android WebView viewport issues */
+        @supports (-webkit-touch-callout: none) {
+            body {
+                /* iOS specific */
+                min-height: -webkit-fill-available;
+            }
         }
     </style>
 </head>
