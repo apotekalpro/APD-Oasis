@@ -1,9 +1,9 @@
 // APD OASIS Warehouse Logistic System - Frontend Application
-// Version: 1.1.23 - Import Subrequest Fix (No auto-refresh, no auto-navigation)
-console.log('%c🚀 APD OASIS v1.1.23 LOADED', 'background: #4CAF50; color: white; padding: 4px 8px; border-radius: 4px; font-weight: bold;')
-console.log('✅ Dashboard auto-refresh: DISABLED')
-console.log('✅ Import auto-navigation: DISABLED')
-console.log('✅ Subrequest optimization: ACTIVE')
+// Version: 1.1.28 - A Code Logic Implementation (Box & Container Tracking)
+console.log('%c🚀 APD OASIS v1.1.28 LOADED', 'background: #4CAF50; color: white; padding: 4px 8px; border-radius: 4px; font-weight: bold;')
+console.log('✅ A Code Scanning: ENABLED')
+console.log('✅ Box & Container Tracking: ENABLED')
+console.log('✅ Dashboard Separate Counts: ENABLED')
 
 // ============ Simple Storage Helper ============
 // Simple wrapper that just uses localStorage (works in Capacitor webview)
