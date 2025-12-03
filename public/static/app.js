@@ -1355,20 +1355,20 @@ function renderDashboard() {
                 <div class="bg-white rounded-lg shadow-lg p-4">
                     <div class="flex flex-col">
                         <div class="flex items-center justify-between mb-2">
-                            <p class="text-gray-500 text-xs">Loaded Containers</p>
-                            <i class="fas fa-check-circle text-2xl text-green-200"></i>
+                            <p class="text-gray-500 text-xs">Boxes Loaded</p>
+                            <i class="fas fa-box text-2xl text-green-200"></i>
                         </div>
-                        <p id="dash-loaded-pallets" class="text-2xl font-bold text-green-600">-</p>
+                        <p id="dash-loaded-boxes" class="text-2xl font-bold text-green-600">-</p>
                     </div>
                 </div>
                 
                 <div class="bg-white rounded-lg shadow-lg p-4">
                     <div class="flex flex-col">
                         <div class="flex items-center justify-between mb-2">
-                            <p class="text-gray-500 text-xs">Delivered Containers</p>
-                            <i class="fas fa-truck text-2xl text-teal-200"></i>
+                            <p class="text-gray-500 text-xs">Containers Loaded</p>
+                            <i class="fas fa-container-storage text-2xl text-teal-200"></i>
                         </div>
-                        <p id="dash-delivered-pallets" class="text-2xl font-bold text-teal-600">-</p>
+                        <p id="dash-loaded-containers" class="text-2xl font-bold text-teal-600">-</p>
                     </div>
                 </div>
                 
@@ -1564,6 +1564,8 @@ async function loadDashboardData() {
         let deliveredPallets = 0
         let totalLoadedContainers = 0
         let totalDeliveredContainers = 0
+        let totalLoadedBoxes = 0 // NEW: Total boxes loaded
+        let totalLoadedACodeContainers = 0 // NEW: Total A-code containers loaded
         let totalTNScanned = 0 // NEW: Count total transfer numbers scanned
         const outletsLoaded = new Set() // NEW: Track unique outlets that have been loaded
         
@@ -1613,6 +1615,9 @@ async function loadDashboardData() {
                 if (parcel.container_count_loaded && !outlet.container_count_loaded) {
                     outlet.container_count_loaded = parcel.container_count_loaded
                 }
+                // NEW: Sum up box_count and container_count
+                totalLoadedBoxes += (parcel.box_count || 0)
+                totalLoadedACodeContainers += (parcel.container_count || 0)
             }
             
             // Track delivered status and info
@@ -1668,8 +1673,8 @@ async function loadDashboardData() {
         document.getElementById('dash-total-pallets').textContent = totalPallets
         document.getElementById('dash-tn-scanned').textContent = totalTNScanned // NEW: Total TN Scanned
         document.getElementById('dash-outlet-loaded').textContent = outletsLoaded.size // NEW: Total Outlet Loaded
-        document.getElementById('dash-loaded-pallets').textContent = totalLoadedContainers > 0 ? totalLoadedContainers : loadedPallets
-        document.getElementById('dash-delivered-pallets').textContent = totalDeliveredContainers > 0 ? totalDeliveredContainers : deliveredPallets
+        document.getElementById('dash-loaded-boxes').textContent = totalLoadedBoxes // NEW: Total Boxes Loaded
+        document.getElementById('dash-loaded-containers').textContent = totalLoadedACodeContainers // NEW: Total A-Code Containers Loaded
         document.getElementById('dash-containers-pickup').textContent = containersForPickup.length
         
         // Update pickup date display
@@ -2366,7 +2371,7 @@ async function checkOutletCompletionAndPromptContainerCount(outletCode) {
     }
 }
 
-// Show modal to input container count for completed outlet
+// Show modal to input box and container counts for completed outlet
 function showContainerCountModal(outletCode, outletShortCode, outletName, palletCount) {
     const modal = document.createElement('div')
     modal.id = `container-modal-${outletCode}`
@@ -2383,27 +2388,37 @@ function showContainerCountModal(outletCode, outletShortCode, outletName, pallet
                     <i class="fas fa-pallet mr-1"></i>${palletCount} pallet${palletCount > 1 ? 's' : ''} scanned
                 </p>
             </div>
-            <form onsubmit="handleContainerCountSubmit(event, '${outletCode}')">
+            <form onsubmit="handleBoxContainerSubmit(event, '${outletCode}', '${outletShortCode}', '${outletName}')">
                 <div class="mb-4">
                     <label class="block text-sm font-medium mb-2">
-                        How many containers for this outlet?
+                        <i class="fas fa-box mr-1"></i>How many boxes?
+                    </label>
+                    <input type="number" id="box_count_${outletCode}" required 
+                        min="0"
+                        class="w-full px-3 py-2 border rounded-lg text-center text-2xl font-bold"
+                        placeholder="0"
+                        value="0">
+                </div>
+                <div class="mb-4">
+                    <label class="block text-sm font-medium mb-2">
+                        <i class="fas fa-container-storage mr-1"></i>How many A-code containers?
                         <span class="text-xs text-gray-500 block mt-1">
-                            (Multiple pallets may be in one container)
+                            (If > 0, you'll need to scan A codes next)
                         </span>
                     </label>
                     <input type="number" id="container_count_${outletCode}" required 
-                        min="1" max="${palletCount}"
+                        min="0"
                         class="w-full px-3 py-2 border rounded-lg text-center text-2xl font-bold"
-                        placeholder="${palletCount}"
-                        value="${palletCount}">
+                        placeholder="0"
+                        value="0">
                 </div>
                 <div class="flex space-x-3">
                     <button type="submit" class="flex-1 bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg">
-                        <i class="fas fa-check mr-2"></i>Confirm
+                        <i class="fas fa-check mr-2"></i>Continue
                     </button>
                     <button type="button" onclick="this.closest('.fixed').remove()" 
                         class="flex-1 bg-gray-300 hover:bg-gray-400 px-4 py-2 rounded-lg">
-                        Skip
+                        Cancel
                     </button>
                 </div>
             </form>
@@ -2411,9 +2426,9 @@ function showContainerCountModal(outletCode, outletShortCode, outletName, pallet
     `
     document.body.appendChild(modal)
     
-    // Focus on input field
+    // Focus on box count input field
     setTimeout(() => {
-        const input = document.getElementById(`container_count_${outletCode}`)
+        const input = document.getElementById(`box_count_${outletCode}`)
         if (input) {
             input.focus()
             input.select()
@@ -2421,7 +2436,50 @@ function showContainerCountModal(outletCode, outletShortCode, outletName, pallet
     }, 100)
 }
 
-// Handle container count submission
+// Handle box and container count submission
+async function handleBoxContainerSubmit(event, outletCode, outletShortCode, outletName) {
+    event.preventDefault()
+    
+    const boxCount = parseInt(document.getElementById(`box_count_${outletCode}`).value) || 0
+    const containerCount = parseInt(document.getElementById(`container_count_${outletCode}`).value) || 0
+    
+    if (boxCount < 0 || containerCount < 0) {
+        showToast('Please enter valid counts', 'error')
+        return
+    }
+    
+    // Close the modal
+    const modal = document.getElementById(`container-modal-${outletCode}`)
+    if (modal) modal.remove()
+    
+    try {
+        // Save box and container counts to backend
+        await axios.post('/api/warehouse/set-box-container-count', {
+            outlet_code: outletCode,
+            box_count: boxCount,
+            container_count: containerCount
+        })
+        
+        // Record in state
+        if (!state.outletContainerCounts) state.outletContainerCounts = {}
+        state.outletContainerCounts[outletCode] = { boxes: boxCount, containers: containerCount }
+        
+        showToast(`✓ Recorded: ${boxCount} boxes, ${containerCount} containers`, 'success')
+        
+        // If containers > 0, prompt to scan A codes
+        if (containerCount > 0) {
+            showACodeScanningModal(outletCode, outletShortCode, outletName, containerCount)
+        } else {
+            // No A codes needed, refresh data
+            loadWarehouseData()
+        }
+    } catch (error) {
+        console.error('Error saving counts:', error)
+        showToast('Failed to save counts', 'error')
+    }
+}
+
+// OLD FUNCTION (LEGACY - KEEP FOR BACKWARD COMPATIBILITY)
 async function handleContainerCountSubmit(event, outletCode) {
     event.preventDefault()
     
@@ -2433,7 +2491,7 @@ async function handleContainerCountSubmit(event, outletCode) {
     }
     
     try {
-        // Save container count to backend
+        // Save container count to backend (legacy endpoint)
         await axios.post('/api/warehouse/set-container-count', {
             outlet_code: outletCode,
             container_count: containerCount
@@ -2454,6 +2512,221 @@ async function handleContainerCountSubmit(event, outletCode) {
     } catch (error) {
         showToast(error.response?.data?.error || 'Failed to save container count', 'error')
     }
+}
+
+// Show modal to scan A codes for containers
+function showACodeScanningModal(outletCode, outletShortCode, outletName, containerCount) {
+    const modal = document.createElement('div')
+    modal.id = `acode-modal-${outletCode}`
+    modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50'
+    
+    // Initialize A code scanning state
+    if (!state.aCodeScans) state.aCodeScans = {}
+    if (!state.aCodeScans[outletCode]) state.aCodeScans[outletCode] = []
+    
+    const renderModal = () => {
+        const scannedCount = state.aCodeScans[outletCode].length
+        const remaining = containerCount - scannedCount
+        
+        modal.innerHTML = `
+            <div class="bg-white rounded-lg p-6 w-full max-w-md">
+                <div class="mb-4 text-center">
+                    <i class="fas fa-qrcode text-blue-500 text-4xl mb-3"></i>
+                    <h3 class="text-xl font-bold">Scan A-Code Containers</h3>
+                </div>
+                <div class="bg-blue-50 border-l-4 border-blue-500 p-4 mb-4">
+                    <p class="font-semibold text-lg">${outletShortCode} - ${outletName}</p>
+                    <p class="text-sm text-gray-600 mt-1">
+                        <i class="fas fa-box mr-1"></i>
+                        ${scannedCount} / ${containerCount} containers scanned
+                    </p>
+                    ${remaining > 0 ? `
+                        <p class="text-lg font-bold text-blue-600 mt-2">
+                            ${remaining} container${remaining > 1 ? 's' : ''} remaining
+                        </p>
+                    ` : `
+                        <p class="text-lg font-bold text-green-600 mt-2">
+                            <i class="fas fa-check-circle mr-1"></i>All containers scanned!
+                        </p>
+                    `}
+                </div>
+                ${scannedCount > 0 ? `
+                    <div class="mb-4 max-h-32 overflow-y-auto border rounded-lg p-2">
+                        <p class="text-xs font-semibold text-gray-600 mb-2">Scanned A-Codes:</p>
+                        ${state.aCodeScans[outletCode].map(code => `
+                            <div class="text-sm bg-green-50 border-l-4 border-green-500 px-2 py-1 mb-1">
+                                <i class="fas fa-check text-green-600 mr-1"></i>${code}
+                            </div>
+                        `).join('')}
+                    </div>
+                ` : ''}
+                ${remaining > 0 ? `
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium mb-2">Scan A-Code:</label>
+                        <input type="text" id="acode_scan_${outletCode}" 
+                            class="w-full px-3 py-2 border rounded-lg text-center text-xl font-mono uppercase"
+                            placeholder="Scan or enter A code"
+                            onkeypress="if(event.key==='Enter') handleACodeScan('${outletCode}', ${containerCount})">
+                    </div>
+                    <button type="button" onclick="handleACodeScan('${outletCode}', ${containerCount})"
+                        class="w-full bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg mb-2">
+                        <i class="fas fa-plus mr-2"></i>Add Container
+                    </button>
+                ` : ''}
+                <button type="button" onclick="completeACodeScanning('${outletCode}')" 
+                    class="w-full bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg ${remaining > 0 ? 'opacity-50' : ''}"
+                    ${remaining > 0 ? 'disabled title="Please scan all containers first"' : ''}>
+                    <i class="fas fa-check mr-2"></i>Complete
+                </button>
+            </div>
+        `
+    }
+    
+    renderModal()
+    document.body.appendChild(modal)
+    
+    // Focus on input
+    setTimeout(() => {
+        const input = document.getElementById(`acode_scan_${outletCode}`)
+        if (input) input.focus()
+    }, 100)
+}
+
+// Handle A code scan
+async function handleACodeScan(outletCode, expectedCount) {
+    const input = document.getElementById(`acode_scan_${outletCode}`)
+    const aCode = input.value.trim().toUpperCase()
+    
+    if (!aCode) {
+        showToast('Please scan or enter an A code', 'error')
+        return
+    }
+    
+    // Validate A code format (starts with 'A')
+    if (!aCode.startsWith('A')) {
+        playBeep(false)
+        showToast('Invalid A code! Must start with "A"', 'error')
+        input.value = ''
+        input.focus()
+        return
+    }
+    
+    // Check for duplicates
+    if (state.aCodeScans[outletCode].includes(aCode)) {
+        playBeep(false)
+        showToast('Duplicate A code!', 'error')
+        input.value = ''
+        input.focus()
+        return
+    }
+    
+    // Add to scanned list
+    state.aCodeScans[outletCode].push(aCode)
+    
+    try {
+        // Get delivery date from state
+        const deliveryDate = state.warehouseDeliveryDate
+        if (!deliveryDate) {
+            throw new Error('No delivery date set')
+        }
+        
+        // Send A code to backend
+        await axios.post('/api/warehouse/scan-container', {
+            container_id: aCode,
+            outlet_code: outletCode,
+            delivery_date: deliveryDate
+        })
+        
+        playBeep(true)
+        showToast(`✓ Container ${aCode} scanned`, 'success')
+        
+        // Clear input
+        input.value = ''
+        
+        // Re-render modal
+        const modal = document.getElementById(`acode-modal-${outletCode}`)
+        if (modal) {
+            const scannedCount = state.aCodeScans[outletCode].length
+            const remaining = expectedCount - scannedCount
+            
+            modal.innerHTML = `
+                <div class="bg-white rounded-lg p-6 w-full max-w-md">
+                    <div class="mb-4 text-center">
+                        <i class="fas fa-qrcode text-blue-500 text-4xl mb-3"></i>
+                        <h3 class="text-xl font-bold">Scan A-Code Containers</h3>
+                    </div>
+                    <div class="bg-blue-50 border-l-4 border-blue-500 p-4 mb-4">
+                        <p class="font-semibold text-lg">${state.aCodeScans[outletCode][0] ? document.getElementById(`acode-modal-${outletCode}`).querySelector('.font-semibold.text-lg').textContent : `Outlet ${outletCode}`}</p>
+                        <p class="text-sm text-gray-600 mt-1">
+                            <i class="fas fa-box mr-1"></i>
+                            ${scannedCount} / ${expectedCount} containers scanned
+                        </p>
+                        ${remaining > 0 ? `
+                            <p class="text-lg font-bold text-blue-600 mt-2">
+                                ${remaining} container${remaining > 1 ? 's' : ''} remaining
+                            </p>
+                        ` : `
+                            <p class="text-lg font-bold text-green-600 mt-2">
+                                <i class="fas fa-check-circle mr-1"></i>All containers scanned!
+                            </p>
+                        `}
+                    </div>
+                    <div class="mb-4 max-h-32 overflow-y-auto border rounded-lg p-2">
+                        <p class="text-xs font-semibold text-gray-600 mb-2">Scanned A-Codes:</p>
+                        ${state.aCodeScans[outletCode].map(code => `
+                            <div class="text-sm bg-green-50 border-l-4 border-green-500 px-2 py-1 mb-1">
+                                <i class="fas fa-check text-green-600 mr-1"></i>${code}
+                            </div>
+                        `).join('')}
+                    </div>
+                    ${remaining > 0 ? `
+                        <div class="mb-4">
+                            <label class="block text-sm font-medium mb-2">Scan A-Code:</label>
+                            <input type="text" id="acode_scan_${outletCode}" 
+                                class="w-full px-3 py-2 border rounded-lg text-center text-xl font-mono uppercase"
+                                placeholder="Scan or enter A code"
+                                onkeypress="if(event.key==='Enter') handleACodeScan('${outletCode}', ${expectedCount})">
+                        </div>
+                        <button type="button" onclick="handleACodeScan('${outletCode}', ${expectedCount})"
+                            class="w-full bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg mb-2">
+                            <i class="fas fa-plus mr-2"></i>Add Container
+                        </button>
+                    ` : ''}
+                    <button type="button" onclick="completeACodeScanning('${outletCode}')" 
+                        class="w-full bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg ${remaining > 0 ? 'opacity-50' : ''}"
+                        ${remaining > 0 ? 'disabled title="Please scan all containers first"' : ''}>
+                        <i class="fas fa-check mr-2"></i>Complete
+                    </button>
+                </div>
+            `
+            
+            // Re-focus input
+            setTimeout(() => {
+                const newInput = document.getElementById(`acode_scan_${outletCode}`)
+                if (newInput) newInput.focus()
+            }, 100)
+        }
+    } catch (error) {
+        console.error('Error scanning A code:', error)
+        // Remove from local state if backend fails
+        state.aCodeScans[outletCode] = state.aCodeScans[outletCode].filter(c => c !== aCode)
+        playBeep(false)
+        showToast(error.response?.data?.error || 'Failed to scan container', 'error')
+        input.value = ''
+        input.focus()
+    }
+}
+
+// Complete A code scanning
+function completeACodeScanning(outletCode) {
+    const modal = document.getElementById(`acode-modal-${outletCode}`)
+    if (modal) modal.remove()
+    
+    const scannedCount = state.aCodeScans[outletCode]?.length || 0
+    showToast(`✓ ${scannedCount} A-code container${scannedCount > 1 ? 's' : ''} linked to outlet`, 'success')
+    
+    // Reload warehouse data
+    loadWarehouseData()
 }
 
 function showCompleteLoadingModal() {
@@ -3123,9 +3396,9 @@ let outletScanTimeout = null
 // NEW: Step 2 - Scan pallet ID (validation only, no immediate delivery)
 async function handleOutletScanPallet() {
     const input = document.getElementById('palletScanInput')
-    const palletId = input.value.trim().toUpperCase()
+    const scannedCode = input.value.trim().toUpperCase()
     
-    if (!palletId || !state.selectedOutlet) return
+    if (!scannedCode || !state.selectedOutlet) return
     
     // Clear input immediately to prevent scanner double-scan
     input.value = ''
@@ -3139,43 +3412,82 @@ async function handleOutletScanPallet() {
         outletScanTimeout = null
     }, 500)
     
+    // Detect code type: A code (starts with 'A') or F code (pallet ID)
+    const isACode = scannedCode.startsWith('A')
+    
+    // Initialize tracking arrays if needed
+    if (!state.outletScannedACodes) state.outletScannedACodes = []
+    if (!state.outletScannedFCodes) state.outletScannedFCodes = []
+    
     // Check for duplicate scan in current session
-    const alreadyScanned = state.scannedItems.find(item => item.pallet_id === palletId)
-    if (alreadyScanned) {
+    const duplicateA = isACode && state.outletScannedACodes.includes(scannedCode)
+    const duplicateF = !isACode && state.outletScannedFCodes.includes(scannedCode)
+    
+    if (duplicateA || duplicateF) {
         playBeep(false)
-        showToast(`⚠️ Duplicate scan! Pallet ${palletId} was already scanned at ${alreadyScanned.time}`, 'error')
-        input.value = ''
+        showToast(`⚠️ Duplicate scan! ${isACode ? 'Container' : 'Pallet'} ${scannedCode} already scanned`, 'error')
         input.focus()
         return
     }
     
     try {
-        // Only validate the pallet (don't mark as delivered yet)
-        const response = await axios.post('/api/outlet/scan-pallet', { 
-            outlet_code_short: state.selectedOutlet.code_short,
-            pallet_id: palletId
-        })
-        
-        if (response.data.success) {
-            playBeep(true)
-            
-            // Add to scanned items list (not delivered yet)
-            state.scannedItems.push({
-                pallet_id: palletId,
-                transfer_count: response.data.transfer_count,
-                time: new Date().toLocaleTimeString()
+        if (isACode) {
+            // Scan A code (container)
+            const response = await axios.post('/api/outlet/scan-container', { 
+                outlet_code_short: state.selectedOutlet.code_short,
+                outlet_code: state.selectedOutlet.code,
+                container_id: scannedCode
             })
             
-            showToast(`✓ Pallet ${palletId} scanned (${response.data.transfer_count} transfers)`, 'success')
-            updateOutletScannedList()
-            updateOutletCompleteButton() // Update the complete button visibility
-            
-            // Remove scanned pallet from "Your Delivery" list
-            state.availablePallets = state.availablePallets.filter(p => p.pallet_id !== palletId)
-            loadOutletPallets() // Refresh the delivery list display
+            if (response.data.success) {
+                playBeep(true)
+                state.outletScannedACodes.push(scannedCode)
+                
+                // Add to combined scanned items list
+                state.scannedItems.push({
+                    code: scannedCode,
+                    type: 'container',
+                    time: new Date().toLocaleTimeString()
+                })
+                
+                showToast(`✓ Container ${scannedCode} scanned`, 'success')
+                updateOutletScannedList()
+                updateOutletCompleteButton()
+            } else {
+                playBeep(false)
+                showToast(`✗ ${response.data.error}`, 'error')
+            }
         } else {
-            playBeep(false)
-            showToast(`✗ ${response.data.error}`, 'error')
+            // Scan F code (pallet)
+            const response = await axios.post('/api/outlet/scan-pallet', { 
+                outlet_code_short: state.selectedOutlet.code_short,
+                pallet_id: scannedCode
+            })
+            
+            if (response.data.success) {
+                playBeep(true)
+                state.outletScannedFCodes.push(scannedCode)
+                
+                // Add to combined scanned items list
+                state.scannedItems.push({
+                    code: scannedCode,
+                    type: 'pallet',
+                    pallet_id: scannedCode,
+                    transfer_count: response.data.transfer_count,
+                    time: new Date().toLocaleTimeString()
+                })
+                
+                showToast(`✓ Pallet ${scannedCode} scanned (${response.data.transfer_count} transfers)`, 'success')
+                updateOutletScannedList()
+                updateOutletCompleteButton()
+                
+                // Remove scanned pallet from "Your Delivery" list
+                state.availablePallets = state.availablePallets.filter(p => p.pallet_id !== scannedCode)
+                loadOutletPallets()
+            } else {
+                playBeep(false)
+                showToast(`✗ ${response.data.error}`, 'error')
+            }
         }
     } catch (error) {
         playBeep(false)
@@ -3190,14 +3502,18 @@ function updateOutletScannedList() {
     const list = document.getElementById('outletScannedList')
     if (!list) return
     
+    const palletCount = state.outletScannedFCodes?.length || 0
+    const containerCount = state.outletScannedACodes?.length || 0
+    const totalCount = state.scannedItems.length
+    
     // Update the header counter
     const headerElement = list.closest('.mt-6')?.querySelector('h4')
     if (headerElement) {
-        headerElement.textContent = `Scanned Pallets (${state.scannedItems.length})`
+        headerElement.textContent = `Scanned Items (${palletCount} pallets, ${containerCount} containers)`
     }
     
-    if (state.scannedItems.length === 0) {
-        list.innerHTML = '<p class="text-gray-500 text-center py-4">No pallets scanned yet</p>'
+    if (totalCount === 0) {
+        list.innerHTML = '<p class="text-gray-500 text-center py-4">No items scanned yet</p>'
         return
     }
     
@@ -3205,15 +3521,26 @@ function updateOutletScannedList() {
         // Calculate actual index in original array
         const actualIndex = state.scannedItems.length - 1 - reversedIndex
         
+        const isContainer = item.type === 'container'
+        const isPallet = item.type === 'pallet'
+        
         return `
-        <div class="border-l-4 border-blue-500 bg-blue-50 p-3 rounded">
+        <div class="border-l-4 ${isContainer ? 'border-purple-500 bg-purple-50' : 'border-blue-500 bg-blue-50'} p-3 rounded">
             <div class="flex justify-between items-start">
                 <div class="flex-1">
                     <p class="font-semibold">
-                        <i class="fas fa-pallet mr-1 text-blue-600"></i>${item.pallet_id}
+                        <i class="fas ${isContainer ? 'fa-box' : 'fa-pallet'} mr-1 ${isContainer ? 'text-purple-600' : 'text-blue-600'}"></i>
+                        ${item.code}
+                        <span class="text-xs ${isContainer ? 'text-purple-600' : 'text-blue-600'} ml-2">
+                            ${isContainer ? 'Container' : 'Pallet'}
+                        </span>
                     </p>
-                    <p class="text-xs text-gray-600">${item.transfer_count} transfers</p>
-                    <p class="text-xs text-blue-600"><i class="fas fa-clock mr-1"></i>Scanned (not confirmed yet)</p>
+                    ${isPallet && item.transfer_count ? `
+                        <p class="text-xs text-gray-600">${item.transfer_count} transfers</p>
+                    ` : ''}
+                    <p class="text-xs ${isContainer ? 'text-purple-600' : 'text-blue-600'}">
+                        <i class="fas fa-clock mr-1"></i>Scanned (not confirmed yet)
+                    </p>
                 </div>
                 <div class="flex items-start space-x-2">
                     <span class="text-sm text-gray-500">${item.time}</span>

@@ -1194,6 +1194,40 @@ app.post('/api/warehouse/complete', authMiddleware, async (c) => {
 })
 
 // Set container count for an outlet
+// NEW: Set box and container count after all outlet pallets are scanned
+app.post('/api/warehouse/set-box-container-count', authMiddleware, async (c) => {
+  try {
+    const user = c.get('user')
+    const { outlet_code, box_count, container_count } = await c.req.json()
+    
+    if (!outlet_code || box_count === undefined || container_count === undefined) {
+      return c.json({ error: 'Missing required fields: outlet_code, box_count, container_count' }, 400)
+    }
+    
+    console.log(`Setting box/container count for outlet ${outlet_code}: ${box_count} boxes, ${container_count} containers`)
+    
+    // Update box_count and container_count for all loaded parcels of this outlet
+    await supabaseRequest(c, `parcels?outlet_code=eq.${outlet_code}&status=eq.loaded`, {
+      method: 'PATCH',
+      body: JSON.stringify({
+        box_count: parseInt(box_count),
+        container_count: parseInt(container_count)
+      })
+    })
+    
+    return c.json({ 
+      success: true, 
+      box_count: parseInt(box_count),
+      container_count: parseInt(container_count),
+      outlet_code 
+    })
+  } catch (error) {
+    console.error('Set box/container count error:', error)
+    return c.json({ error: 'Failed to set box/container count' }, 500)
+  }
+})
+
+// DEPRECATED: Old endpoint (kept for backward compatibility)
 app.post('/api/warehouse/set-container-count', authMiddleware, async (c) => {
   try {
     const user = c.get('user')
@@ -1203,7 +1237,7 @@ app.post('/api/warehouse/set-container-count', authMiddleware, async (c) => {
       return c.json({ error: 'Missing required fields' }, 400)
     }
     
-    // Update container_count_loaded for all loaded parcels of this outlet
+    // Update container_count_loaded for all loaded parcels of this outlet (legacy)
     await supabaseRequest(c, `parcels?outlet_code=eq.${outlet_code}&status=eq.loaded`, {
       method: 'PATCH',
       body: JSON.stringify({
@@ -1214,6 +1248,56 @@ app.post('/api/warehouse/set-container-count', authMiddleware, async (c) => {
     return c.json({ success: true, container_count })
   } catch (error) {
     return c.json({ error: 'Failed to set container count' }, 500)
+  }
+})
+
+// NEW: Scan A code container and link to outlet
+app.post('/api/warehouse/scan-container', authMiddleware, async (c) => {
+  try {
+    const user = c.get('user')
+    const { container_id, outlet_code, delivery_date } = await c.req.json()
+    
+    if (!container_id || !outlet_code || !delivery_date) {
+      return c.json({ error: 'Missing required fields: container_id, outlet_code, delivery_date' }, 400)
+    }
+    
+    console.log(`Scanning A code container: ${container_id} for outlet ${outlet_code}`)
+    
+    // Check if A code already scanned for this outlet
+    const existingResponse = await supabaseRequest(c, 
+      `containers?container_id=eq.${container_id}&outlet_code=eq.${outlet_code}&select=*`)
+    const existing = await existingResponse.json()
+    
+    if (existing && existing.length > 0) {
+      return c.json({ 
+        success: false, 
+        error: 'Container already scanned for this outlet',
+        container_id 
+      })
+    }
+    
+    // Create container record linked to outlet
+    await supabaseRequest(c, 'containers', {
+      method: 'POST',
+      body: JSON.stringify({
+        container_id: container_id,
+        outlet_code: outlet_code,
+        delivery_date: delivery_date,
+        status: 'at_outlet', // Container loaded and ready for delivery
+        scanned_at: new Date().toISOString(),
+        scanned_by: user.id,
+        scanned_by_name: user.full_name
+      })
+    })
+    
+    return c.json({ 
+      success: true, 
+      container_id,
+      outlet_code 
+    })
+  } catch (error) {
+    console.error('Scan container error:', error)
+    return c.json({ error: 'Failed to scan container' }, 500)
   }
 })
 
@@ -1458,6 +1542,49 @@ app.post('/api/outlet/revert-pallet', authMiddleware, async (c) => {
   } catch (error) {
     console.error('Revert outlet pallet error:', error)
     return c.json({ error: 'Revert failed' }, 500)
+  }
+})
+
+// NEW: Scan A code container at outlet
+app.post('/api/outlet/scan-container', authMiddleware, async (c) => {
+  try {
+    const user = c.get('user')
+    const { outlet_code_short, outlet_code, container_id } = await c.req.json()
+    
+    console.log(`Scanning container ${container_id} for outlet ${outlet_code_short || outlet_code}`)
+    
+    // Check if container exists for this outlet
+    const containersResponse = await supabaseRequest(c, 
+      `containers?container_id=eq.${container_id}&outlet_code=eq.${outlet_code || outlet_code_short}&select=*`)
+    const containers = await containersResponse.json()
+    
+    if (!containers || containers.length === 0) {
+      return c.json({ 
+        success: false, 
+        error: 'Container not found for this outlet',
+        container_id 
+      })
+    }
+    
+    const container = containers[0]
+    
+    // Check if already delivered
+    if (container.status === 'delivered') {
+      return c.json({ 
+        success: false, 
+        error: 'Duplicate scan! This container was already received',
+        container_id
+      })
+    }
+    
+    // Just validate - don't update yet (wait for confirmation like pallets)
+    return c.json({ 
+      success: true, 
+      container_id
+    })
+  } catch (error) {
+    console.error('Scan container error:', error)
+    return c.json({ error: 'Scan failed' }, 500)
   }
 })
 
