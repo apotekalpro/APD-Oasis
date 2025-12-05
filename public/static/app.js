@@ -3169,35 +3169,43 @@ function renderOutlet() {
                     <!-- Container Count & Date Info -->
                     <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
                         <!-- Mobile: Stack vertically, Desktop: Side by side -->
-                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-3">
+                        <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3">
                             <div class="text-center md:text-left">
-                                <p class="text-sm text-gray-600 mb-1">
-                                    <i class="fas fa-truck mr-1"></i>Container Loaded
+                                <p class="text-xs text-gray-600 mb-1">
+                                    <i class="fas fa-box mr-1"></i>Boxes
                                 </p>
-                                <p class="text-3xl font-bold text-blue-600">
-                                    ${state.selectedOutlet.container_count_loaded || 0}
+                                <p class="text-2xl font-bold text-green-600">
+                                    ${state.selectedOutlet.box_count || 0}
                                 </p>
                             </div>
-                            <div class="text-center md:text-left md:border-l md:border-blue-300 md:pl-4">
-                                <p class="text-sm text-gray-600 mb-1">
+                            <div class="text-center md:text-left">
+                                <p class="text-xs text-gray-600 mb-1">
+                                    <i class="fas fa-container-storage mr-1"></i>Containers
+                                </p>
+                                <p class="text-2xl font-bold text-purple-600">
+                                    ${state.selectedOutlet.container_count || 0}
+                                </p>
+                            </div>
+                            <div class="text-center md:text-left">
+                                <p class="text-xs text-gray-600 mb-1">
                                     <i class="fas fa-pallet mr-1"></i>Total TN
                                 </p>
-                                <p class="text-3xl font-bold text-green-600">
+                                <p class="text-2xl font-bold text-blue-600">
                                     ${state.availablePallets.length + state.scannedItems.length}
                                 </p>
                             </div>
-                            <div class="text-center md:text-left md:border-l md:border-blue-300 md:pl-4">
-                                <label class="text-sm text-gray-600 mb-1 block">
-                                    <i class="fas fa-calendar mr-1"></i>Delivery Date
+                            <div class="text-center md:text-left">
+                                <label class="text-xs text-gray-600 mb-1 block">
+                                    <i class="fas fa-calendar mr-1"></i>Date
                                 </label>
                                 <input type="date" id="outletDeliveryDate" 
-                                    class="w-full px-3 py-2 border-2 border-blue-300 rounded-lg font-semibold text-center"
+                                    class="w-full px-2 py-1 border-2 border-blue-300 rounded-lg font-semibold text-center text-sm"
                                     value="${state.outletDeliveryDate || new Date().toISOString().split('T')[0]}"
                                     onchange="setOutletDeliveryDate(this.value)">
                             </div>
                         </div>
                         <div class="text-xs text-gray-600 text-center md:text-left border-t border-blue-200 pt-2">
-                            <i class="fas fa-info-circle mr-1"></i>Driver: Check counts match your load
+                            <i class="fas fa-info-circle mr-1"></i>Scan all F codes (pallets) and A codes (containers) to complete
                         </div>
                     </div>
                 </div>
@@ -3291,12 +3299,17 @@ async function handleFindOutletPallets() {
                 code: response.data.outlet_code,
                 code_short: response.data.outlet_code_short,
                 name: response.data.outlet_name,
-                container_count_loaded: response.data.container_count_loaded // Store warehouse container count
+                container_count_loaded: response.data.container_count_loaded, // OLD: Legacy field
+                box_count: response.data.box_count || 0, // NEW: Box count
+                container_count: response.data.container_count || 0, // NEW: A-code container count
+                a_code_containers: response.data.a_code_containers || [] // NEW: List of A-code containers
             }
             state.availablePallets = response.data.pallets
+            state.availableACodeContainers = response.data.a_code_containers || [] // NEW: Store A-code containers separately
             state.scannedItems = []
             
-            showToast(`Found ${response.data.pallets.length} pallet(s) for ${outletCodeShort}`, 'success')
+            const totalItems = response.data.pallets.length + (response.data.a_code_containers?.length || 0)
+            showToast(`Found ${response.data.pallets.length} pallet(s) + ${response.data.a_code_containers?.length || 0} container(s) for ${outletCodeShort}`, 'success')
             render()
             setTimeout(() => loadOutletPallets(), 100)
         } else {
@@ -3319,9 +3332,17 @@ async function loadOutletPallets() {
         
         if (response.data.success) {
             state.availablePallets = response.data.pallets
-            // Update container count if it changed
+            state.availableACodeContainers = response.data.a_code_containers || [] // NEW: Store A-code containers
+            
+            // Update container counts if they changed
             if (response.data.container_count_loaded) {
                 state.selectedOutlet.container_count_loaded = response.data.container_count_loaded
+            }
+            if (response.data.box_count !== undefined) {
+                state.selectedOutlet.box_count = response.data.box_count
+            }
+            if (response.data.container_count !== undefined) {
+                state.selectedOutlet.container_count = response.data.container_count
             }
             
             // IMPORTANT: Restore previously scanned pallets (status='scanned_unloading')
@@ -3344,12 +3365,14 @@ async function loadOutletPallets() {
             const palletsDiv = document.getElementById('availablePallets')
             if (!palletsDiv) return
             
-            if (state.availablePallets.length === 0) {
+            const totalItems = state.availablePallets.length + (state.availableACodeContainers?.length || 0)
+            
+            if (totalItems === 0) {
                 palletsDiv.innerHTML = `
                     <div class="text-center py-8">
                         <i class="fas fa-check-circle text-6xl text-green-500 mb-3"></i>
                         <p class="text-lg font-semibold text-green-600">All Deliveries Received!</p>
-                        <p class="text-sm text-gray-600">No pending pallets</p>
+                        <p class="text-sm text-gray-600">No pending items</p>
                     </div>
                 `
                 return
@@ -3360,7 +3383,14 @@ async function loadOutletPallets() {
                 !state.scannedItems.find(s => s.pallet_id === pallet.pallet_id)
             )
             
-            if (unscannedPallets.length === 0) {
+            // Filter out already scanned A-code containers
+            const unscannedACodeContainers = (state.availableACodeContainers || []).filter(container =>
+                !state.outletScannedACodes?.includes(container.container_id)
+            )
+            
+            const totalUnscanned = unscannedPallets.length + unscannedACodeContainers.length
+            
+            if (totalUnscanned === 0) {
                 palletsDiv.innerHTML = `
                     <div class="text-center py-6">
                         <i class="fas fa-check-circle text-4xl text-green-500 mb-2"></i>
@@ -3369,21 +3399,47 @@ async function loadOutletPallets() {
                     </div>
                 `
             } else {
-                palletsDiv.innerHTML = unscannedPallets.map(pallet => `
-                    <div class="border-2 border-blue-300 rounded-lg p-4 bg-blue-50">
-                        <div class="flex items-center justify-between mb-2">
-                            <p class="font-bold text-lg">
-                                <i class="fas fa-pallet mr-2 text-blue-600"></i>${pallet.pallet_id}
+                let html = ''
+                
+                // Show F codes (pallets)
+                if (unscannedPallets.length > 0) {
+                    html += unscannedPallets.map(pallet => `
+                        <div class="border-2 border-blue-300 rounded-lg p-3 bg-blue-50 mb-2">
+                            <div class="flex items-center justify-between mb-1">
+                                <p class="font-bold text-base">
+                                    <i class="fas fa-pallet mr-2 text-blue-600"></i>${pallet.pallet_id}
+                                </p>
+                                <span class="px-2 py-1 bg-blue-500 text-white text-xs rounded font-semibold">
+                                    F CODE
+                                </span>
+                            </div>
+                            <p class="text-xs text-gray-600">
+                                <i class="fas fa-box mr-1"></i>${pallet.transfer_count} transfers
                             </p>
-                            <span class="px-2 py-1 bg-blue-500 text-white text-xs rounded font-semibold">
-                                ${pallet.status.toUpperCase()}
-                            </span>
                         </div>
-                        <p class="text-sm text-gray-600">
-                            <i class="fas fa-box mr-1"></i>${pallet.transfer_count} transfers
-                        </p>
-                    </div>
-                `).join('')
+                    `).join('')
+                }
+                
+                // Show A codes (containers)
+                if (unscannedACodeContainers.length > 0) {
+                    html += unscannedACodeContainers.map(container => `
+                        <div class="border-2 border-purple-300 rounded-lg p-3 bg-purple-50 mb-2">
+                            <div class="flex items-center justify-between mb-1">
+                                <p class="font-bold text-base">
+                                    <i class="fas fa-box mr-2 text-purple-600"></i>${container.container_id}
+                                </p>
+                                <span class="px-2 py-1 bg-purple-500 text-white text-xs rounded font-semibold">
+                                    A CODE
+                                </span>
+                            </div>
+                            <p class="text-xs text-gray-600">
+                                <i class="fas fa-container-storage mr-1"></i>Container
+                            </p>
+                        </div>
+                    `).join('')
+                }
+                
+                palletsDiv.innerHTML = html
             }
         }
     } catch (error) {

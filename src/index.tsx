@@ -1418,15 +1418,36 @@ app.post('/api/outlet/find-pallets', authMiddleware, async (c) => {
     // Get outlet info from first parcel
     const firstParcel = parcels[0]
     
-    // Get container_count_loaded from first parcel (all pallets in same outlet should have same count)
-    const containerCountLoaded = firstParcel.container_count_loaded
+    // Get container counts from first parcel
+    const containerCountLoaded = firstParcel.container_count_loaded || 0 // OLD: Legacy field
+    const boxCount = firstParcel.box_count || 0 // NEW: Box count
+    const containerCount = firstParcel.container_count || 0 // NEW: A-code container count
+    
+    // Fetch A-code containers linked to this outlet
+    let aCodeContainers = []
+    if (containerCount > 0) {
+      try {
+        const containersResponse = await supabaseRequest(c, 
+          `containers?outlet_code=eq.${firstParcel.outlet_code}&status=eq.at_outlet&select=*`)
+        const containers = await containersResponse.json()
+        aCodeContainers = containers.map((cont: any) => ({
+          container_id: cont.container_id,
+          scanned_at: cont.scanned_at
+        }))
+      } catch (err) {
+        console.error('Error fetching A-code containers:', err)
+      }
+    }
     
     return c.json({
       success: true,
       outlet_code: firstParcel.outlet_code,
       outlet_code_short: firstParcel.outlet_code_short,
       outlet_name: firstParcel.outlet_name,
-      container_count_loaded: containerCountLoaded, // Include warehouse container count
+      container_count_loaded: containerCountLoaded, // OLD: Legacy field for backward compatibility
+      box_count: boxCount, // NEW: Box count from warehouse
+      container_count: containerCount, // NEW: A-code container count
+      a_code_containers: aCodeContainers, // NEW: List of A-code containers to scan
       pallets: parcels.map((p: any) => ({
         id: p.id,
         pallet_id: p.pallet_id,
