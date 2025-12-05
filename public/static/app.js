@@ -2639,11 +2639,19 @@ async function handleACodeScan(outletCode, expectedCount) {
         }
         
         // Send A code to backend
-        await axios.post('/api/warehouse/scan-container', {
+        console.log('📤 Sending A-code to backend:', {
             container_id: aCode,
             outlet_code: outletCode,
             delivery_date: deliveryDate
         })
+        
+        const response = await axios.post('/api/warehouse/scan-container', {
+            container_id: aCode,
+            outlet_code: outletCode,
+            delivery_date: deliveryDate
+        })
+        
+        console.log('✅ A-code saved successfully:', response.data)
         
         playBeep(true)
         showToast(`✓ Container ${aCode} scanned`, 'success')
@@ -2715,7 +2723,15 @@ async function handleACodeScan(outletCode, expectedCount) {
             }, 100)
         }
     } catch (error) {
-        console.error('Error scanning A code:', error)
+        console.error('❌ Error scanning A code:', error)
+        console.error('❌ Error details:', {
+            message: error.message,
+            response: error.response?.data,
+            status: error.response?.status,
+            container_id: aCode,
+            outlet_code: outletCode,
+            delivery_date: state.warehouseDeliveryDate
+        })
         // Remove from local state if backend fails
         state.aCodeScans[outletCode] = state.aCodeScans[outletCode].filter(c => c !== aCode)
         playBeep(false)

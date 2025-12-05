@@ -1261,7 +1261,8 @@ app.post('/api/warehouse/scan-container', authMiddleware, async (c) => {
       return c.json({ error: 'Missing required fields: container_id, outlet_code, delivery_date' }, 400)
     }
     
-    console.log(`Scanning A code container: ${container_id} for outlet ${outlet_code}`)
+    console.log(`🔍 Scanning A code container: ${container_id} for outlet ${outlet_code}`)
+    console.log(`📝 Scan details:`, { container_id, outlet_code, delivery_date, user: user.full_name })
     
     // Check if A code already scanned for this outlet
     const existingResponse = await supabaseRequest(c, 
@@ -1269,6 +1270,7 @@ app.post('/api/warehouse/scan-container', authMiddleware, async (c) => {
     const existing = await existingResponse.json()
     
     if (existing && existing.length > 0) {
+      console.log(`⚠️ Duplicate scan detected: ${container_id} already exists for outlet ${outlet_code}`)
       return c.json({ 
         success: false, 
         error: 'Container already scanned for this outlet',
@@ -1277,7 +1279,14 @@ app.post('/api/warehouse/scan-container', authMiddleware, async (c) => {
     }
     
     // Create container record linked to outlet
-    await supabaseRequest(c, 'container_inventory', {
+    console.log(`💾 Saving A-code to container_inventory:`, {
+      container_id,
+      outlet_code,
+      delivery_date,
+      status: 'at_outlet'
+    })
+    
+    const insertResponse = await supabaseRequest(c, 'container_inventory', {
       method: 'POST',
       body: JSON.stringify({
         container_id: container_id,
@@ -1290,10 +1299,14 @@ app.post('/api/warehouse/scan-container', authMiddleware, async (c) => {
       })
     })
     
+    const insertResult = await insertResponse.json()
+    console.log(`✅ A-code saved successfully:`, insertResult)
+    
     return c.json({ 
       success: true, 
       container_id,
-      outlet_code 
+      outlet_code,
+      saved_data: insertResult
     })
   } catch (error) {
     console.error('Scan container error:', error)
@@ -1452,6 +1465,11 @@ app.post('/api/outlet/find-pallets', authMiddleware, async (c) => {
     // Fetch A-code containers linked to this outlet
     let aCodeContainers = []
     console.log(`🔍 Fetching A-code containers for outlet ${firstParcel.outlet_code}, container_count=${containerCount}`)
+    console.log(`📝 Full outlet info:`, {
+      outlet_code: firstParcel.outlet_code,
+      outlet_code_short: firstParcel.outlet_code_short,
+      outlet_name: firstParcel.outlet_name
+    })
     console.log(`📝 Query: container_inventory?outlet_code=eq.${firstParcel.outlet_code}&select=*`)
     
     // Always try to fetch containers, not just when container_count > 0
@@ -1460,7 +1478,8 @@ app.post('/api/outlet/find-pallets', authMiddleware, async (c) => {
       const containersResponse = await supabaseRequest(c, 
         `container_inventory?outlet_code=eq.${firstParcel.outlet_code}&select=*`)
       const containers = await containersResponse.json()
-      console.log(`✅ Found ${containers?.length || 0} A-code containers for outlet ${firstParcel.outlet_code}:`, JSON.stringify(containers, null, 2))
+      console.log(`✅ Query returned ${containers?.length || 0} A-code containers`)
+      console.log(`📦 Container data:`, JSON.stringify(containers, null, 2))
       
       if (containers && containers.length > 0) {
         aCodeContainers = containers.map((cont: any) => ({
