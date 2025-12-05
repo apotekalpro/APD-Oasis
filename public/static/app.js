@@ -3685,14 +3685,24 @@ function showOutletCompletionModal() {
         return
     }
     
-    // Check if all available pallets are scanned
+    // Check if all available pallets (F-codes) are scanned
     const unscannedPallets = state.availablePallets.filter(p => 
         !state.scannedItems.find(s => s.pallet_id === p.pallet_id)
     )
     
+    // Check if all available A-code containers are scanned
+    const availableAcodes = state.availableACodeContainers || []
+    const unscannedAcodes = availableAcodes.filter(a => 
+        !state.scannedItems.find(s => s.pallet_id === a.container_id)
+    )
+    
     const totalPallets = state.availablePallets.length
+    const totalAcodes = availableAcodes.length
     const scannedCount = state.scannedItems.length
     const totalTransfers = state.scannedItems.reduce((sum, item) => sum + item.transfer_count, 0)
+    
+    // Check if incomplete (either pallets or A-codes missing)
+    const isIncomplete = unscannedPallets.length > 0 || unscannedAcodes.length > 0
     
     // Check if warehouse already set container count
     const warehouseContainerCount = state.selectedOutlet.container_count_loaded
@@ -3717,34 +3727,51 @@ function showOutletCompletionModal() {
                     </p>
                 </div>
                 
-                ${unscannedPallets.length > 0 ? `
+                ${isIncomplete ? `
                     <div class="mb-4 bg-red-50 border-2 border-red-500 rounded-lg p-4">
                         <p class="text-sm font-bold text-red-800 mb-2">
                             <i class="fas fa-exclamation-triangle mr-1"></i>⚠️ Warning: Incomplete Receipt
                         </p>
-                        <p class="text-xs text-red-700 mb-2">
-                            You have <strong>${unscannedPallets.length} pallet(s)</strong> not yet scanned out of ${totalPallets} total.
-                        </p>
-                        <div class="text-xs text-red-600 bg-white rounded p-2 border border-red-300">
-                            <strong>Unscanned pallets:</strong>
-                            <ul class="list-disc list-inside mt-1">
-                                ${unscannedPallets.slice(0, 5).map(p => `
-                                    <li>${p.pallet_id} (${p.transfer_count} transfers)</li>
-                                `).join('')}
-                                ${unscannedPallets.length > 5 ? `<li>...and ${unscannedPallets.length - 5} more</li>` : ''}
-                            </ul>
-                        </div>
+                        ${unscannedPallets.length > 0 ? `
+                            <p class="text-xs text-red-700 mb-2">
+                                You have <strong>${unscannedPallets.length} F-code pallet(s)</strong> not yet scanned out of ${totalPallets} total.
+                            </p>
+                            <div class="text-xs text-red-600 bg-white rounded p-2 border border-red-300 mb-2">
+                                <strong>Unscanned F-codes (Pallets):</strong>
+                                <ul class="list-disc list-inside mt-1">
+                                    ${unscannedPallets.slice(0, 5).map(p => `
+                                        <li class="text-blue-700">📦 ${p.pallet_id} (${p.transfer_count} transfers)</li>
+                                    `).join('')}
+                                    ${unscannedPallets.length > 5 ? `<li>...and ${unscannedPallets.length - 5} more</li>` : ''}
+                                </ul>
+                            </div>
+                        ` : ''}
+                        ${unscannedAcodes.length > 0 ? `
+                            <p class="text-xs text-red-700 mb-2">
+                                You have <strong>${unscannedAcodes.length} A-code container(s)</strong> not yet scanned out of ${totalAcodes} total.
+                            </p>
+                            <div class="text-xs text-red-600 bg-white rounded p-2 border border-red-300">
+                                <strong>Unscanned A-codes (Containers):</strong>
+                                <ul class="list-disc list-inside mt-1">
+                                    ${unscannedAcodes.slice(0, 5).map(a => `
+                                        <li class="text-purple-700">📦 ${a.container_id}</li>
+                                    `).join('')}
+                                    ${unscannedAcodes.length > 5 ? `<li>...and ${unscannedAcodes.length - 5} more</li>` : ''}
+                                </ul>
+                            </div>
+                        ` : ''}
                         <p class="text-xs text-red-700 mt-2 font-semibold">
-                            <i class="fas fa-info-circle mr-1"></i>These will be marked as <strong>unreceived</strong> in the report.
+                            <i class="fas fa-info-circle mr-1"></i>Unscanned items will be marked as <strong>unreceived</strong> in the report.
                         </p>
                     </div>
                 ` : `
                     <div class="mb-4 bg-green-50 border border-green-300 rounded-lg p-4">
                         <p class="text-sm font-semibold text-green-800">
-                            <i class="fas fa-check-circle mr-1"></i>All Pallets Scanned!
+                            <i class="fas fa-check-circle mr-1"></i>All Items Scanned!
                         </p>
                         <p class="text-xs text-green-600 mt-1">
-                            You have scanned all ${totalPallets} pallets for this outlet.
+                            ✓ ${totalPallets} F-code pallet(s) scanned
+                            ${totalAcodes > 0 ? `<br>✓ ${totalAcodes} A-code container(s) scanned` : ''}
                         </p>
                     </div>
                 `}
