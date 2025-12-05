@@ -3135,6 +3135,11 @@ async function deleteTransfer(transferId, outletCode) {
 
 // ============ Outlet Page ============
 function renderOutlet() {
+    // Initialize outlet delivery date to today if not set
+    if (!state.outletDeliveryDate) {
+        state.outletDeliveryDate = new Date().toISOString().split('T')[0]
+    }
+    
     return `
         <div class="h-full flex flex-col">
         <div class="container mx-auto px-2 py-2 pb-20 flex-1 overflow-y-auto" style="max-height: 100vh;">
@@ -3552,12 +3557,18 @@ async function handleOutletScanPallet() {
                 state.scannedItems.push({
                     code: scannedCode,
                     type: 'container',
+                    container_id: scannedCode,
                     time: new Date().toLocaleTimeString()
                 })
                 
                 showToast(`✓ Container ${scannedCode} scanned`, 'success')
                 updateOutletScannedList()
                 updateOutletCompleteButton()
+                
+                // Remove scanned A-code from "Your Deliveries" list
+                if (!state.availableACodeContainers) state.availableACodeContainers = []
+                state.availableACodeContainers = state.availableACodeContainers.filter(a => a.container_id !== scannedCode)
+                loadOutletPallets()
             } else {
                 playBeep(false)
                 showToast(`✗ ${response.data.error}`, 'error')
