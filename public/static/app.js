@@ -3295,6 +3295,15 @@ async function handleFindOutletPallets() {
         })
         
         if (response.data.success) {
+            // Debug logging
+            console.log('🔍 Outlet data received:', {
+                outlet: response.data.outlet_code,
+                box_count: response.data.box_count,
+                container_count: response.data.container_count,
+                a_code_containers: response.data.a_code_containers,
+                pallets: response.data.pallets.length
+            })
+            
             state.selectedOutlet = {
                 code: response.data.outlet_code,
                 code_short: response.data.outlet_code_short,
@@ -3309,6 +3318,10 @@ async function handleFindOutletPallets() {
             state.scannedItems = []
             
             const totalItems = response.data.pallets.length + (response.data.a_code_containers?.length || 0)
+            console.log('📦 Available items:', {
+                pallets: state.availablePallets.length,
+                aCodeContainers: state.availableACodeContainers.length
+            })
             showToast(`Found ${response.data.pallets.length} pallet(s) + ${response.data.a_code_containers?.length || 0} container(s) for ${outletCodeShort}`, 'success')
             render()
             setTimeout(() => loadOutletPallets(), 100)

@@ -1265,7 +1265,7 @@ app.post('/api/warehouse/scan-container', authMiddleware, async (c) => {
     
     // Check if A code already scanned for this outlet
     const existingResponse = await supabaseRequest(c, 
-      `containers?container_id=eq.${container_id}&outlet_code=eq.${outlet_code}&select=*`)
+      `container_inventory?container_id=eq.${container_id}&outlet_code=eq.${outlet_code}&select=*`)
     const existing = await existingResponse.json()
     
     if (existing && existing.length > 0) {
@@ -1277,7 +1277,7 @@ app.post('/api/warehouse/scan-container', authMiddleware, async (c) => {
     }
     
     // Create container record linked to outlet
-    await supabaseRequest(c, 'containers', {
+    await supabaseRequest(c, 'container_inventory', {
       method: 'POST',
       body: JSON.stringify({
         container_id: container_id,
@@ -1298,6 +1298,32 @@ app.post('/api/warehouse/scan-container', authMiddleware, async (c) => {
   } catch (error) {
     console.error('Scan container error:', error)
     return c.json({ error: 'Failed to scan container' }, 500)
+  }
+})
+
+// DEBUG: Check containers table for specific outlet
+app.get('/api/debug/containers/:outlet_code', authMiddleware, async (c) => {
+  try {
+    const outlet_code = c.req.param('outlet_code')
+    
+    // Get all containers for this outlet
+    const containersResponse = await supabaseRequest(c, 
+      `container_inventory?outlet_code=eq.${outlet_code}&select=*`)
+    const containers = await containersResponse.json()
+    
+    // Also get ALL containers (to see what outlet_codes exist)
+    const allContainersResponse = await supabaseRequest(c, `container_inventory?select=*&order=scanned_at.desc&limit=20`)
+    const allContainers = await allContainersResponse.json()
+    
+    return c.json({
+      outlet_code: outlet_code,
+      containers_for_outlet: containers,
+      recent_containers: allContainers,
+      query_used: `container_inventory?outlet_code=eq.${outlet_code}&select=*`
+    })
+  } catch (error) {
+    console.error('Debug containers error:', error)
+    return c.json({ error: 'Failed to query containers' }, 500)
   }
 })
 
@@ -1425,18 +1451,26 @@ app.post('/api/outlet/find-pallets', authMiddleware, async (c) => {
     
     // Fetch A-code containers linked to this outlet
     let aCodeContainers = []
-    if (containerCount > 0) {
-      try {
-        const containersResponse = await supabaseRequest(c, 
-          `containers?outlet_code=eq.${firstParcel.outlet_code}&status=eq.at_outlet&select=*`)
-        const containers = await containersResponse.json()
+    console.log(`🔍 Fetching A-code containers for outlet ${firstParcel.outlet_code}, container_count=${containerCount}`)
+    console.log(`📝 Query: container_inventory?outlet_code=eq.${firstParcel.outlet_code}&select=*`)
+    
+    // Always try to fetch containers, not just when container_count > 0
+    // (in case data is inconsistent)
+    try {
+      const containersResponse = await supabaseRequest(c, 
+        `container_inventory?outlet_code=eq.${firstParcel.outlet_code}&select=*`)
+      const containers = await containersResponse.json()
+      console.log(`✅ Found ${containers?.length || 0} A-code containers for outlet ${firstParcel.outlet_code}:`, JSON.stringify(containers, null, 2))
+      
+      if (containers && containers.length > 0) {
         aCodeContainers = containers.map((cont: any) => ({
           container_id: cont.container_id,
-          scanned_at: cont.scanned_at
+          scanned_at: cont.scanned_at,
+          status: cont.status
         }))
-      } catch (err) {
-        console.error('Error fetching A-code containers:', err)
       }
+    } catch (err) {
+      console.error('Error fetching A-code containers:', err)
     }
     
     return c.json({
@@ -1576,7 +1610,7 @@ app.post('/api/outlet/scan-container', authMiddleware, async (c) => {
     
     // Check if container exists for this outlet
     const containersResponse = await supabaseRequest(c, 
-      `containers?container_id=eq.${container_id}&outlet_code=eq.${outlet_code || outlet_code_short}&select=*`)
+      `container_inventory?container_id=eq.${container_id}&outlet_code=eq.${outlet_code || outlet_code_short}&select=*`)
     const containers = await containersResponse.json()
     
     if (!containers || containers.length === 0) {
