@@ -3690,14 +3690,14 @@ function showOutletCompletionModal() {
                 </div>
                 
                 ${unscannedPallets.length > 0 ? `
-                    <div class="mb-4 bg-yellow-50 border border-yellow-300 rounded-lg p-4">
-                        <p class="text-sm font-semibold text-yellow-800 mb-2">
-                            <i class="fas fa-exclamation-triangle mr-1"></i>Warning: Incomplete Receipt
+                    <div class="mb-4 bg-red-50 border-2 border-red-500 rounded-lg p-4">
+                        <p class="text-sm font-bold text-red-800 mb-2">
+                            <i class="fas fa-exclamation-triangle mr-1"></i>⚠️ Warning: Incomplete Receipt
                         </p>
-                        <p class="text-xs text-yellow-700 mb-2">
+                        <p class="text-xs text-red-700 mb-2">
                             You have <strong>${unscannedPallets.length} pallet(s)</strong> not yet scanned out of ${totalPallets} total.
                         </p>
-                        <div class="text-xs text-yellow-600 bg-white rounded p-2">
+                        <div class="text-xs text-red-600 bg-white rounded p-2 border border-red-300">
                             <strong>Unscanned pallets:</strong>
                             <ul class="list-disc list-inside mt-1">
                                 ${unscannedPallets.slice(0, 5).map(p => `
@@ -3706,7 +3706,7 @@ function showOutletCompletionModal() {
                                 ${unscannedPallets.length > 5 ? `<li>...and ${unscannedPallets.length - 5} more</li>` : ''}
                             </ul>
                         </div>
-                        <p class="text-xs text-yellow-700 mt-2">
+                        <p class="text-xs text-red-700 mt-2 font-semibold">
                             <i class="fas fa-info-circle mr-1"></i>These will be marked as <strong>unreceived</strong> in the report.
                         </p>
                     </div>
@@ -3787,6 +3787,37 @@ function showOutletCompletionModal() {
                     `}
                 `}
                 
+                <div class="mb-4 bg-blue-50 border border-blue-300 rounded-lg p-4">
+                    <p class="text-sm font-semibold text-blue-800 mb-3">
+                        <i class="fas fa-box mr-1"></i>Delivery Quantities
+                    </p>
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-xs font-medium mb-1">
+                                📦 Boxes Delivered <span class="text-red-500">*</span>
+                            </label>
+                            <input type="number" id="boxes_delivered" required 
+                                min="0"
+                                class="w-full px-3 py-2 border rounded-lg text-center text-lg font-bold"
+                                placeholder="0"
+                                value="0">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium mb-1">
+                                📦 Containers Delivered <span class="text-red-500">*</span>
+                            </label>
+                            <input type="number" id="containers_delivered" required 
+                                min="0"
+                                class="w-full px-3 py-2 border rounded-lg text-center text-lg font-bold"
+                                placeholder="0"
+                                value="0">
+                        </div>
+                    </div>
+                    <p class="text-xs text-gray-500 mt-2">
+                        <i class="fas fa-info-circle mr-1"></i>Enter the actual quantities received
+                    </p>
+                </div>
+                
                 <div class="mb-4">
                     <label class="block text-sm font-medium mb-2">Receiver Name/Signature <span class="text-red-500">*</span></label>
                     <input type="text" id="receiver_name_complete" required 
@@ -3837,15 +3868,26 @@ async function handleConfirmOutletCompletion(event) {
     event.preventDefault()
     
     const receiverName = document.getElementById('receiver_name_complete').value.trim()
-    const containerCount = parseInt(document.getElementById('container_count_outlet').value)
+    const boxesDelivered = parseInt(document.getElementById('boxes_delivered').value) || 0
+    const containersDelivered = parseInt(document.getElementById('containers_delivered').value) || 0
     
     if (!receiverName) {
         showToast('Please enter receiver name', 'error')
         return
     }
     
-    if (!containerCount || containerCount < 1) {
-        showToast('Please enter a valid container count', 'error')
+    if (boxesDelivered < 0) {
+        showToast('Boxes delivered cannot be negative', 'error')
+        return
+    }
+    
+    if (containersDelivered < 0) {
+        showToast('Containers delivered cannot be negative', 'error')
+        return
+    }
+    
+    if (boxesDelivered === 0 && containersDelivered === 0) {
+        showToast('Please enter at least one box or container delivered', 'error')
         return
     }
     
@@ -3863,13 +3905,13 @@ async function handleConfirmOutletCompletion(event) {
     
     // Show double confirmation dialog
     const palletIds = state.scannedItems.map(item => item.pallet_id)
-    showFinalConfirmationDialog(receiverName, containerCount, palletIds)
+    showFinalConfirmationDialog(receiverName, boxesDelivered, containersDelivered, palletIds)
 }
 
 // NEW: Final confirmation dialog before submitting
-function showFinalConfirmationDialog(receiverName, containerCount, palletIds) {
+function showFinalConfirmationDialog(receiverName, boxesDelivered, containersDelivered, palletIds) {
     // Store data in state for the confirmation handler
-    state.pendingOutletCompletion = { receiverName, containerCount, palletIds }
+    state.pendingOutletCompletion = { receiverName, boxesDelivered, containersDelivered, palletIds }
     
     const confirmModal = document.createElement('div')
     confirmModal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60] p-4'
@@ -3885,7 +3927,8 @@ function showFinalConfirmationDialog(receiverName, containerCount, palletIds) {
                 <div class="space-y-2 text-sm">
                     <p><i class="fas fa-store mr-2 text-blue-600"></i><strong>Outlet:</strong> ${state.selectedOutlet.code_short} - ${state.selectedOutlet.name}</p>
                     <p><i class="fas fa-pallet mr-2 text-blue-600"></i><strong>Pallets:</strong> ${palletIds.length} pallet(s)</p>
-                    <p><i class="fas fa-truck mr-2 text-blue-600"></i><strong>Containers:</strong> ${containerCount} container(s)</p>
+                    <p><i class="fas fa-box mr-2 text-blue-600"></i><strong>Boxes:</strong> ${boxesDelivered} box(es)</p>
+                    <p><i class="fas fa-container-storage mr-2 text-blue-600"></i><strong>Containers:</strong> ${containersDelivered} container(s)</p>
                     <p><i class="fas fa-user mr-2 text-blue-600"></i><strong>Received by:</strong> ${receiverName}</p>
                 </div>
             </div>
@@ -3942,17 +3985,18 @@ async function proceedWithOutletCompletion() {
         return
     }
     
-    const { receiverName, containerCount, palletIds } = state.pendingOutletCompletion
+    const { receiverName, boxesDelivered, containersDelivered, palletIds } = state.pendingOutletCompletion
     
     try {
         const response = await axios.post('/api/outlet/confirm-receipt-bulk', {
             outlet_code_short: state.selectedOutlet.code_short,
             pallet_ids: palletIds,
             receiver_name: receiverName,
-            container_count: containerCount
+            boxes_delivered: boxesDelivered,
+            containers_delivered: containersDelivered
         })
         
-        showToast(`✓ Receipt completed! ${containerCount} container(s) with ${palletIds.length} pallet(s) received by ${receiverName}`, 'success')
+        showToast(`✓ Receipt completed! ${boxesDelivered} boxes, ${containersDelivered} containers with ${palletIds.length} pallet(s) received by ${receiverName}`, 'success')
         
         // Close all modals
         document.querySelectorAll('.fixed.inset-0').forEach(modal => modal.remove())
