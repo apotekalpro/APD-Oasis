@@ -2532,6 +2532,14 @@ function showACodeScanningModal(outletCode, outletShortCode, outletName, contain
     if (!state.aCodeScans) state.aCodeScans = {}
     if (!state.aCodeScans[outletCode]) state.aCodeScans[outletCode] = []
     
+    // Store outlet info for use during scanning
+    if (!state.aCodeOutletInfo) state.aCodeOutletInfo = {}
+    state.aCodeOutletInfo[outletCode] = {
+        outletCode: outletCode,
+        outletShortCode: outletShortCode,
+        outletName: outletName
+    }
+    
     const renderModal = () => {
         const scannedCount = state.aCodeScans[outletCode].length
         const remaining = containerCount - scannedCount
@@ -2574,9 +2582,9 @@ function showACodeScanningModal(outletCode, outletShortCode, outletName, contain
                         <input type="text" id="acode_scan_${outletCode}" 
                             class="w-full px-3 py-2 border rounded-lg text-center text-xl font-mono uppercase"
                             placeholder="Scan or enter A code"
-                            onkeypress="if(event.key==='Enter') handleACodeScan('${outletCode}', ${containerCount})">
+                            onkeypress="if(event.key==='Enter') handleACodeScan('${outletCode}', ${containerCount}, '${outletName}')">
                     </div>
-                    <button type="button" onclick="handleACodeScan('${outletCode}', ${containerCount})"
+                    <button type="button" onclick="handleACodeScan('${outletCode}', ${containerCount}, '${outletName}')"
                         class="w-full bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg mb-2">
                         <i class="fas fa-plus mr-2"></i>Add Container
                     </button>
@@ -2601,7 +2609,7 @@ function showACodeScanningModal(outletCode, outletShortCode, outletName, contain
 }
 
 // Handle A code scan
-async function handleACodeScan(outletCode, expectedCount) {
+async function handleACodeScan(outletCode, expectedCount, outletName = '') {
     const input = document.getElementById(`acode_scan_${outletCode}`)
     const aCode = input.value.trim().toUpperCase()
     
@@ -2642,12 +2650,14 @@ async function handleACodeScan(outletCode, expectedCount) {
         console.log('📤 Sending A-code to backend:', {
             container_id: aCode,
             outlet_code: outletCode,
+            outlet_name: outletName,
             delivery_date: deliveryDate
         })
         
         const response = await axios.post('/api/warehouse/scan-container', {
             container_id: aCode,
             outlet_code: outletCode,
+            outlet_name: outletName,
             delivery_date: deliveryDate
         })
         
@@ -2664,6 +2674,8 @@ async function handleACodeScan(outletCode, expectedCount) {
         if (modal) {
             const scannedCount = state.aCodeScans[outletCode].length
             const remaining = expectedCount - scannedCount
+            const outletInfo = state.aCodeOutletInfo[outletCode] || {}
+            const savedOutletName = outletInfo.outletName || outletName || ''
             
             modal.innerHTML = `
                 <div class="bg-white rounded-lg p-6 w-full max-w-md">
@@ -2701,9 +2713,9 @@ async function handleACodeScan(outletCode, expectedCount) {
                             <input type="text" id="acode_scan_${outletCode}" 
                                 class="w-full px-3 py-2 border rounded-lg text-center text-xl font-mono uppercase"
                                 placeholder="Scan or enter A code"
-                                onkeypress="if(event.key==='Enter') handleACodeScan('${outletCode}', ${expectedCount})">
+                                onkeypress="if(event.key==='Enter') handleACodeScan('${outletCode}', ${expectedCount}, '${savedOutletName}')">
                         </div>
-                        <button type="button" onclick="handleACodeScan('${outletCode}', ${expectedCount})"
+                        <button type="button" onclick="handleACodeScan('${outletCode}', ${expectedCount}, '${savedOutletName}')"
                             class="w-full bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg mb-2">
                             <i class="fas fa-plus mr-2"></i>Add Container
                         </button>

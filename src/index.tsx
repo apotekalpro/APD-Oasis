@@ -1255,14 +1255,14 @@ app.post('/api/warehouse/set-container-count', authMiddleware, async (c) => {
 app.post('/api/warehouse/scan-container', authMiddleware, async (c) => {
   try {
     const user = c.get('user')
-    const { container_id, outlet_code, delivery_date } = await c.req.json()
+    const { container_id, outlet_code, outlet_name, delivery_date } = await c.req.json()
     
     if (!container_id || !outlet_code || !delivery_date) {
       return c.json({ error: 'Missing required fields: container_id, outlet_code, delivery_date' }, 400)
     }
     
     console.log(`🔍 Scanning A code container: ${container_id} for outlet ${outlet_code}`)
-    console.log(`📝 Scan details:`, { container_id, outlet_code, delivery_date, user: user.full_name })
+    console.log(`📝 Scan details:`, { container_id, outlet_code, outlet_name, delivery_date, user: user.full_name })
     
     // Check if A code already scanned for this outlet
     const existingResponse = await supabaseRequest(c, 
@@ -1282,6 +1282,7 @@ app.post('/api/warehouse/scan-container', authMiddleware, async (c) => {
     console.log(`💾 Saving A-code to container_inventory:`, {
       container_id,
       outlet_code,
+      outlet_name,
       delivery_date,
       status: 'at_outlet'
     })
@@ -1291,6 +1292,7 @@ app.post('/api/warehouse/scan-container', authMiddleware, async (c) => {
       body: JSON.stringify({
         container_id: container_id,
         outlet_code: outlet_code,
+        outlet_name: outlet_name || `Outlet ${outlet_code}`, // Fallback if name not provided
         delivery_date: delivery_date,
         status: 'at_outlet', // Container loaded and ready for delivery
         scanned_at: new Date().toISOString(),
