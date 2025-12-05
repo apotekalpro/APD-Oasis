@@ -1564,10 +1564,12 @@ async function loadDashboardData() {
         let deliveredPallets = 0
         let totalLoadedContainers = 0
         let totalDeliveredContainers = 0
-        let totalLoadedBoxes = 0 // NEW: Total boxes loaded
-        let totalLoadedACodeContainers = 0 // NEW: Total A-code containers loaded
+        let totalLoadedBoxes = 0 // NEW: Total boxes loaded (counted once per outlet)
+        let totalLoadedACodeContainers = 0 // NEW: Total A-code containers loaded (counted once per outlet)
         let totalTNScanned = 0 // NEW: Count total transfer numbers scanned
         const outletsLoaded = new Set() // NEW: Track unique outlets that have been loaded
+        const outletBoxCounts = new Map() // NEW: Track box counts per outlet (avoid double-counting)
+        const outletContainerCounts = new Map() // NEW: Track container counts per outlet (avoid double-counting)
         
         parcels.forEach(parcel => {
             // Skip invalid parcels
@@ -1615,9 +1617,15 @@ async function loadDashboardData() {
                 if (parcel.container_count_loaded && !outlet.container_count_loaded) {
                     outlet.container_count_loaded = parcel.container_count_loaded
                 }
-                // NEW: Sum up box_count and container_count
-                totalLoadedBoxes += (parcel.box_count || 0)
-                totalLoadedACodeContainers += (parcel.container_count || 0)
+                // NEW: Track box_count and container_count ONCE per outlet (not per parcel)
+                if (parcel.box_count && !outletBoxCounts.has(parcel.outlet_code)) {
+                    outletBoxCounts.set(parcel.outlet_code, parcel.box_count)
+                    totalLoadedBoxes += parcel.box_count
+                }
+                if (parcel.container_count && !outletContainerCounts.has(parcel.outlet_code)) {
+                    outletContainerCounts.set(parcel.outlet_code, parcel.container_count)
+                    totalLoadedACodeContainers += parcel.container_count
+                }
             }
             
             // Track delivered status and info
