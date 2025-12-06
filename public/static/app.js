@@ -1366,7 +1366,7 @@ function renderDashboard() {
                     <div class="flex flex-col">
                         <div class="flex items-center justify-between mb-2">
                             <p class="text-gray-500 text-xs">Containers Loaded</p>
-                            <i class="fas fa-container-storage text-2xl text-teal-200"></i>
+                            <i class="fas fa-cubes text-2xl text-teal-200"></i>
                         </div>
                         <p id="dash-loaded-containers" class="text-2xl font-bold text-teal-600">-</p>
                     </div>
@@ -2107,7 +2107,7 @@ async function loadWarehouseData() {
             return
         }
         
-        // Check if outlets are delivered (all parcels delivered)
+        // Check if outlets are delivered or completed loading
         const outlets = Array.from(outletMap.values()).map(outlet => {
             const percentage = outlet.total > 0 ? Math.round((outlet.scanned / outlet.total) * 100) : 0
             const isComplete = outlet.scanned === outlet.total
@@ -2116,11 +2116,15 @@ async function loadWarehouseData() {
             const outletParcels = state.parcels.filter(p => p.outlet_code === outlet.code)
             const allDelivered = outletParcels.every(p => p.status === 'delivered')
             
-            return { ...outlet, percentage, isComplete, allDelivered }
+            // Check if loading is completed (has loaded_at timestamp AND is fully loaded)
+            const loadingCompleted = outletParcels.every(p => p.status === 'loaded' && p.loaded_at)
+            
+            return { ...outlet, percentage, isComplete, allDelivered, loadingCompleted }
         })
         
-        // Separate into pending and delivered outlets
-        const pendingOutlets = outlets.filter(o => !o.allDelivered)
+        // Separate into pending, completed loading, and delivered outlets
+        // Only show pending outlets (not completed loading or delivered)
+        const pendingOutlets = outlets.filter(o => !o.loadingCompleted && !o.allDelivered)
         const deliveredOutlets = outlets.filter(o => o.allDelivered)
         
         // Render function for outlet card
@@ -3704,7 +3708,7 @@ function showOutletCompletionModal() {
     // Check if all available A-code containers are scanned
     const availableAcodes = state.availableACodeContainers || []
     const unscannedAcodes = availableAcodes.filter(a => 
-        !state.scannedItems.find(s => s.pallet_id === a.container_id)
+        !state.scannedItems.find(s => s.container_id === a.container_id)
     )
     
     const totalPallets = state.availablePallets.length
