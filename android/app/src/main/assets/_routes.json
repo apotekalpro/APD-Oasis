@@ -1,1 +1,1 @@
-{"version":1,"include":["/*"],"exclude":["/downloads/*","/static/*","/test-outlets.html"]}
+{"version":1,"include":["/*"],"exclude":["/check-deployment.html","/downloads/*","/static/*","/test-outlets.html","/test-supabase-direct.html"]}

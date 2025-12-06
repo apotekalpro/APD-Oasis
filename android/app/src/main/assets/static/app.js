@@ -1,4 +1,9 @@
 // APD OASIS Warehouse Logistic System - Frontend Application
+// Version: 1.1.28 - A Code Logic Implementation (Box & Container Tracking)
+console.log('%c🚀 APD OASIS v1.1.28 LOADED', 'background: #4CAF50; color: white; padding: 4px 8px; border-radius: 4px; font-weight: bold;')
+console.log('✅ A Code Scanning: ENABLED')
+console.log('✅ Box & Container Tracking: ENABLED')
+console.log('✅ Dashboard Separate Counts: ENABLED')
 
 // ============ Simple Storage Helper ============
 // Simple wrapper that just uses localStorage (works in Capacitor webview)
@@ -45,7 +50,8 @@ const state = {
     transfers: [],
     scannedItems: [],
     selectedOutlet: null,
-    errors: []
+    errors: [],
+    cachedContainerInventory: null // OPTIMIZATION: Cache for container inventory API
 }
 
 // Permission helper functions
@@ -71,6 +77,7 @@ function isSupervisor() {
 const isMobile = window.location.origin.startsWith('capacitor://') || 
                  window.location.origin.startsWith('file://') ||
                  window.location.origin.includes('localhost') ||
+                 window.location.hostname === 'app' ||
                  window.location.protocol === 'capacitor:' ||
                  window.location.protocol === 'file:'
 
@@ -353,6 +360,9 @@ function renderNavBar() {
                             class="flex-1 min-w-[120px] px-4 py-2 rounded ${state.currentPage === 'admin' ? 'bg-blue-800' : 'bg-blue-500 hover:bg-blue-700'}">
                             <i class="fas fa-cog mr-2"></i>Admin
                         </button>
+                    ` : ''}
+                    
+                    ${showAllTabs && ['admin', 'warehouse_supervisor'].includes(state.user.role) ? `
                         <button onclick="navigateTo('import')" 
                             class="flex-1 min-w-[120px] px-4 py-2 rounded ${state.currentPage === 'import' ? 'bg-blue-800' : 'bg-blue-500 hover:bg-blue-700'}">
                             <i class="fas fa-upload mr-2"></i>Import
@@ -1106,15 +1116,48 @@ async function confirmImport() {
             return
         }
         
+        // OPTIMIZED: Single batch upload with backend optimization
+        // Backend processes ALL data at once using batch inserts (2 API calls total)
+        // Much faster than chunked approach - completes in 3-5 seconds
+        
+        console.log('🚀 Starting import...')
+        console.log(`Total rows: ${importData.length}`)
+        
+        // Show processing message
+        showToast(`Processing ${importData.length} rows, please wait...`, 'info')
+        
         const response = await axios.post('/api/import', {
             data: importData,
             import_date: new Date().toISOString().split('T')[0],
             delivery_date: deliveryDate
+        }, {
+            timeout: 60000  // 60 second timeout for large imports
         })
         
-        showToast(`Successfully imported ${response.data.total_parcels} parcels for ${deliveryDate}`, 'success')
+        console.log('✅ Import response:', response.data)
+        
+        // Show success message
+        const totalParcels = response.data.total_parcels || importData.length
+        const successMsg = `Successfully imported ${totalParcels} parcels for ${deliveryDate}!`
+        showToast(successMsg, 'success')
+        
+        // Update UI to show success state
+        if (confirmBtn) {
+            confirmBtn.disabled = false
+            confirmBtn.innerHTML = '<i class="fas fa-check-circle mr-2"></i>Import Complete!'
+            confirmBtn.classList.remove('bg-blue-500', 'hover:bg-blue-600')
+            confirmBtn.classList.add('bg-green-500', 'hover:bg-green-600')
+            
+            // Add "Go to Warehouse" button next to it
+            const warehouseBtn = document.createElement('button')
+            warehouseBtn.className = 'ml-3 px-6 py-2 bg-purple-500 hover:bg-purple-600 text-white rounded-lg'
+            warehouseBtn.innerHTML = '<i class="fas fa-warehouse mr-2"></i>Go to Warehouse'
+            warehouseBtn.onclick = () => navigateTo('warehouse')
+            confirmBtn.parentElement.appendChild(warehouseBtn)
+        }
+        
         cancelImport()
-        navigateTo('warehouse')
+        // Don't auto-navigate to prevent triggering additional API calls that cause "Too Many Subrequests"
     } catch (error) {
         // Log full error details to console for debugging
         console.error('❌ IMPORT ERROR - Full Details:', {
@@ -1199,16 +1242,26 @@ function renderDashboard() {
         state.dashboardDate = new Date().toISOString().split('T')[0] // Today
     }
     
-    // Calculate yesterday, today, tomorrow
+    // Calculate 5 days: 2 days before, today, 2 days after
     const today = new Date()
+    
+    const twoDaysBeforeYesterday = new Date(today)
+    twoDaysBeforeYesterday.setDate(twoDaysBeforeYesterday.getDate() - 2)
+    
     const yesterday = new Date(today)
     yesterday.setDate(yesterday.getDate() - 1)
+    
     const tomorrow = new Date(today)
     tomorrow.setDate(tomorrow.getDate() + 1)
     
+    const twoDaysAfterTomorrow = new Date(today)
+    twoDaysAfterTomorrow.setDate(twoDaysAfterTomorrow.getDate() + 2)
+    
+    const twoDaysBeforeYesterdayStr = twoDaysBeforeYesterday.toISOString().split('T')[0]
     const yesterdayStr = yesterday.toISOString().split('T')[0]
     const todayStr = today.toISOString().split('T')[0]
     const tomorrowStr = tomorrow.toISOString().split('T')[0]
+    const twoDaysAfterTomorrowStr = twoDaysAfterTomorrow.toISOString().split('T')[0]
     
     const selectedDate = state.dashboardDate
     
@@ -1220,15 +1273,19 @@ function renderDashboard() {
     
     return `
         <div class="h-full flex flex-col">
-            <div class="container mx-auto px-3 py-4 flex-1 overflow-y-auto">
+            <div class="container mx-auto px-3 py-4 flex-1 overflow-y-auto" style="max-height: 100vh;">
                 <h2 class="text-xl md:text-3xl font-bold mb-4 text-gray-800">
                     <i class="fas fa-tachometer-alt text-blue-600 mr-2"></i>Live Dashboard
                 </h2>
                 
-                <!-- Date Selection Tabs -->
+                <!-- Date Selection Tabs (5 Days) -->
                 <div class="bg-white rounded-lg shadow-lg mb-4 p-3">
                     <div class="flex items-center justify-between flex-wrap gap-2">
                         <div class="flex gap-1.5 flex-wrap">
+                            <button onclick="setDashboardDate('${twoDaysBeforeYesterdayStr}')" 
+                                class="px-2 py-1 text-[10px] rounded-lg font-semibold transition ${selectedDate === twoDaysBeforeYesterdayStr ? 'bg-blue-600 text-white' : 'bg-gray-200 hover:bg-gray-300 text-gray-700'}">
+                                <i class="fas fa-angle-double-left mr-1"></i>-2 Days<br/><span class="text-[8px]">(${formatDateLabel(twoDaysBeforeYesterdayStr)})</span>
+                            </button>
                             <button onclick="setDashboardDate('${yesterdayStr}')" 
                                 class="px-2 py-1 text-xs rounded-lg font-semibold transition ${selectedDate === yesterdayStr ? 'bg-blue-600 text-white' : 'bg-gray-200 hover:bg-gray-300 text-gray-700'}">
                                 <i class="fas fa-chevron-left mr-1"></i>Yesterday<br/><span class="text-[9px]">(${formatDateLabel(yesterdayStr)})</span>
@@ -1240,6 +1297,10 @@ function renderDashboard() {
                             <button onclick="setDashboardDate('${tomorrowStr}')" 
                                 class="px-2 py-1 text-xs rounded-lg font-semibold transition ${selectedDate === tomorrowStr ? 'bg-blue-600 text-white' : 'bg-gray-200 hover:bg-gray-300 text-gray-700'}">
                                 Tomorrow<br/><span class="text-[9px]">(${formatDateLabel(tomorrowStr)})</span><i class="fas fa-chevron-right ml-1"></i>
+                            </button>
+                            <button onclick="setDashboardDate('${twoDaysAfterTomorrowStr}')" 
+                                class="px-2 py-1 text-[10px] rounded-lg font-semibold transition ${selectedDate === twoDaysAfterTomorrowStr ? 'bg-blue-600 text-white' : 'bg-gray-200 hover:bg-gray-300 text-gray-700'}">
+                                +2 Days<br/><span class="text-[8px]">(${formatDateLabel(twoDaysAfterTomorrowStr)})</span><i class="fas fa-angle-double-right ml-1"></i>
                             </button>
                         </div>
                         <button onclick="loadDashboardData()" 
@@ -1294,20 +1355,20 @@ function renderDashboard() {
                 <div class="bg-white rounded-lg shadow-lg p-4">
                     <div class="flex flex-col">
                         <div class="flex items-center justify-between mb-2">
-                            <p class="text-gray-500 text-xs">Loaded Containers</p>
-                            <i class="fas fa-check-circle text-2xl text-green-200"></i>
+                            <p class="text-gray-500 text-xs">Boxes Loaded</p>
+                            <i class="fas fa-box text-2xl text-green-200"></i>
                         </div>
-                        <p id="dash-loaded-pallets" class="text-2xl font-bold text-green-600">-</p>
+                        <p id="dash-loaded-boxes" class="text-2xl font-bold text-green-600">-</p>
                     </div>
                 </div>
                 
                 <div class="bg-white rounded-lg shadow-lg p-4">
                     <div class="flex flex-col">
                         <div class="flex items-center justify-between mb-2">
-                            <p class="text-gray-500 text-xs">Delivered Containers</p>
-                            <i class="fas fa-truck text-2xl text-teal-200"></i>
+                            <p class="text-gray-500 text-xs">Containers Loaded</p>
+                            <i class="fas fa-cubes text-2xl text-teal-200"></i>
                         </div>
-                        <p id="dash-delivered-pallets" class="text-2xl font-bold text-teal-600">-</p>
+                        <p id="dash-loaded-containers" class="text-2xl font-bold text-teal-600">-</p>
                     </div>
                 </div>
                 
@@ -1477,11 +1538,21 @@ async function loadDashboardData() {
         // Get selected date (default to today)
         const selectedDate = state.dashboardDate || new Date().toISOString().split('T')[0]
         
-        // Fetch parcels for selected date and container inventory
-        const [parcelsResponse, containersResponse] = await Promise.all([
-            axios.get(`/api/dashboard/parcels?delivery_date=${selectedDate}`),
-            axios.get('/api/containers/inventory')
-        ])
+        // OPTIMIZATION: Cache container inventory to reduce subrequests
+        let containersResponse
+        if (state.cachedContainerInventory && Date.now() - state.cachedContainerInventory.timestamp < 30000) {
+            // Use cached data if less than 30 seconds old
+            containersResponse = state.cachedContainerInventory
+        } else {
+            containersResponse = await axios.get('/api/containers/inventory')
+            state.cachedContainerInventory = {
+                ...containersResponse,
+                timestamp: Date.now()
+            }
+        }
+        
+        // Fetch parcels for selected date
+        const parcelsResponse = await axios.get(`/api/dashboard/parcels?delivery_date=${selectedDate}`)
         
         const parcels = parcelsResponse.data.parcels || []
         const allContainers = containersResponse.data.containers || []
@@ -1493,8 +1564,12 @@ async function loadDashboardData() {
         let deliveredPallets = 0
         let totalLoadedContainers = 0
         let totalDeliveredContainers = 0
+        let totalLoadedBoxes = 0 // NEW: Total boxes loaded (counted once per outlet)
+        let totalLoadedACodeContainers = 0 // NEW: Total A-code containers loaded (counted once per outlet)
         let totalTNScanned = 0 // NEW: Count total transfer numbers scanned
         const outletsLoaded = new Set() // NEW: Track unique outlets that have been loaded
+        const outletBoxCounts = new Map() // NEW: Track box counts per outlet (avoid double-counting)
+        const outletContainerCounts = new Map() // NEW: Track container counts per outlet (avoid double-counting)
         
         parcels.forEach(parcel => {
             // Skip invalid parcels
@@ -1541,6 +1616,15 @@ async function loadDashboardData() {
                 // Track container count (use first non-null value from outlet)
                 if (parcel.container_count_loaded && !outlet.container_count_loaded) {
                     outlet.container_count_loaded = parcel.container_count_loaded
+                }
+                // NEW: Track box_count and container_count ONCE per outlet (not per parcel)
+                if (parcel.box_count && !outletBoxCounts.has(parcel.outlet_code)) {
+                    outletBoxCounts.set(parcel.outlet_code, parcel.box_count)
+                    totalLoadedBoxes += parcel.box_count
+                }
+                if (parcel.container_count && !outletContainerCounts.has(parcel.outlet_code)) {
+                    outletContainerCounts.set(parcel.outlet_code, parcel.container_count)
+                    totalLoadedACodeContainers += parcel.container_count
                 }
             }
             
@@ -1597,8 +1681,8 @@ async function loadDashboardData() {
         document.getElementById('dash-total-pallets').textContent = totalPallets
         document.getElementById('dash-tn-scanned').textContent = totalTNScanned // NEW: Total TN Scanned
         document.getElementById('dash-outlet-loaded').textContent = outletsLoaded.size // NEW: Total Outlet Loaded
-        document.getElementById('dash-loaded-pallets').textContent = totalLoadedContainers > 0 ? totalLoadedContainers : loadedPallets
-        document.getElementById('dash-delivered-pallets').textContent = totalDeliveredContainers > 0 ? totalDeliveredContainers : deliveredPallets
+        document.getElementById('dash-loaded-boxes').textContent = totalLoadedBoxes // NEW: Total Boxes Loaded
+        document.getElementById('dash-loaded-containers').textContent = totalLoadedACodeContainers // NEW: Total A-Code Containers Loaded
         document.getElementById('dash-containers-pickup').textContent = containersForPickup.length
         
         // Update pickup date display
@@ -1813,11 +1897,13 @@ async function loadDashboardData() {
 }
 
 // Auto-refresh dashboard every 30 seconds
-setInterval(() => {
-    if (state.currentPage === 'dashboard') {
-        loadDashboardData()
-    }
-}, 30000)
+// Auto-refresh dashboard disabled to prevent "Too Many Subrequests" errors
+// Dashboard will only load when user navigates to it or manually refreshes
+// setInterval(() => {
+//     if (state.currentPage === 'dashboard') {
+//         loadDashboardData()
+//     }
+// }, 30000)
 
 // ============ Warehouse Page ============
 function renderWarehouse() {
@@ -1832,49 +1918,50 @@ function renderWarehouse() {
     
     return `
         <div class="h-full flex flex-col">
-        <div class="container mx-auto px-4 py-6 flex-1 overflow-y-auto">
-            <h2 class="text-3xl font-bold mb-6 text-gray-800">
-                <i class="fas fa-warehouse text-blue-600 mr-3"></i>Warehouse Loading
+        <div class="container mx-auto px-2 py-2 flex-1 overflow-y-auto" style="max-height: 100vh;">
+            <!-- Mobile-optimized header - smaller on small screens -->
+            <h2 class="text-lg sm:text-2xl md:text-3xl font-bold mb-2 sm:mb-4 md:mb-6 text-gray-800">
+                <i class="fas fa-warehouse text-blue-600 mr-2"></i>Warehouse Loading
             </h2>
             
-            <!-- Delivery Date Selection -->
-            <div class="bg-white rounded-lg shadow-lg mb-6 p-4">
-                <div class="flex items-center gap-4 flex-wrap">
-                    <label class="font-semibold text-gray-700">
-                        <i class="fas fa-calendar mr-2"></i>Delivery Date:
+            <!-- Delivery Date Selection - Compact for mobile -->
+            <div class="bg-white rounded-lg shadow-lg mb-3 sm:mb-4 md:mb-6 p-2 sm:p-3 md:p-4">
+                <div class="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-4">
+                    <label class="text-sm sm:text-base font-semibold text-gray-700 whitespace-nowrap">
+                        <i class="fas fa-calendar mr-1 sm:mr-2"></i>Delivery Date:
                     </label>
                     <input type="date" id="warehouseDeliveryDate" 
-                        class="px-4 py-2 border-2 border-blue-300 rounded-lg font-semibold"
+                        class="w-full sm:w-auto px-3 py-2 border-2 border-blue-300 rounded-lg text-sm sm:text-base font-semibold"
                         value="${state.warehouseDeliveryDate}"
                         onchange="setWarehouseDeliveryDate(this.value)">
-                    <p class="text-sm text-gray-600">
+                    <p class="text-xs sm:text-sm text-gray-600 hidden sm:block">
                         <i class="fas fa-info-circle mr-1"></i>
                         Select the delivery date to view and load parcels
                     </p>
                 </div>
             </div>
             
-            <div class="grid lg:grid-cols-3 gap-6">
-                <!-- Scanning Panel -->
+            <div class="grid lg:grid-cols-3 gap-3 sm:gap-4 md:gap-6">
+                <!-- Scanning Panel - Mobile optimized -->
                 <div class="lg:col-span-2">
-                    <div class="bg-white rounded-lg shadow-lg p-6">
-                        <h3 class="text-xl font-bold mb-4">
+                    <div class="bg-white rounded-lg shadow-lg p-3 sm:p-4 md:p-6">
+                        <h3 class="text-base sm:text-lg md:text-xl font-bold mb-2 sm:mb-3 md:mb-4">
                             <i class="fas fa-pallet mr-2 text-blue-600"></i>Scan Pallet ID
                         </h3>
                         
-                        <div class="mb-4">
+                        <div class="mb-3 sm:mb-4">
                             <input type="text" id="warehouseScanInput" 
-                                class="w-full px-4 py-3 border-4 border-blue-500 rounded-lg text-lg scan-input"
-                                placeholder="Scan or enter Pallet ID..."
+                                class="w-full px-3 py-2 sm:px-4 sm:py-3 border-4 border-blue-500 rounded-lg text-base sm:text-lg scan-input"
+                                placeholder="Scan Pallet ID..."
                                 autofocus
                                 onkeydown="if(event.key==='Enter' || event.keyCode===13) { event.preventDefault(); handleWarehouseScan(); }"
                                 onkeypress="if(event.key==='Enter') handleWarehouseScan()">
                         </div>
                         
-                        <div class="bg-blue-50 border-l-4 border-blue-500 p-3 mb-4">
-                            <p class="text-sm text-blue-800">
-                                <i class="fas fa-info-circle mr-2"></i>
-                                <strong>New!</strong> Scan Pallet ID to mark all transfers in that pallet as loaded at once.
+                        <div class="bg-blue-50 border-l-4 border-blue-500 p-2 sm:p-3 mb-3 sm:mb-4">
+                            <p class="text-xs sm:text-sm text-blue-800">
+                                <i class="fas fa-info-circle mr-1 sm:mr-2"></i>
+                                <strong>New!</strong> Scan Pallet ID to mark all transfers as loaded.
                             </p>
                         </div>
                         
@@ -1954,6 +2041,24 @@ async function loadWarehouseData() {
         
         console.log('Loaded parcels:', state.parcels.length)
         
+        // IMPORTANT: Load previously scanned pallets (status='loaded' but not confirmed yet)
+        // This allows users to see scanned list even after logout/refresh/user change
+        const scannedParcels = state.parcels.filter(p => p.status === 'loaded')
+        if (scannedParcels.length > 0 && state.scannedItems.length === 0) {
+            console.log(`📦 Restoring ${scannedParcels.length} previously scanned pallets`)
+            state.scannedItems = scannedParcels.map(p => ({
+                pallet_id: p.pallet_id,
+                outlet_code: p.outlet_code,
+                outlet_code_short: p.outlet_code_short,
+                outlet_name: p.outlet_name,
+                transfer_count: p.total_count,
+                delivery_date: p.delivery_date,
+                time: p.loaded_at ? new Date(p.loaded_at).toLocaleTimeString() : 'Previously scanned'
+            }))
+            updateScannedItemsList()
+            console.log('✅ Scanned items restored from database')
+        }
+        
         // Group by outlet - using parcels instead of transfers for accurate pallet counting
         const outletMap = new Map()
         state.parcels.forEach(parcel => {
@@ -2002,7 +2107,7 @@ async function loadWarehouseData() {
             return
         }
         
-        // Check if outlets are delivered (all parcels delivered)
+        // Check if outlets are delivered or completed loading
         const outlets = Array.from(outletMap.values()).map(outlet => {
             const percentage = outlet.total > 0 ? Math.round((outlet.scanned / outlet.total) * 100) : 0
             const isComplete = outlet.scanned === outlet.total
@@ -2011,11 +2116,15 @@ async function loadWarehouseData() {
             const outletParcels = state.parcels.filter(p => p.outlet_code === outlet.code)
             const allDelivered = outletParcels.every(p => p.status === 'delivered')
             
-            return { ...outlet, percentage, isComplete, allDelivered }
+            // Check if loading is completed (has loaded_at timestamp AND is fully loaded)
+            const loadingCompleted = outletParcels.every(p => p.status === 'loaded' && p.loaded_at)
+            
+            return { ...outlet, percentage, isComplete, allDelivered, loadingCompleted }
         })
         
-        // Separate into pending and delivered outlets
-        const pendingOutlets = outlets.filter(o => !o.allDelivered)
+        // Separate into pending, completed loading, and delivered outlets
+        // Only show pending outlets (not completed loading or delivered)
+        const pendingOutlets = outlets.filter(o => !o.loadingCompleted && !o.allDelivered)
         const deliveredOutlets = outlets.filter(o => o.allDelivered)
         
         // Render function for outlet card
@@ -2274,7 +2383,7 @@ async function checkOutletCompletionAndPromptContainerCount(outletCode) {
     }
 }
 
-// Show modal to input container count for completed outlet
+// Show modal to input box and container counts for completed outlet
 function showContainerCountModal(outletCode, outletShortCode, outletName, palletCount) {
     const modal = document.createElement('div')
     modal.id = `container-modal-${outletCode}`
@@ -2291,27 +2400,37 @@ function showContainerCountModal(outletCode, outletShortCode, outletName, pallet
                     <i class="fas fa-pallet mr-1"></i>${palletCount} pallet${palletCount > 1 ? 's' : ''} scanned
                 </p>
             </div>
-            <form onsubmit="handleContainerCountSubmit(event, '${outletCode}')">
+            <form onsubmit="handleBoxContainerSubmit(event, '${outletCode}', '${outletShortCode}', '${outletName}')">
                 <div class="mb-4">
                     <label class="block text-sm font-medium mb-2">
-                        How many containers for this outlet?
+                        <i class="fas fa-box mr-1"></i>How many boxes?
+                    </label>
+                    <input type="number" id="box_count_${outletCode}" required 
+                        min="0"
+                        class="w-full px-3 py-2 border rounded-lg text-center text-2xl font-bold"
+                        placeholder="0"
+                        value="0">
+                </div>
+                <div class="mb-4">
+                    <label class="block text-sm font-medium mb-2">
+                        <i class="fas fa-container-storage mr-1"></i>How many A-code containers?
                         <span class="text-xs text-gray-500 block mt-1">
-                            (Multiple pallets may be in one container)
+                            (If > 0, you'll need to scan A codes next)
                         </span>
                     </label>
                     <input type="number" id="container_count_${outletCode}" required 
-                        min="1" max="${palletCount}"
+                        min="0"
                         class="w-full px-3 py-2 border rounded-lg text-center text-2xl font-bold"
-                        placeholder="${palletCount}"
-                        value="${palletCount}">
+                        placeholder="0"
+                        value="0">
                 </div>
                 <div class="flex space-x-3">
                     <button type="submit" class="flex-1 bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg">
-                        <i class="fas fa-check mr-2"></i>Confirm
+                        <i class="fas fa-check mr-2"></i>Continue
                     </button>
                     <button type="button" onclick="this.closest('.fixed').remove()" 
                         class="flex-1 bg-gray-300 hover:bg-gray-400 px-4 py-2 rounded-lg">
-                        Skip
+                        Cancel
                     </button>
                 </div>
             </form>
@@ -2319,9 +2438,9 @@ function showContainerCountModal(outletCode, outletShortCode, outletName, pallet
     `
     document.body.appendChild(modal)
     
-    // Focus on input field
+    // Focus on box count input field
     setTimeout(() => {
-        const input = document.getElementById(`container_count_${outletCode}`)
+        const input = document.getElementById(`box_count_${outletCode}`)
         if (input) {
             input.focus()
             input.select()
@@ -2329,7 +2448,50 @@ function showContainerCountModal(outletCode, outletShortCode, outletName, pallet
     }, 100)
 }
 
-// Handle container count submission
+// Handle box and container count submission
+async function handleBoxContainerSubmit(event, outletCode, outletShortCode, outletName) {
+    event.preventDefault()
+    
+    const boxCount = parseInt(document.getElementById(`box_count_${outletCode}`).value) || 0
+    const containerCount = parseInt(document.getElementById(`container_count_${outletCode}`).value) || 0
+    
+    if (boxCount < 0 || containerCount < 0) {
+        showToast('Please enter valid counts', 'error')
+        return
+    }
+    
+    // Close the modal
+    const modal = document.getElementById(`container-modal-${outletCode}`)
+    if (modal) modal.remove()
+    
+    try {
+        // Save box and container counts to backend
+        await axios.post('/api/warehouse/set-box-container-count', {
+            outlet_code: outletCode,
+            box_count: boxCount,
+            container_count: containerCount
+        })
+        
+        // Record in state
+        if (!state.outletContainerCounts) state.outletContainerCounts = {}
+        state.outletContainerCounts[outletCode] = { boxes: boxCount, containers: containerCount }
+        
+        showToast(`✓ Recorded: ${boxCount} boxes, ${containerCount} containers`, 'success')
+        
+        // If containers > 0, prompt to scan A codes
+        if (containerCount > 0) {
+            showACodeScanningModal(outletCode, outletShortCode, outletName, containerCount)
+        } else {
+            // No A codes needed, refresh data
+            loadWarehouseData()
+        }
+    } catch (error) {
+        console.error('Error saving counts:', error)
+        showToast('Failed to save counts', 'error')
+    }
+}
+
+// OLD FUNCTION (LEGACY - KEEP FOR BACKWARD COMPATIBILITY)
 async function handleContainerCountSubmit(event, outletCode) {
     event.preventDefault()
     
@@ -2341,7 +2503,7 @@ async function handleContainerCountSubmit(event, outletCode) {
     }
     
     try {
-        // Save container count to backend
+        // Save container count to backend (legacy endpoint)
         await axios.post('/api/warehouse/set-container-count', {
             outlet_code: outletCode,
             container_count: containerCount
@@ -2362,6 +2524,249 @@ async function handleContainerCountSubmit(event, outletCode) {
     } catch (error) {
         showToast(error.response?.data?.error || 'Failed to save container count', 'error')
     }
+}
+
+// Show modal to scan A codes for containers
+function showACodeScanningModal(outletCode, outletShortCode, outletName, containerCount) {
+    const modal = document.createElement('div')
+    modal.id = `acode-modal-${outletCode}`
+    modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50'
+    
+    // Initialize A code scanning state
+    if (!state.aCodeScans) state.aCodeScans = {}
+    if (!state.aCodeScans[outletCode]) state.aCodeScans[outletCode] = []
+    
+    // Store outlet info for use during scanning
+    if (!state.aCodeOutletInfo) state.aCodeOutletInfo = {}
+    state.aCodeOutletInfo[outletCode] = {
+        outletCode: outletCode,
+        outletShortCode: outletShortCode,
+        outletName: outletName
+    }
+    
+    const renderModal = () => {
+        const scannedCount = state.aCodeScans[outletCode].length
+        const remaining = containerCount - scannedCount
+        
+        modal.innerHTML = `
+            <div class="bg-white rounded-lg p-6 w-full max-w-md">
+                <div class="mb-4 text-center">
+                    <i class="fas fa-qrcode text-blue-500 text-4xl mb-3"></i>
+                    <h3 class="text-xl font-bold">Scan A-Code Containers</h3>
+                </div>
+                <div class="bg-blue-50 border-l-4 border-blue-500 p-4 mb-4">
+                    <p class="font-semibold text-lg">${outletShortCode} - ${outletName}</p>
+                    <p class="text-sm text-gray-600 mt-1">
+                        <i class="fas fa-box mr-1"></i>
+                        ${scannedCount} / ${containerCount} containers scanned
+                    </p>
+                    ${remaining > 0 ? `
+                        <p class="text-lg font-bold text-blue-600 mt-2">
+                            ${remaining} container${remaining > 1 ? 's' : ''} remaining
+                        </p>
+                    ` : `
+                        <p class="text-lg font-bold text-green-600 mt-2">
+                            <i class="fas fa-check-circle mr-1"></i>All containers scanned!
+                        </p>
+                    `}
+                </div>
+                ${scannedCount > 0 ? `
+                    <div class="mb-4 max-h-32 overflow-y-auto border rounded-lg p-2">
+                        <p class="text-xs font-semibold text-gray-600 mb-2">Scanned A-Codes:</p>
+                        ${state.aCodeScans[outletCode].map(code => `
+                            <div class="text-sm bg-green-50 border-l-4 border-green-500 px-2 py-1 mb-1">
+                                <i class="fas fa-check text-green-600 mr-1"></i>${code}
+                            </div>
+                        `).join('')}
+                    </div>
+                ` : ''}
+                ${remaining > 0 ? `
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium mb-2">Scan A-Code:</label>
+                        <input type="text" id="acode_scan_${outletCode}" 
+                            class="w-full px-3 py-2 border rounded-lg text-center text-xl font-mono uppercase"
+                            placeholder="Scan or enter A code"
+                            onkeypress="if(event.key==='Enter') handleACodeScan('${outletCode}', ${containerCount}, '${outletName}')">
+                    </div>
+                    <button type="button" onclick="handleACodeScan('${outletCode}', ${containerCount}, '${outletName}')"
+                        class="w-full bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg mb-2">
+                        <i class="fas fa-plus mr-2"></i>Add Container
+                    </button>
+                ` : ''}
+                <button type="button" onclick="completeACodeScanning('${outletCode}')" 
+                    class="w-full bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg ${remaining > 0 ? 'opacity-50' : ''}"
+                    ${remaining > 0 ? 'disabled title="Please scan all containers first"' : ''}>
+                    <i class="fas fa-check mr-2"></i>Complete
+                </button>
+            </div>
+        `
+    }
+    
+    renderModal()
+    document.body.appendChild(modal)
+    
+    // Focus on input
+    setTimeout(() => {
+        const input = document.getElementById(`acode_scan_${outletCode}`)
+        if (input) input.focus()
+    }, 100)
+}
+
+// Handle A code scan
+async function handleACodeScan(outletCode, expectedCount, outletName = '') {
+    const input = document.getElementById(`acode_scan_${outletCode}`)
+    const aCode = input.value.trim().toUpperCase()
+    
+    if (!aCode) {
+        showToast('Please scan or enter an A code', 'error')
+        return
+    }
+    
+    // Validate A code format (starts with 'A')
+    if (!aCode.startsWith('A')) {
+        playBeep(false)
+        showToast('Invalid A code! Must start with "A"', 'error')
+        input.value = ''
+        input.focus()
+        return
+    }
+    
+    // Check for duplicates
+    if (state.aCodeScans[outletCode].includes(aCode)) {
+        playBeep(false)
+        showToast('Duplicate A code!', 'error')
+        input.value = ''
+        input.focus()
+        return
+    }
+    
+    // Add to scanned list
+    state.aCodeScans[outletCode].push(aCode)
+    
+    try {
+        // Get delivery date from state
+        const deliveryDate = state.warehouseDeliveryDate
+        if (!deliveryDate) {
+            throw new Error('No delivery date set')
+        }
+        
+        // Send A code to backend
+        console.log('📤 Sending A-code to backend:', {
+            container_id: aCode,
+            outlet_code: outletCode,
+            outlet_name: outletName,
+            delivery_date: deliveryDate
+        })
+        
+        const response = await axios.post('/api/warehouse/scan-container', {
+            container_id: aCode,
+            outlet_code: outletCode,
+            outlet_name: outletName,
+            delivery_date: deliveryDate
+        })
+        
+        console.log('✅ A-code saved successfully:', response.data)
+        
+        playBeep(true)
+        showToast(`✓ Container ${aCode} scanned`, 'success')
+        
+        // Clear input
+        input.value = ''
+        
+        // Re-render modal
+        const modal = document.getElementById(`acode-modal-${outletCode}`)
+        if (modal) {
+            const scannedCount = state.aCodeScans[outletCode].length
+            const remaining = expectedCount - scannedCount
+            const outletInfo = state.aCodeOutletInfo[outletCode] || {}
+            const savedOutletName = outletInfo.outletName || outletName || ''
+            
+            modal.innerHTML = `
+                <div class="bg-white rounded-lg p-6 w-full max-w-md">
+                    <div class="mb-4 text-center">
+                        <i class="fas fa-qrcode text-blue-500 text-4xl mb-3"></i>
+                        <h3 class="text-xl font-bold">Scan A-Code Containers</h3>
+                    </div>
+                    <div class="bg-blue-50 border-l-4 border-blue-500 p-4 mb-4">
+                        <p class="font-semibold text-lg">${state.aCodeScans[outletCode][0] ? document.getElementById(`acode-modal-${outletCode}`).querySelector('.font-semibold.text-lg').textContent : `Outlet ${outletCode}`}</p>
+                        <p class="text-sm text-gray-600 mt-1">
+                            <i class="fas fa-box mr-1"></i>
+                            ${scannedCount} / ${expectedCount} containers scanned
+                        </p>
+                        ${remaining > 0 ? `
+                            <p class="text-lg font-bold text-blue-600 mt-2">
+                                ${remaining} container${remaining > 1 ? 's' : ''} remaining
+                            </p>
+                        ` : `
+                            <p class="text-lg font-bold text-green-600 mt-2">
+                                <i class="fas fa-check-circle mr-1"></i>All containers scanned!
+                            </p>
+                        `}
+                    </div>
+                    <div class="mb-4 max-h-32 overflow-y-auto border rounded-lg p-2">
+                        <p class="text-xs font-semibold text-gray-600 mb-2">Scanned A-Codes:</p>
+                        ${state.aCodeScans[outletCode].map(code => `
+                            <div class="text-sm bg-green-50 border-l-4 border-green-500 px-2 py-1 mb-1">
+                                <i class="fas fa-check text-green-600 mr-1"></i>${code}
+                            </div>
+                        `).join('')}
+                    </div>
+                    ${remaining > 0 ? `
+                        <div class="mb-4">
+                            <label class="block text-sm font-medium mb-2">Scan A-Code:</label>
+                            <input type="text" id="acode_scan_${outletCode}" 
+                                class="w-full px-3 py-2 border rounded-lg text-center text-xl font-mono uppercase"
+                                placeholder="Scan or enter A code"
+                                onkeypress="if(event.key==='Enter') handleACodeScan('${outletCode}', ${expectedCount}, '${savedOutletName}')">
+                        </div>
+                        <button type="button" onclick="handleACodeScan('${outletCode}', ${expectedCount}, '${savedOutletName}')"
+                            class="w-full bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg mb-2">
+                            <i class="fas fa-plus mr-2"></i>Add Container
+                        </button>
+                    ` : ''}
+                    <button type="button" onclick="completeACodeScanning('${outletCode}')" 
+                        class="w-full bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg ${remaining > 0 ? 'opacity-50' : ''}"
+                        ${remaining > 0 ? 'disabled title="Please scan all containers first"' : ''}>
+                        <i class="fas fa-check mr-2"></i>Complete
+                    </button>
+                </div>
+            `
+            
+            // Re-focus input
+            setTimeout(() => {
+                const newInput = document.getElementById(`acode_scan_${outletCode}`)
+                if (newInput) newInput.focus()
+            }, 100)
+        }
+    } catch (error) {
+        console.error('❌ Error scanning A code:', error)
+        console.error('❌ Error details:', {
+            message: error.message,
+            response: error.response?.data,
+            status: error.response?.status,
+            container_id: aCode,
+            outlet_code: outletCode,
+            delivery_date: state.warehouseDeliveryDate
+        })
+        // Remove from local state if backend fails
+        state.aCodeScans[outletCode] = state.aCodeScans[outletCode].filter(c => c !== aCode)
+        playBeep(false)
+        showToast(error.response?.data?.error || 'Failed to scan container', 'error')
+        input.value = ''
+        input.focus()
+    }
+}
+
+// Complete A code scanning
+function completeACodeScanning(outletCode) {
+    const modal = document.getElementById(`acode-modal-${outletCode}`)
+    if (modal) modal.remove()
+    
+    const scannedCount = state.aCodeScans[outletCode]?.length || 0
+    showToast(`✓ ${scannedCount} A-code container${scannedCount > 1 ? 's' : ''} linked to outlet`, 'success')
+    
+    // Reload warehouse data
+    loadWarehouseData()
 }
 
 function showCompleteLoadingModal() {
@@ -2734,45 +3139,51 @@ async function deleteTransfer(transferId, outletCode) {
 
 // ============ Outlet Page ============
 function renderOutlet() {
+    // Initialize outlet delivery date to today if not set
+    if (!state.outletDeliveryDate) {
+        state.outletDeliveryDate = new Date().toISOString().split('T')[0]
+    }
+    
     return `
         <div class="h-full flex flex-col">
-        <div class="container mx-auto px-4 py-6 flex-1 overflow-y-auto">
-            <h2 class="text-3xl font-bold mb-6 text-gray-800">
-                <i class="fas fa-store text-blue-600 mr-3"></i>Outlet Unloading
+        <div class="container mx-auto px-2 py-2 pb-20 flex-1 overflow-y-auto" style="max-height: 100vh;">
+            <!-- Mobile-optimized header -->
+            <h2 class="text-lg sm:text-2xl md:text-3xl font-bold mb-2 sm:mb-4 md:mb-6 text-gray-800">
+                <i class="fas fa-store text-blue-600 mr-2"></i>Outlet Unloading
             </h2>
             
             ${!state.selectedOutlet ? `
-                <!-- Step 1: Scan Outlet Code -->
-                <div class="bg-white rounded-lg shadow-lg p-8 max-w-2xl mx-auto">
-                    <div class="text-center mb-6">
-                        <div class="bg-blue-100 rounded-full w-20 h-20 flex items-center justify-center mx-auto mb-4">
-                            <i class="fas fa-store text-4xl text-blue-600"></i>
+                <!-- Step 1: Scan Outlet Code - Mobile optimized -->
+                <div class="bg-white rounded-lg shadow-lg p-4 sm:p-6 md:p-8 max-w-2xl mx-auto">
+                    <div class="text-center mb-4 sm:mb-6">
+                        <div class="bg-blue-100 rounded-full w-16 h-16 sm:w-20 sm:h-20 flex items-center justify-center mx-auto mb-3 sm:mb-4">
+                            <i class="fas fa-store text-3xl sm:text-4xl text-blue-600"></i>
                         </div>
-                        <h3 class="text-2xl font-bold mb-2">Step 1: Identify Your Outlet</h3>
-                        <p class="text-gray-600">Scan or enter your outlet short code</p>
+                        <h3 class="text-lg sm:text-xl md:text-2xl font-bold mb-2">Step 1: Identify Your Outlet</h3>
+                        <p class="text-sm sm:text-base text-gray-600">Scan or enter your outlet short code</p>
                     </div>
                     
-                    <div class="mb-4">
-                        <label class="block text-sm font-medium text-gray-700 mb-2">
-                            Outlet Short Code (e.g., MKC, JBB, JKJSTT1)
+                    <div class="mb-3 sm:mb-4">
+                        <label class="block text-xs sm:text-sm font-medium text-gray-700 mb-2">
+                            Outlet Short Code (e.g., MKC, JBB)
                         </label>
                         <input type="text" id="outletCodeInput" 
-                            class="w-full px-4 py-3 border-4 border-blue-500 rounded-lg text-lg scan-input"
-                            placeholder="Scan or enter outlet code..."
+                            class="w-full px-3 py-2 sm:px-4 sm:py-3 border-4 border-blue-500 rounded-lg text-base sm:text-lg scan-input"
+                            placeholder="Scan outlet code..."
                             autofocus
                             onkeydown="if(event.key==='Enter' || event.keyCode===13) { event.preventDefault(); handleFindOutletPallets(); }"
                             onkeypress="if(event.key==='Enter') handleFindOutletPallets()">
                     </div>
                     
                     <button onclick="handleFindOutletPallets()" 
-                        class="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-4 rounded-lg text-lg">
+                        class="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 sm:py-4 rounded-lg text-base sm:text-lg">
                         <i class="fas fa-search mr-2"></i>Find My Pallets
                     </button>
                     
-                    <div class="mt-6 bg-blue-50 border-l-4 border-blue-500 p-4">
-                        <p class="text-sm text-blue-800">
-                            <i class="fas fa-info-circle mr-2"></i>
-                            <strong>Tip:</strong> Your outlet code is the short name before the dash in your store name (e.g., if your store is "MKC - Central Store", enter "MKC")
+                    <div class="mt-4 sm:mt-6 bg-blue-50 border-l-4 border-blue-500 p-3 sm:p-4">
+                        <p class="text-xs sm:text-sm text-blue-800">
+                            <i class="fas fa-info-circle mr-1 sm:mr-2"></i>
+                            <strong>Tip:</strong> Your outlet code is the short name (e.g., "MKC")
                         </p>
                     </div>
                 </div>
@@ -2795,40 +3206,49 @@ function renderOutlet() {
                     <!-- Container Count & Date Info -->
                     <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
                         <!-- Mobile: Stack vertically, Desktop: Side by side -->
-                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-3">
+                        <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3">
                             <div class="text-center md:text-left">
-                                <p class="text-sm text-gray-600 mb-1">
-                                    <i class="fas fa-truck mr-1"></i>Container Loaded
+                                <p class="text-xs text-gray-600 mb-1">
+                                    <i class="fas fa-box mr-1"></i>Boxes
                                 </p>
-                                <p class="text-3xl font-bold text-blue-600">
-                                    ${state.selectedOutlet.container_count_loaded || 0}
+                                <p class="text-2xl font-bold text-green-600">
+                                    ${state.selectedOutlet.box_count || 0}
                                 </p>
                             </div>
-                            <div class="text-center md:text-left md:border-l md:border-blue-300 md:pl-4">
-                                <p class="text-sm text-gray-600 mb-1">
+                            <div class="text-center md:text-left">
+                                <p class="text-xs text-gray-600 mb-1">
+                                    <i class="fas fa-container-storage mr-1"></i>Containers
+                                </p>
+                                <p class="text-2xl font-bold text-purple-600">
+                                    ${state.selectedOutlet.container_count || 0}
+                                </p>
+                            </div>
+                            <div class="text-center md:text-left">
+                                <p class="text-xs text-gray-600 mb-1">
                                     <i class="fas fa-pallet mr-1"></i>Total TN
                                 </p>
-                                <p class="text-3xl font-bold text-green-600">
+                                <p class="text-2xl font-bold text-blue-600">
                                     ${state.availablePallets.length + state.scannedItems.length}
                                 </p>
                             </div>
-                            <div class="text-center md:text-left md:border-l md:border-blue-300 md:pl-4">
-                                <label class="text-sm text-gray-600 mb-1 block">
-                                    <i class="fas fa-calendar mr-1"></i>Delivery Date
+                            <div class="text-center md:text-left">
+                                <label class="text-xs text-gray-600 mb-1 block">
+                                    <i class="fas fa-calendar mr-1"></i>Date
                                 </label>
                                 <input type="date" id="outletDeliveryDate" 
-                                    class="w-full px-3 py-2 border-2 border-blue-300 rounded-lg font-semibold text-center"
+                                    class="w-full px-2 py-1 border-2 border-blue-300 rounded-lg font-semibold text-center text-sm"
                                     value="${state.outletDeliveryDate || new Date().toISOString().split('T')[0]}"
                                     onchange="setOutletDeliveryDate(this.value)">
                             </div>
                         </div>
                         <div class="text-xs text-gray-600 text-center md:text-left border-t border-blue-200 pt-2">
-                            <i class="fas fa-info-circle mr-1"></i>Driver: Check counts match your load
+                            <i class="fas fa-info-circle mr-1"></i>Scan all F codes (pallets) and A codes (containers) to complete
                         </div>
                     </div>
                 </div>
                 
-                <div class="grid lg:grid-cols-3 gap-6">
+                <!-- Mobile: Stack vertically, Desktop: Side-by-side grid -->
+                <div class="flex flex-col lg:grid lg:grid-cols-3 gap-6">
                     <!-- Scanning Panel -->
                     <div class="lg:col-span-2">
                         <div class="bg-white rounded-lg shadow-lg p-6">
@@ -2873,7 +3293,7 @@ function renderOutlet() {
                         </div>
                     </div>
                     
-                    <!-- Available Pallets -->
+                    <!-- Available Pallets (Your Deliveries) - Fully scrollable on mobile -->
                     <div class="lg:col-span-1">
                         <div class="bg-white rounded-lg shadow-lg p-6">
                             <h3 class="text-xl font-bold mb-4">Your Deliveries</h3>
@@ -2889,6 +3309,8 @@ function renderOutlet() {
                     </div>
                 </div>
             `}
+            <!-- Extra spacing at bottom to ensure full content visibility -->
+            <div class="h-16"></div>
         </div>
         </div>
     `
@@ -2910,16 +3332,34 @@ async function handleFindOutletPallets() {
         })
         
         if (response.data.success) {
+            // Debug logging
+            console.log('🔍 Outlet data received:', {
+                outlet: response.data.outlet_code,
+                box_count: response.data.box_count,
+                container_count: response.data.container_count,
+                a_code_containers: response.data.a_code_containers,
+                pallets: response.data.pallets.length
+            })
+            
             state.selectedOutlet = {
                 code: response.data.outlet_code,
                 code_short: response.data.outlet_code_short,
                 name: response.data.outlet_name,
-                container_count_loaded: response.data.container_count_loaded // Store warehouse container count
+                container_count_loaded: response.data.container_count_loaded, // OLD: Legacy field
+                box_count: response.data.box_count || 0, // NEW: Box count
+                container_count: response.data.container_count || 0, // NEW: A-code container count
+                a_code_containers: response.data.a_code_containers || [] // NEW: List of A-code containers
             }
             state.availablePallets = response.data.pallets
+            state.availableACodeContainers = response.data.a_code_containers || [] // NEW: Store A-code containers separately
             state.scannedItems = []
             
-            showToast(`Found ${response.data.pallets.length} pallet(s) for ${outletCodeShort}`, 'success')
+            const totalItems = response.data.pallets.length + (response.data.a_code_containers?.length || 0)
+            console.log('📦 Available items:', {
+                pallets: state.availablePallets.length,
+                aCodeContainers: state.availableACodeContainers.length
+            })
+            showToast(`Found ${response.data.pallets.length} pallet(s) + ${response.data.a_code_containers?.length || 0} container(s) for ${outletCodeShort}`, 'success')
             render()
             setTimeout(() => loadOutletPallets(), 100)
         } else {
@@ -2942,20 +3382,47 @@ async function loadOutletPallets() {
         
         if (response.data.success) {
             state.availablePallets = response.data.pallets
-            // Update container count if it changed
+            state.availableACodeContainers = response.data.a_code_containers || [] // NEW: Store A-code containers
+            
+            // Update container counts if they changed
             if (response.data.container_count_loaded) {
                 state.selectedOutlet.container_count_loaded = response.data.container_count_loaded
+            }
+            if (response.data.box_count !== undefined) {
+                state.selectedOutlet.box_count = response.data.box_count
+            }
+            if (response.data.container_count !== undefined) {
+                state.selectedOutlet.container_count = response.data.container_count
+            }
+            
+            // IMPORTANT: Restore previously scanned pallets (status='scanned_unloading')
+            // This allows outlet users to see scanned list after logout/refresh
+            const scannedPallets = state.availablePallets.filter(p => p.status === 'scanned_unloading')
+            if (scannedPallets.length > 0 && state.scannedItems.length === 0) {
+                console.log(`📦 Restoring ${scannedPallets.length} previously scanned pallets for outlet`)
+                state.scannedItems = scannedPallets.map(p => ({
+                    pallet_id: p.pallet_id,
+                    outlet_code: state.selectedOutlet.code,
+                    outlet_code_short: state.selectedOutlet.code_short,
+                    outlet_name: state.selectedOutlet.name,
+                    transfer_count: p.transfer_count,
+                    time: 'Previously scanned'
+                }))
+                updateOutletScannedList()
+                console.log('✅ Outlet scanned items restored from database')
             }
             
             const palletsDiv = document.getElementById('availablePallets')
             if (!palletsDiv) return
             
-            if (state.availablePallets.length === 0) {
+            const totalItems = state.availablePallets.length + (state.availableACodeContainers?.length || 0)
+            
+            if (totalItems === 0) {
                 palletsDiv.innerHTML = `
                     <div class="text-center py-8">
                         <i class="fas fa-check-circle text-6xl text-green-500 mb-3"></i>
                         <p class="text-lg font-semibold text-green-600">All Deliveries Received!</p>
-                        <p class="text-sm text-gray-600">No pending pallets</p>
+                        <p class="text-sm text-gray-600">No pending items</p>
                     </div>
                 `
                 return
@@ -2966,7 +3433,14 @@ async function loadOutletPallets() {
                 !state.scannedItems.find(s => s.pallet_id === pallet.pallet_id)
             )
             
-            if (unscannedPallets.length === 0) {
+            // Filter out already scanned A-code containers
+            const unscannedACodeContainers = (state.availableACodeContainers || []).filter(container =>
+                !state.outletScannedACodes?.includes(container.container_id)
+            )
+            
+            const totalUnscanned = unscannedPallets.length + unscannedACodeContainers.length
+            
+            if (totalUnscanned === 0) {
                 palletsDiv.innerHTML = `
                     <div class="text-center py-6">
                         <i class="fas fa-check-circle text-4xl text-green-500 mb-2"></i>
@@ -2975,21 +3449,47 @@ async function loadOutletPallets() {
                     </div>
                 `
             } else {
-                palletsDiv.innerHTML = unscannedPallets.map(pallet => `
-                    <div class="border-2 border-blue-300 rounded-lg p-4 bg-blue-50">
-                        <div class="flex items-center justify-between mb-2">
-                            <p class="font-bold text-lg">
-                                <i class="fas fa-pallet mr-2 text-blue-600"></i>${pallet.pallet_id}
+                let html = ''
+                
+                // Show F codes (pallets)
+                if (unscannedPallets.length > 0) {
+                    html += unscannedPallets.map(pallet => `
+                        <div class="border-2 border-blue-300 rounded-lg p-3 bg-blue-50 mb-2">
+                            <div class="flex items-center justify-between mb-1">
+                                <p class="font-bold text-base">
+                                    <i class="fas fa-pallet mr-2 text-blue-600"></i>${pallet.pallet_id}
+                                </p>
+                                <span class="px-2 py-1 bg-blue-500 text-white text-xs rounded font-semibold">
+                                    F CODE
+                                </span>
+                            </div>
+                            <p class="text-xs text-gray-600">
+                                <i class="fas fa-box mr-1"></i>${pallet.transfer_count} transfers
                             </p>
-                            <span class="px-2 py-1 bg-blue-500 text-white text-xs rounded font-semibold">
-                                ${pallet.status.toUpperCase()}
-                            </span>
                         </div>
-                        <p class="text-sm text-gray-600">
-                            <i class="fas fa-box mr-1"></i>${pallet.transfer_count} transfers
-                        </p>
-                    </div>
-                `).join('')
+                    `).join('')
+                }
+                
+                // Show A codes (containers)
+                if (unscannedACodeContainers.length > 0) {
+                    html += unscannedACodeContainers.map(container => `
+                        <div class="border-2 border-purple-300 rounded-lg p-3 bg-purple-50 mb-2">
+                            <div class="flex items-center justify-between mb-1">
+                                <p class="font-bold text-base">
+                                    <i class="fas fa-box mr-2 text-purple-600"></i>${container.container_id}
+                                </p>
+                                <span class="px-2 py-1 bg-purple-500 text-white text-xs rounded font-semibold">
+                                    A CODE
+                                </span>
+                            </div>
+                            <p class="text-xs text-gray-600">
+                                <i class="fas fa-container-storage mr-1"></i>Container
+                            </p>
+                        </div>
+                    `).join('')
+                }
+                
+                palletsDiv.innerHTML = html
             }
         }
     } catch (error) {
@@ -3010,9 +3510,9 @@ let outletScanTimeout = null
 // NEW: Step 2 - Scan pallet ID (validation only, no immediate delivery)
 async function handleOutletScanPallet() {
     const input = document.getElementById('palletScanInput')
-    const palletId = input.value.trim().toUpperCase()
+    const scannedCode = input.value.trim().toUpperCase()
     
-    if (!palletId || !state.selectedOutlet) return
+    if (!scannedCode || !state.selectedOutlet) return
     
     // Clear input immediately to prevent scanner double-scan
     input.value = ''
@@ -3026,43 +3526,88 @@ async function handleOutletScanPallet() {
         outletScanTimeout = null
     }, 500)
     
+    // Detect code type: A code (starts with 'A') or F code (pallet ID)
+    const isACode = scannedCode.startsWith('A')
+    
+    // Initialize tracking arrays if needed
+    if (!state.outletScannedACodes) state.outletScannedACodes = []
+    if (!state.outletScannedFCodes) state.outletScannedFCodes = []
+    
     // Check for duplicate scan in current session
-    const alreadyScanned = state.scannedItems.find(item => item.pallet_id === palletId)
-    if (alreadyScanned) {
+    const duplicateA = isACode && state.outletScannedACodes.includes(scannedCode)
+    const duplicateF = !isACode && state.outletScannedFCodes.includes(scannedCode)
+    
+    if (duplicateA || duplicateF) {
         playBeep(false)
-        showToast(`⚠️ Duplicate scan! Pallet ${palletId} was already scanned at ${alreadyScanned.time}`, 'error')
-        input.value = ''
+        showToast(`⚠️ Duplicate scan! ${isACode ? 'Container' : 'Pallet'} ${scannedCode} already scanned`, 'error')
         input.focus()
         return
     }
     
     try {
-        // Only validate the pallet (don't mark as delivered yet)
-        const response = await axios.post('/api/outlet/scan-pallet', { 
-            outlet_code_short: state.selectedOutlet.code_short,
-            pallet_id: palletId
-        })
-        
-        if (response.data.success) {
-            playBeep(true)
-            
-            // Add to scanned items list (not delivered yet)
-            state.scannedItems.push({
-                pallet_id: palletId,
-                transfer_count: response.data.transfer_count,
-                time: new Date().toLocaleTimeString()
+        if (isACode) {
+            // Scan A code (container)
+            const response = await axios.post('/api/outlet/scan-container', { 
+                outlet_code_short: state.selectedOutlet.code_short,
+                outlet_code: state.selectedOutlet.code,
+                container_id: scannedCode
             })
             
-            showToast(`✓ Pallet ${palletId} scanned (${response.data.transfer_count} transfers)`, 'success')
-            updateOutletScannedList()
-            updateOutletCompleteButton() // Update the complete button visibility
-            
-            // Remove scanned pallet from "Your Delivery" list
-            state.availablePallets = state.availablePallets.filter(p => p.pallet_id !== palletId)
-            loadOutletPallets() // Refresh the delivery list display
+            if (response.data.success) {
+                playBeep(true)
+                state.outletScannedACodes.push(scannedCode)
+                
+                // Add to combined scanned items list
+                state.scannedItems.push({
+                    code: scannedCode,
+                    type: 'container',
+                    container_id: scannedCode,
+                    time: new Date().toLocaleTimeString()
+                })
+                
+                showToast(`✓ Container ${scannedCode} scanned`, 'success')
+                updateOutletScannedList()
+                updateOutletCompleteButton()
+                
+                // Remove scanned A-code from "Your Deliveries" list
+                if (!state.availableACodeContainers) state.availableACodeContainers = []
+                state.availableACodeContainers = state.availableACodeContainers.filter(a => a.container_id !== scannedCode)
+                loadOutletPallets()
+            } else {
+                playBeep(false)
+                showToast(`✗ ${response.data.error}`, 'error')
+            }
         } else {
-            playBeep(false)
-            showToast(`✗ ${response.data.error}`, 'error')
+            // Scan F code (pallet)
+            const response = await axios.post('/api/outlet/scan-pallet', { 
+                outlet_code_short: state.selectedOutlet.code_short,
+                pallet_id: scannedCode
+            })
+            
+            if (response.data.success) {
+                playBeep(true)
+                state.outletScannedFCodes.push(scannedCode)
+                
+                // Add to combined scanned items list
+                state.scannedItems.push({
+                    code: scannedCode,
+                    type: 'pallet',
+                    pallet_id: scannedCode,
+                    transfer_count: response.data.transfer_count,
+                    time: new Date().toLocaleTimeString()
+                })
+                
+                showToast(`✓ Pallet ${scannedCode} scanned (${response.data.transfer_count} transfers)`, 'success')
+                updateOutletScannedList()
+                updateOutletCompleteButton()
+                
+                // Remove scanned pallet from "Your Delivery" list
+                state.availablePallets = state.availablePallets.filter(p => p.pallet_id !== scannedCode)
+                loadOutletPallets()
+            } else {
+                playBeep(false)
+                showToast(`✗ ${response.data.error}`, 'error')
+            }
         }
     } catch (error) {
         playBeep(false)
@@ -3077,14 +3622,18 @@ function updateOutletScannedList() {
     const list = document.getElementById('outletScannedList')
     if (!list) return
     
+    const palletCount = state.outletScannedFCodes?.length || 0
+    const containerCount = state.outletScannedACodes?.length || 0
+    const totalCount = state.scannedItems.length
+    
     // Update the header counter
     const headerElement = list.closest('.mt-6')?.querySelector('h4')
     if (headerElement) {
-        headerElement.textContent = `Scanned Pallets (${state.scannedItems.length})`
+        headerElement.textContent = `Scanned Items (${palletCount} pallets, ${containerCount} containers)`
     }
     
-    if (state.scannedItems.length === 0) {
-        list.innerHTML = '<p class="text-gray-500 text-center py-4">No pallets scanned yet</p>'
+    if (totalCount === 0) {
+        list.innerHTML = '<p class="text-gray-500 text-center py-4">No items scanned yet</p>'
         return
     }
     
@@ -3092,15 +3641,26 @@ function updateOutletScannedList() {
         // Calculate actual index in original array
         const actualIndex = state.scannedItems.length - 1 - reversedIndex
         
+        const isContainer = item.type === 'container'
+        const isPallet = item.type === 'pallet'
+        
         return `
-        <div class="border-l-4 border-blue-500 bg-blue-50 p-3 rounded">
+        <div class="border-l-4 ${isContainer ? 'border-purple-500 bg-purple-50' : 'border-blue-500 bg-blue-50'} p-3 rounded">
             <div class="flex justify-between items-start">
                 <div class="flex-1">
                     <p class="font-semibold">
-                        <i class="fas fa-pallet mr-1 text-blue-600"></i>${item.pallet_id}
+                        <i class="fas ${isContainer ? 'fa-box' : 'fa-pallet'} mr-1 ${isContainer ? 'text-purple-600' : 'text-blue-600'}"></i>
+                        ${item.code}
+                        <span class="text-xs ${isContainer ? 'text-purple-600' : 'text-blue-600'} ml-2">
+                            ${isContainer ? 'Container' : 'Pallet'}
+                        </span>
                     </p>
-                    <p class="text-xs text-gray-600">${item.transfer_count} transfers</p>
-                    <p class="text-xs text-blue-600"><i class="fas fa-clock mr-1"></i>Scanned (not confirmed yet)</p>
+                    ${isPallet && item.transfer_count ? `
+                        <p class="text-xs text-gray-600">${item.transfer_count} transfers</p>
+                    ` : ''}
+                    <p class="text-xs ${isContainer ? 'text-purple-600' : 'text-blue-600'}">
+                        <i class="fas fa-clock mr-1"></i>Scanned (not confirmed yet)
+                    </p>
                 </div>
                 <div class="flex items-start space-x-2">
                     <span class="text-sm text-gray-500">${item.time}</span>
@@ -3140,14 +3700,24 @@ function showOutletCompletionModal() {
         return
     }
     
-    // Check if all available pallets are scanned
+    // Check if all available pallets (F-codes) are scanned
     const unscannedPallets = state.availablePallets.filter(p => 
         !state.scannedItems.find(s => s.pallet_id === p.pallet_id)
     )
     
+    // Check if all available A-code containers are scanned
+    const availableAcodes = state.availableACodeContainers || []
+    const unscannedAcodes = availableAcodes.filter(a => 
+        !state.scannedItems.find(s => s.container_id === a.container_id)
+    )
+    
     const totalPallets = state.availablePallets.length
+    const totalAcodes = availableAcodes.length
     const scannedCount = state.scannedItems.length
     const totalTransfers = state.scannedItems.reduce((sum, item) => sum + item.transfer_count, 0)
+    
+    // Check if incomplete (either pallets or A-codes missing)
+    const isIncomplete = unscannedPallets.length > 0 || unscannedAcodes.length > 0
     
     // Check if warehouse already set container count
     const warehouseContainerCount = state.selectedOutlet.container_count_loaded
@@ -3172,103 +3742,85 @@ function showOutletCompletionModal() {
                     </p>
                 </div>
                 
-                ${unscannedPallets.length > 0 ? `
-                    <div class="mb-4 bg-yellow-50 border border-yellow-300 rounded-lg p-4">
-                        <p class="text-sm font-semibold text-yellow-800 mb-2">
-                            <i class="fas fa-exclamation-triangle mr-1"></i>Warning: Incomplete Receipt
+                ${isIncomplete ? `
+                    <div class="mb-4 bg-red-50 border-2 border-red-500 rounded-lg p-4">
+                        <p class="text-sm font-bold text-red-800 mb-2">
+                            <i class="fas fa-exclamation-triangle mr-1"></i>⚠️ Warning: Incomplete Receipt
                         </p>
-                        <p class="text-xs text-yellow-700 mb-2">
-                            You have <strong>${unscannedPallets.length} pallet(s)</strong> not yet scanned out of ${totalPallets} total.
-                        </p>
-                        <div class="text-xs text-yellow-600 bg-white rounded p-2">
-                            <strong>Unscanned pallets:</strong>
-                            <ul class="list-disc list-inside mt-1">
-                                ${unscannedPallets.slice(0, 5).map(p => `
-                                    <li>${p.pallet_id} (${p.transfer_count} transfers)</li>
-                                `).join('')}
-                                ${unscannedPallets.length > 5 ? `<li>...and ${unscannedPallets.length - 5} more</li>` : ''}
-                            </ul>
-                        </div>
-                        <p class="text-xs text-yellow-700 mt-2">
-                            <i class="fas fa-info-circle mr-1"></i>These will be marked as <strong>unreceived</strong> in the report.
+                        ${unscannedPallets.length > 0 ? `
+                            <p class="text-xs text-red-700 mb-2">
+                                You have <strong>${unscannedPallets.length} F-code pallet(s)</strong> not yet scanned out of ${totalPallets} total.
+                            </p>
+                            <div class="text-xs text-red-600 bg-white rounded p-2 border border-red-300 mb-2">
+                                <strong>Unscanned F-codes (Pallets):</strong>
+                                <ul class="list-disc list-inside mt-1">
+                                    ${unscannedPallets.slice(0, 5).map(p => `
+                                        <li class="text-blue-700">📦 ${p.pallet_id} (${p.transfer_count} transfers)</li>
+                                    `).join('')}
+                                    ${unscannedPallets.length > 5 ? `<li>...and ${unscannedPallets.length - 5} more</li>` : ''}
+                                </ul>
+                            </div>
+                        ` : ''}
+                        ${unscannedAcodes.length > 0 ? `
+                            <p class="text-xs text-red-700 mb-2">
+                                You have <strong>${unscannedAcodes.length} A-code container(s)</strong> not yet scanned out of ${totalAcodes} total.
+                            </p>
+                            <div class="text-xs text-red-600 bg-white rounded p-2 border border-red-300">
+                                <strong>Unscanned A-codes (Containers):</strong>
+                                <ul class="list-disc list-inside mt-1">
+                                    ${unscannedAcodes.slice(0, 5).map(a => `
+                                        <li class="text-purple-700">📦 ${a.container_id}</li>
+                                    `).join('')}
+                                    ${unscannedAcodes.length > 5 ? `<li>...and ${unscannedAcodes.length - 5} more</li>` : ''}
+                                </ul>
+                            </div>
+                        ` : ''}
+                        <p class="text-xs text-red-700 mt-2 font-semibold">
+                            <i class="fas fa-info-circle mr-1"></i>Unscanned items will be marked as <strong>unreceived</strong> in the report.
                         </p>
                     </div>
                 ` : `
                     <div class="mb-4 bg-green-50 border border-green-300 rounded-lg p-4">
                         <p class="text-sm font-semibold text-green-800">
-                            <i class="fas fa-check-circle mr-1"></i>All Pallets Scanned!
+                            <i class="fas fa-check-circle mr-1"></i>All Items Scanned!
                         </p>
                         <p class="text-xs text-green-600 mt-1">
-                            You have scanned all ${totalPallets} pallets for this outlet.
+                            ✓ ${totalPallets} F-code pallet(s) scanned
+                            ${totalAcodes > 0 ? `<br>✓ ${totalAcodes} A-code container(s) scanned` : ''}
                         </p>
                     </div>
                 `}
                 
-                ${hasWarehouseCount ? `
-                    <!-- Warehouse already set container count -->
-                    ${unscannedPallets.length === 0 ? `
-                        <!-- All pallets scanned - Read-only -->
-                        <div class="mb-4 bg-blue-50 border border-blue-300 rounded-lg p-4">
-                            <p class="text-sm font-semibold text-blue-800 mb-2">
-                                <i class="fas fa-lock mr-1"></i>Container Count: Auto-filled (Read-Only)
-                            </p>
-                            <p class="text-xs text-blue-700 mb-2">
-                                All pallets scanned! Container count from warehouse: <strong>${warehouseContainerCount}</strong>
-                            </p>
-                            <div class="text-center">
-                                <span class="text-3xl font-bold text-blue-600">${warehouseContainerCount}</span>
-                                <span class="text-sm text-blue-600 ml-2">container(s)</span>
-                            </div>
-                            <input type="hidden" id="container_count_outlet" value="${warehouseContainerCount}">
-                        </div>
-                    ` : `
-                        <!-- Incomplete - Allow editing -->
-                        <div class="mb-4 bg-yellow-50 border border-yellow-300 rounded-lg p-4">
-                            <p class="text-sm font-semibold text-yellow-800 mb-2">
-                                <i class="fas fa-edit mr-1"></i>Container Count: Editable (Incomplete Receipt)
-                            </p>
-                            <p class="text-xs text-yellow-700 mb-2">
-                                Warehouse loaded <strong>${warehouseContainerCount}</strong> containers, but you're receiving <strong>${scannedCount}/${totalPallets} pallets</strong>. Adjust if needed.
-                            </p>
-                            <input type="number" id="container_count_outlet" required 
-                                min="1" max="${warehouseContainerCount}"
-                                class="w-full px-3 py-2 border-2 border-yellow-400 rounded-lg text-center text-xl font-bold"
-                                value="${warehouseContainerCount}">
-                        </div>
-                    `}
-                ` : `
-                    <!-- No warehouse count - Always allow manual entry -->
-                    ${unscannedPallets.length === 0 ? `
-                        <!-- All pallets scanned - Suggest count equals pallet count -->
-                        <div class="mb-4 bg-green-50 border border-green-300 rounded-lg p-4">
-                            <p class="text-sm font-semibold text-green-800 mb-2">
-                                <i class="fas fa-check-circle mr-1"></i>Container Count (All Pallets Scanned)
-                            </p>
-                            <p class="text-xs text-green-700 mb-2">
-                                Enter number of containers delivered (default: ${scannedCount})
-                            </p>
-                            <input type="number" id="container_count_outlet" required 
-                                min="1" max="${scannedCount}"
-                                class="w-full px-3 py-2 border-2 border-green-400 rounded-lg text-center text-xl font-bold"
-                                value="${scannedCount}">
-                        </div>
-                    ` : `
-                        <!-- Incomplete - Allow manual entry -->
-                        <div class="mb-4">
-                            <label class="block text-sm font-medium mb-2">
-                                How many containers were delivered? <span class="text-red-500">*</span>
-                                <span class="text-xs text-gray-500 block mt-1">
-                                    (Receiving ${scannedCount}/${totalPallets} pallets)
-                                </span>
+                <div class="mb-4 bg-blue-50 border border-blue-300 rounded-lg p-4">
+                    <p class="text-sm font-semibold text-blue-800 mb-3">
+                        <i class="fas fa-box mr-1"></i>Delivery Quantities
+                    </p>
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-xs font-medium mb-1">
+                                📦 Boxes Delivered <span class="text-red-500">*</span>
                             </label>
-                            <input type="number" id="container_count_outlet" required 
-                                min="1" max="${scannedCount}"
-                                class="w-full px-3 py-2 border rounded-lg text-center text-xl font-bold"
-                                placeholder="${scannedCount}"
-                                value="${scannedCount}">
+                            <input type="number" id="boxes_delivered" required 
+                                min="0"
+                                class="w-full px-3 py-2 border rounded-lg text-center text-lg font-bold"
+                                placeholder="0"
+                                value="0">
                         </div>
-                    `}
-                `}
+                        <div>
+                            <label class="block text-xs font-medium mb-1">
+                                📦 Containers Delivered <span class="text-red-500">*</span>
+                            </label>
+                            <input type="number" id="containers_delivered" required 
+                                min="0"
+                                class="w-full px-3 py-2 border rounded-lg text-center text-lg font-bold"
+                                placeholder="0"
+                                value="0">
+                        </div>
+                    </div>
+                    <p class="text-xs text-gray-500 mt-2">
+                        <i class="fas fa-info-circle mr-1"></i>Enter the actual quantities received
+                    </p>
+                </div>
                 
                 <div class="mb-4">
                     <label class="block text-sm font-medium mb-2">Receiver Name/Signature <span class="text-red-500">*</span></label>
@@ -3295,7 +3847,24 @@ function showOutletCompletionModal() {
     
     // CRITICAL FIX: Attach event listener after modal is added to DOM (for Android WebView compatibility)
     const form = modal.querySelector('form')
-    form.addEventListener('submit', handleConfirmOutletCompletion)
+    if (form) {
+        form.addEventListener('submit', function(e) {
+            e.preventDefault()
+            e.stopPropagation()
+            handleConfirmOutletCompletion(e)
+        })
+        
+        // Also prevent default form submission via button clicks
+        const submitBtn = modal.querySelector('#confirmSignBtn')
+        if (submitBtn) {
+            submitBtn.addEventListener('click', function(e) {
+                e.preventDefault()
+                e.stopPropagation()
+                const event = new Event('submit', { cancelable: true, bubbles: true })
+                form.dispatchEvent(event)
+            })
+        }
+    }
 }
 
 // NEW: Handle completion confirmation with bulk update
@@ -3303,15 +3872,26 @@ async function handleConfirmOutletCompletion(event) {
     event.preventDefault()
     
     const receiverName = document.getElementById('receiver_name_complete').value.trim()
-    const containerCount = parseInt(document.getElementById('container_count_outlet').value)
+    const boxesDelivered = parseInt(document.getElementById('boxes_delivered').value) || 0
+    const containersDelivered = parseInt(document.getElementById('containers_delivered').value) || 0
     
     if (!receiverName) {
         showToast('Please enter receiver name', 'error')
         return
     }
     
-    if (!containerCount || containerCount < 1) {
-        showToast('Please enter a valid container count', 'error')
+    if (boxesDelivered < 0) {
+        showToast('Boxes delivered cannot be negative', 'error')
+        return
+    }
+    
+    if (containersDelivered < 0) {
+        showToast('Containers delivered cannot be negative', 'error')
+        return
+    }
+    
+    if (boxesDelivered === 0 && containersDelivered === 0) {
+        showToast('Please enter at least one box or container delivered', 'error')
         return
     }
     
@@ -3320,15 +3900,22 @@ async function handleConfirmOutletCompletion(event) {
         return
     }
     
+    // CRITICAL FIX: Close the completion modal BEFORE showing confirmation dialog
+    // This prevents the confirmation dialog from appearing behind the completion modal
+    const completionModal = document.querySelector('.fixed.inset-0.z-50')
+    if (completionModal) {
+        completionModal.style.display = 'none' // Hide but don't remove (we'll remove both later)
+    }
+    
     // Show double confirmation dialog
     const palletIds = state.scannedItems.map(item => item.pallet_id)
-    showFinalConfirmationDialog(receiverName, containerCount, palletIds)
+    showFinalConfirmationDialog(receiverName, boxesDelivered, containersDelivered, palletIds)
 }
 
 // NEW: Final confirmation dialog before submitting
-function showFinalConfirmationDialog(receiverName, containerCount, palletIds) {
+function showFinalConfirmationDialog(receiverName, boxesDelivered, containersDelivered, palletIds) {
     // Store data in state for the confirmation handler
-    state.pendingOutletCompletion = { receiverName, containerCount, palletIds }
+    state.pendingOutletCompletion = { receiverName, boxesDelivered, containersDelivered, palletIds }
     
     const confirmModal = document.createElement('div')
     confirmModal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60] p-4'
@@ -3344,7 +3931,8 @@ function showFinalConfirmationDialog(receiverName, containerCount, palletIds) {
                 <div class="space-y-2 text-sm">
                     <p><i class="fas fa-store mr-2 text-blue-600"></i><strong>Outlet:</strong> ${state.selectedOutlet.code_short} - ${state.selectedOutlet.name}</p>
                     <p><i class="fas fa-pallet mr-2 text-blue-600"></i><strong>Pallets:</strong> ${palletIds.length} pallet(s)</p>
-                    <p><i class="fas fa-truck mr-2 text-blue-600"></i><strong>Containers:</strong> ${containerCount} container(s)</p>
+                    <p><i class="fas fa-box mr-2 text-blue-600"></i><strong>Boxes:</strong> ${boxesDelivered} box(es)</p>
+                    <p><i class="fas fa-container-storage mr-2 text-blue-600"></i><strong>Containers:</strong> ${containersDelivered} container(s)</p>
                     <p><i class="fas fa-user mr-2 text-blue-600"></i><strong>Received by:</strong> ${receiverName}</p>
                 </div>
             </div>
@@ -3353,11 +3941,11 @@ function showFinalConfirmationDialog(receiverName, containerCount, palletIds) {
                 Once confirmed, this action cannot be undone. Are you sure you want to proceed?
             </p>
             <div class="flex space-x-3">
-                <button onclick="proceedWithOutletCompletion()" 
+                <button id="yesProceedBtn"
                     class="flex-1 bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg font-semibold">
                     <i class="fas fa-check-circle mr-2"></i>YES - Proceed
                 </button>
-                <button onclick="this.closest('.fixed').remove()" 
+                <button id="noCancelBtn"
                     class="flex-1 bg-gray-300 hover:bg-gray-400 text-gray-800 px-4 py-2 rounded-lg font-semibold">
                     <i class="fas fa-times mr-2"></i>NO - Cancel
                 </button>
@@ -3365,6 +3953,33 @@ function showFinalConfirmationDialog(receiverName, containerCount, palletIds) {
         </div>
     `
     document.body.appendChild(confirmModal)
+    
+    // CRITICAL: Attach event listeners after modal is added to DOM (Android WebView compatibility)
+    const yesBtn = confirmModal.querySelector('#yesProceedBtn')
+    const noBtn = confirmModal.querySelector('#noCancelBtn')
+    
+    if (yesBtn) {
+        yesBtn.addEventListener('click', function(e) {
+            e.preventDefault()
+            e.stopPropagation()
+            proceedWithOutletCompletion()
+        })
+    }
+    
+    if (noBtn) {
+        noBtn.addEventListener('click', function(e) {
+            e.preventDefault()
+            e.stopPropagation()
+            
+            // CRITICAL FIX: Show the completion modal again when user clicks NO
+            const completionModal = document.querySelector('.fixed.inset-0.z-50')
+            if (completionModal) {
+                completionModal.style.display = 'flex' // Show it again
+            }
+            
+            confirmModal.remove()
+        })
+    }
 }
 
 // NEW: Proceed with actual submission after confirmation
@@ -3374,17 +3989,18 @@ async function proceedWithOutletCompletion() {
         return
     }
     
-    const { receiverName, containerCount, palletIds } = state.pendingOutletCompletion
+    const { receiverName, boxesDelivered, containersDelivered, palletIds } = state.pendingOutletCompletion
     
     try {
         const response = await axios.post('/api/outlet/confirm-receipt-bulk', {
             outlet_code_short: state.selectedOutlet.code_short,
             pallet_ids: palletIds,
             receiver_name: receiverName,
-            container_count: containerCount
+            boxes_delivered: boxesDelivered,
+            containers_delivered: containersDelivered
         })
         
-        showToast(`✓ Receipt completed! ${containerCount} container(s) with ${palletIds.length} pallet(s) received by ${receiverName}`, 'success')
+        showToast(`✓ Receipt completed! ${boxesDelivered} boxes, ${containersDelivered} containers with ${palletIds.length} pallet(s) received by ${receiverName}`, 'success')
         
         // Close all modals
         document.querySelectorAll('.fixed.inset-0').forEach(modal => modal.remove())
@@ -3466,7 +4082,7 @@ async function handleCompleteUnloading(event) {
 function renderContainers() {
     return `
         <div class="h-full flex flex-col">
-        <div class="container mx-auto px-4 py-6 flex-1 overflow-y-auto">
+        <div class="container mx-auto px-4 py-6 flex-1 overflow-y-auto" style="max-height: 100vh;">
             <h2 class="text-2xl md:text-3xl font-bold mb-6 text-gray-800">
                 <i class="fas fa-recycle text-green-600 mr-2"></i>Container Collection & Management
             </h2>
@@ -4107,7 +4723,7 @@ function showContainerInventoryView() {
     const content = document.getElementById('containerContent')
     
     content.innerHTML = `
-        <div class="bg-white rounded-lg shadow-lg p-4 md:p-6">
+        <div class="bg-white rounded-lg shadow-lg p-4 md:p-6 pb-20">
             <h3 class="text-xl md:text-2xl font-bold mb-4 md:mb-6 flex items-center">
                 <i class="fas fa-warehouse text-blue-600 mr-2"></i>
                 <span>Container Inventory</span>
@@ -4118,7 +4734,7 @@ function showContainerInventoryView() {
             </div>
             
             <button onclick="loadContainerInventory()" 
-                class="w-full mt-4 bg-blue-500 hover:bg-blue-600 active:bg-blue-700 text-white px-4 py-2.5 md:py-2 rounded-lg shadow-md text-sm md:text-base">
+                class="w-full mt-4 mb-8 bg-blue-500 hover:bg-blue-600 active:bg-blue-700 text-white px-4 py-2.5 md:py-2 rounded-lg shadow-md text-sm md:text-base">
                 <i class="fas fa-sync mr-2"></i>Refresh Inventory
             </button>
         </div>
@@ -4130,7 +4746,17 @@ function showContainerInventoryView() {
 // Load container inventory
 async function loadContainerInventory() {
     try {
-        const response = await axios.get('/api/containers/inventory')
+        // OPTIMIZATION: Use cached data if available
+        let response
+        if (state.cachedContainerInventory && Date.now() - state.cachedContainerInventory.timestamp < 30000) {
+            response = state.cachedContainerInventory
+        } else {
+            response = await axios.get('/api/containers/inventory')
+            state.cachedContainerInventory = {
+                ...response,
+                timestamp: Date.now()
+            }
+        }
         const containers = response.data.containers || []
         
         const listDiv = document.getElementById('containerInventoryList')
@@ -4302,7 +4928,17 @@ async function loadDeliveryReport() {
 
 async function loadContainerReport() {
     try {
-        const response = await axios.get('/api/containers/inventory')
+        // OPTIMIZATION: Use cached data if available
+        let response
+        if (state.cachedContainerInventory && Date.now() - state.cachedContainerInventory.timestamp < 30000) {
+            response = state.cachedContainerInventory
+        } else {
+            response = await axios.get('/api/containers/inventory')
+            state.cachedContainerInventory = {
+                ...response,
+                timestamp: Date.now()
+            }
+        }
         const containers = response.data.containers || []
         
         const content = document.getElementById('reportContent')
