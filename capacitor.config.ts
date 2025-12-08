@@ -5,9 +5,9 @@ const config: CapacitorConfig = {
   appName: 'APD Oasis',
   webDir: 'dist',
   server: {
-    // Load assets from APK
-    hostname: 'app',
-    androidScheme: 'http'
+    // Load assets from APK - use https scheme for proper loading
+    hostname: 'localhost',
+    androidScheme: 'https'
   },
   android: {
     buildOptions: {
