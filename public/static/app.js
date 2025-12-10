@@ -1525,6 +1525,7 @@ function renderDashboard() {
                                 <th class="px-4 py-2 text-left">Outlet Name</th>
                                 <th class="px-4 py-2 text-center">Total TN</th>
                                 <th class="px-4 py-2 text-center">Loaded TN</th>
+                                <th class="px-4 py-2 text-center">Loaded Boxes</th>
                                 <th class="px-4 py-2 text-center">Loaded Container</th>
                                 <th class="px-4 py-2 text-center">Delivered</th>
                                 <th class="px-4 py-2 text-center">Status</th>
@@ -1535,7 +1536,7 @@ function renderDashboard() {
                         </thead>
                         <tbody id="dash-outlet-table">
                             <tr>
-                                <td colspan="10" class="text-center py-4 text-gray-500">Loading...</td>
+                                <td colspan="11" class="text-center py-4 text-gray-500">Loading...</td>
                             </tr>
                         </tbody>
                     </table>
@@ -1614,6 +1615,7 @@ async function loadDashboardData() {
                     total: 0,
                     loaded: 0,
                     delivered: 0,
+                    box_count_loaded: null,
                     container_count_loaded: null,
                     container_count_delivered: null,
                     last_loaded_at: null,
@@ -1628,13 +1630,21 @@ async function loadDashboardData() {
             if (parcel.status === 'loaded' || parcel.status === 'delivered') {
                 outlet.loaded++
                 // Store latest loaded timestamp
+                console.log(`🔍 Parcel ${parcel.pallet_id} for ${outlet.code}: status=${parcel.status}, loaded_at=${parcel.loaded_at}`)
                 if (parcel.loaded_at && (!outlet.last_loaded_at || parcel.loaded_at > outlet.last_loaded_at)) {
                     outlet.last_loaded_at = parcel.loaded_at
                     console.log(`📅 Outlet ${outlet.code}: loaded_at set to ${parcel.loaded_at}`)
+                } else if (!parcel.loaded_at) {
+                    console.warn(`⚠️ Parcel ${parcel.pallet_id} has status '${parcel.status}' but loaded_at is NULL/empty!`)
                 }
-                // Track container count (use NEW container_count field, not legacy container_count_loaded)
+                // Track box count and container count (use NEW fields)
+                if (parcel.box_count !== null && parcel.box_count !== undefined && !outlet.box_count_loaded) {
+                    outlet.box_count_loaded = parcel.box_count
+                    console.log(`📦 Outlet ${outlet.code}: box_count set to ${parcel.box_count}`)
+                }
                 if (parcel.container_count !== null && parcel.container_count !== undefined && !outlet.container_count_loaded) {
                     outlet.container_count_loaded = parcel.container_count
+                    console.log(`📦 Outlet ${outlet.code}: container_count set to ${parcel.container_count}`)
                 }
                 // NEW: Track box_count and container_count ONCE per outlet (not per parcel)
                 if (parcel.box_count && !outletBoxCounts.has(parcel.outlet_code)) {
@@ -1858,7 +1868,7 @@ async function loadDashboardData() {
         // Update outlet table
         const tableBody = document.getElementById('dash-outlet-table')
         if (outletMap.size === 0) {
-            tableBody.innerHTML = '<tr><td colspan="10" class="text-center py-4 text-gray-500">No data available</td></tr>'
+            tableBody.innerHTML = '<tr><td colspan="11" class="text-center py-4 text-gray-500">No data available</td></tr>'
             return
         }
         
@@ -1874,6 +1884,12 @@ async function loadDashboardData() {
             })
             return `${dateStr}<br/>${timeStr}`
         }
+        
+        // Debug: Log outlet data before rendering
+        console.log('📊 Outlet Status Table Data:')
+        outletMap.forEach((outlet, code) => {
+            console.log(`   ${code}: loaded=${outlet.loaded}, boxes=${outlet.box_count_loaded}, containers=${outlet.container_count_loaded}, loaded_at=${outlet.last_loaded_at}`)
+        })
         
         tableBody.innerHTML = Array.from(outletMap.values()).map(outlet => {
             const loadedPercent = outlet.total > 0 ? Math.round((outlet.loaded / outlet.total) * 100) : 0
@@ -1905,6 +1921,9 @@ async function loadDashboardData() {
                     <td class="px-4 py-3 text-center">
                         <span class="text-green-600 font-semibold">${outlet.loaded}</span>
                         <span class="text-gray-400 text-sm"> (${loadedPercent}%)</span>
+                    </td>
+                    <td class="px-4 py-3 text-center">
+                        <span class="text-amber-600 font-bold text-lg">${outlet.box_count_loaded || '-'}</span>
                     </td>
                     <td class="px-4 py-3 text-center">
                         <span class="text-blue-600 font-bold text-lg">${outlet.container_count_loaded || '-'}</span>
