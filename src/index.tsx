@@ -676,37 +676,20 @@ app.post('/api/import/:import_id/process-chunk', authMiddleware, async (c) => {
 app.post('/api/admin/clear-database', authMiddleware, async (c) => {
   try {
     console.log('\n=== CLEARING DATABASE ===')
+    console.log('Note: Users and audit logs will be preserved')
     
     let totalDeleted = {
-      audit_logs: 0,
       transfer_details: 0,
       parcels: 0,
       imports: 0,
       containers: 0
     }
     
-    // Delete in correct order (foreign key constraints)
-    // First count records, then delete all
+    // Delete operational data in correct order (foreign key constraints)
+    // Keep: users table, audit_logs (logs)
+    // Delete: transfer_details, parcels, imports, container_inventory
     
-    // 1. Delete audit_logs (using created_at >= minimum date to match all records)
-    console.log('Counting audit_logs...')
-    const auditCountResponse = await supabaseRequest(c, 'audit_logs?select=id')
-    const auditList = await auditCountResponse.json()
-    console.log(`  Found ${auditList.length} audit logs to delete`)
-    
-    if (auditList.length > 0) {
-      console.log('Deleting audit_logs...')
-      const auditDeleteResponse = await supabaseRequest(c, 'audit_logs?created_at=gte.2000-01-01', {
-        method: 'DELETE',
-        headers: {
-          'Prefer': 'return=representation'
-        }
-      })
-      totalDeleted.audit_logs = auditList.length
-      console.log(`  ✓ Deleted ${totalDeleted.audit_logs} audit logs`)
-    }
-    
-    // 2. Delete transfer_details
+    // 1. Delete transfer_details
     console.log('Counting transfer_details...')
     const transferCountResponse = await supabaseRequest(c, 'transfer_details?select=id')
     const transferList = await transferCountResponse.json()
@@ -724,7 +707,7 @@ app.post('/api/admin/clear-database', authMiddleware, async (c) => {
       console.log(`  ✓ Deleted ${totalDeleted.transfer_details} transfer details`)
     }
     
-    // 3. Delete parcels
+    // 2. Delete parcels
     console.log('Counting parcels...')
     const parcelCountResponse = await supabaseRequest(c, 'parcels?select=id')
     const parcelList = await parcelCountResponse.json()
@@ -742,7 +725,7 @@ app.post('/api/admin/clear-database', authMiddleware, async (c) => {
       console.log(`  ✓ Deleted ${totalDeleted.parcels} parcels`)
     }
     
-    // 4. Delete imports
+    // 3. Delete imports
     console.log('Counting imports...')
     const importCountResponse = await supabaseRequest(c, 'imports?select=id')
     const importList = await importCountResponse.json()
@@ -760,7 +743,7 @@ app.post('/api/admin/clear-database', authMiddleware, async (c) => {
       console.log(`  ✓ Deleted ${totalDeleted.imports} imports`)
     }
     
-    // 5. Delete container_inventory (A-code containers)
+    // 4. Delete container_inventory (A-code containers)
     console.log('Counting container_inventory...')
     const containerCountResponse = await supabaseRequest(c, 'container_inventory?select=id')
     const containerList = await containerCountResponse.json()
