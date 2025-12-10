@@ -1234,12 +1234,15 @@ async function confirmClearDatabase() {
             state.outletScannedFCodes = []
             
             showToast(
-                `✅ Database cleared successfully!\n` +
-                `Deleted: ${response.data.deleted.parcels} parcels, ` +
-                `${response.data.deleted.containers} containers, ` +
-                `${response.data.deleted.transfer_details} transfers, ` +
-                `${response.data.deleted.imports} imports\n` +
-                `Preserved: Users & Logs`,
+                `✅ Database cleared successfully!\n\n` +
+                `📊 Reports Cleared:\n` +
+                `• Delivery Report: ${response.data.deleted.parcels} records\n` +
+                `• Container Report: ${response.data.deleted.containers} records\n` +
+                `• Error Parcels: ${response.data.deleted.error_parcels || 0} records\n\n` +
+                `📦 Operational Data:\n` +
+                `• Transfers: ${response.data.deleted.transfer_details}\n` +
+                `• Imports: ${response.data.deleted.imports}\n\n` +
+                `✅ Preserved: Users & Audit Logs`,
                 'success'
             )
             

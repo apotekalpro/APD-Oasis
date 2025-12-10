@@ -687,8 +687,13 @@ app.post('/api/admin/clear-database', authMiddleware, async (c) => {
     }
     
     // Delete operational data in correct order (foreign key constraints)
-    // Keep: users table, audit_logs (logs)
-    // Delete: transfer_details, parcels, imports, container_inventory, error_parcels
+    // ✅ KEEP: users table, audit_logs (logs)
+    // ❌ DELETE: 
+    //    - transfer_details (all F-code transfers)
+    //    - parcels (all delivery records - this clears Delivery Report)
+    //    - imports (all import records)
+    //    - container_inventory (all A-code containers - this clears Container Report)
+    //    - error_parcels (all error records - this clears Error Parcels Report)
     
     // 1. Delete transfer_details
     console.log('Counting transfer_details...')
@@ -780,11 +785,24 @@ app.post('/api/admin/clear-database', authMiddleware, async (c) => {
       console.log(`  ✓ Deleted ${totalDeleted.error_parcels} error parcels`)
     }
     
-    console.log('=== DATABASE CLEARED SUCCESSFULLY ===\n')
+    console.log('=== DATABASE CLEARED SUCCESSFULLY ===')
+    console.log('📊 Reports Cleared:')
+    console.log(`   ✓ Delivery Report: ${totalDeleted.parcels} records removed`)
+    console.log(`   ✓ Container Report: ${totalDeleted.containers} records removed`)
+    console.log(`   ✓ Error Parcels Report: ${totalDeleted.error_parcels} records removed`)
+    console.log('📦 Operational Data Cleared:')
+    console.log(`   ✓ Transfer Details: ${totalDeleted.transfer_details} records removed`)
+    console.log(`   ✓ Imports: ${totalDeleted.imports} records removed`)
+    console.log('✅ Users and Audit Logs: PRESERVED\n')
     
     return c.json({
       success: true,
-      deleted: totalDeleted
+      deleted: totalDeleted,
+      reports_cleared: {
+        delivery_report: totalDeleted.parcels,
+        container_report: totalDeleted.containers,
+        error_parcels_report: totalDeleted.error_parcels
+      }
     })
   } catch (error) {
     console.error('Clear database error:', error)
