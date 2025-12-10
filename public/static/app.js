@@ -1671,15 +1671,25 @@ async function loadDashboardData() {
             }
         })
         
-        // Filter containers delivered on selected date
-        const containersDeliveredToday = allContainers.filter(c => {
-            if (!c.delivered_at) return false
-            const deliveredDate = new Date(c.delivered_at).toISOString().split('T')[0]
-            return deliveredDate === selectedDate
+        // NEW LOGIC: Get outlets that have parcels scheduled for today
+        const outletsScheduledToday = new Set()
+        parcels.forEach(parcel => {
+            if (parcel.outlet_code) {
+                outletsScheduledToday.add(parcel.outlet_code)
+            }
         })
         
-        // Count total containers available for pickup (status = 'delivered', not yet collected)
-        const containersForPickup = containersDeliveredToday.filter(c => c.status === 'delivered')
+        // Filter containers for pickup:
+        // 1. Must have status='delivered' (ready for collection)
+        // 2. Must belong to outlets scheduled for delivery today
+        const containersForPickup = allContainers.filter(c => {
+            return c.status === 'delivered' && outletsScheduledToday.has(c.outlet_code)
+        })
+        
+        console.log(`📦 Containers for Pickup Logic:`)
+        console.log(`   - Outlets scheduled today: ${outletsScheduledToday.size}`)
+        console.log(`   - Total containers with status='delivered': ${allContainers.filter(c => c.status === 'delivered').length}`)
+        console.log(`   - Containers for pickup (at scheduled outlets): ${containersForPickup.length}`)
         
         // Group containers by outlet for pickup table
         const pickupByOutlet = new Map()
@@ -1745,7 +1755,13 @@ async function loadDashboardData() {
         }
         
         // Count containers returning to warehouse (status = 'collected')
-        const containersReturning = containersDeliveredToday.filter(c => c.status === 'collected')
+        // Filter by collected_at date (when driver collected the container)
+        const containersReturning = allContainers.filter(c => {
+            if (c.status !== 'collected') return false
+            if (!c.collected_at) return false
+            const collectedDate = new Date(c.collected_at).toISOString().split('T')[0]
+            return collectedDate === selectedDate
+        })
         
         // Update containers returning statistic
         document.getElementById('dash-containers-returning').textContent = containersReturning.length
@@ -2833,7 +2849,15 @@ async function handleCompleteLoading(event) {
         
         showToast('Loading process completed!', 'success')
         document.querySelector('.fixed').remove()
+        
+        // CRITICAL: Clear ALL warehouse state after completion
         state.scannedItems = []
+        state.availablePallets = []
+        state.availableACodeContainers = []
+        state.selectedOutlet = null
+        state.parcels = []
+        
+        // Force UI refresh to show empty state
         loadWarehouseData()
     } catch (error) {
         showToast('Failed to complete loading', 'error')
@@ -4251,46 +4275,29 @@ async function findOutletContainers() {
     }
     
     try {
-        // Get outlet info from outlets table (now has code_short after SQL update)
-        // Using v2 endpoint to bypass Cloudflare cache of broken v1 endpoint
-        const outletsResponse = await axios.get('/api/v2/outlets')
-        console.log('Outlets API v2 response:', outletsResponse.data)
-        
-        const outlets = outletsResponse.data.outlets || []
-        console.log('Outlets array:', outlets, 'Is array:', Array.isArray(outlets))
-        
-        if (!Array.isArray(outlets)) {
-            console.error('Outlets is not an array:', typeof outlets, outlets)
-            showToast('Invalid data format from server', 'error')
-            return
-        }
-        
-        // Find outlet by code_short
-        console.log('Looking for code_short:', outletCodeShort)
-        const outlet = outlets.find(o => {
-            console.log('Checking outlet:', o.code_short, 'against', outletCodeShort)
-            return o.code_short === outletCodeShort
+        // NEW: Use dedicated container collection endpoint
+        // This finds outlets based on container_inventory with status='delivered'
+        const response = await axios.post('/api/containers/find-outlet', {
+            outlet_code: outletCodeShort
         })
         
-        if (outlet) {
+        if (response.data.success) {
+            const containerData = response.data
+            
             state.selectedOutlet = {
-                code: outlet.outlet_code,
-                code_short: outlet.code_short,
-                name: outlet.outlet_name
+                code: containerData.outlet_code,
+                code_short: containerData.outlet_code_short,
+                name: containerData.outlet_name
             }
             state.scannedContainers = []
-            state.availableContainers = []
+            state.availableContainers = containerData.containers || []
             
             // Reload the view
             showContainerCollectionView()
             
-            // Load containers
-            await loadAvailableContainers()
-            
-            showToast(`Outlet found: ${outlet.outlet_name}`, 'success')
+            showToast(`Found ${state.availableContainers.length} container(s) at ${containerData.outlet_name}`, 'success')
         } else {
-            console.log('No matching outlet found in', outlets.length, 'outlets')
-            showToast(`Outlet ${outletCodeShort} not found. Available outlets: ${outlets.length}`, 'error')
+            showToast(response.data.error || 'Outlet not found', 'error')
         }
     } catch (error) {
         console.error('Error finding outlet:', error)

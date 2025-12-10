@@ -2304,6 +2304,72 @@ app.post('/api/containers/complete-collection', authMiddleware, async (c) => {
   }
 })
 
+// Find outlet for container collection (driver use)
+app.post('/api/containers/find-outlet', authMiddleware, async (c) => {
+  try {
+    const user = c.get('user')
+    const { outlet_code } = await c.req.json()
+    
+    console.log(`🔍 Finding outlet for container collection: ${outlet_code}`)
+    
+    // Find containers at this outlet with status='delivered' (ready for collection)
+    // Support both full outlet_code and outlet_code_short
+    const containersResponse = await supabaseRequest(c, 
+      `container_inventory?outlet_code=eq.${outlet_code}&status=eq.delivered&select=*`)
+    const containersByFullCode = await containersResponse.json()
+    
+    let containers = containersByFullCode
+    let outletInfo = null
+    
+    // If no containers found with full code, try searching by short code in parcels
+    if (!containers || containers.length === 0) {
+      console.log(`🔍 No containers found by full code, trying short code lookup...`)
+      
+      // Find outlet info from parcels table using short code
+      const parcelsResponse = await supabaseRequest(c,
+        `parcels?outlet_code_short=eq.${outlet_code}&select=outlet_code,outlet_code_short,outlet_name&limit=1`)
+      const parcels = await parcelsResponse.json()
+      
+      if (parcels && parcels.length > 0) {
+        outletInfo = parcels[0]
+        console.log(`📝 Found outlet info from parcels:`, outletInfo)
+        
+        // Now search containers using the full outlet_code
+        const containersResponse2 = await supabaseRequest(c,
+          `container_inventory?outlet_code=eq.${outletInfo.outlet_code}&status=eq.delivered&select=*`)
+        containers = await containersResponse2.json()
+      }
+    } else {
+      // Get outlet info from first container
+      outletInfo = containers[0]
+    }
+    
+    if (!containers || containers.length === 0) {
+      return c.json({
+        success: false,
+        error: `Outlet ${outlet_code} not found or has no containers available for pickup`
+      })
+    }
+    
+    console.log(`✅ Found ${containers.length} containers ready for collection`)
+    
+    return c.json({
+      success: true,
+      outlet_code: outletInfo.outlet_code,
+      outlet_code_short: outletInfo.outlet_code_short || outlet_code,
+      outlet_name: outletInfo.outlet_name,
+      containers: containers.map((c: any) => ({
+        container_id: c.container_id,
+        delivered_at: c.delivered_at,
+        status: c.status
+      }))
+    })
+  } catch (error) {
+    console.error('Find outlet for collection error:', error)
+    return c.json({ error: 'Failed to find outlet' }, 500)
+  }
+})
+
 // ============ Reports Routes ============
 
 // Get delivery reports
