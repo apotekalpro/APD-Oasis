@@ -2602,9 +2602,9 @@ function showACodeScanningModal(outletCode, outletShortCode, outletName, contain
     modal.id = `acode-modal-${outletCode}`
     modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50'
     
-    // Initialize A code scanning state
+    // Initialize A code scanning state (FORCE CLEAR to prevent reuse from previous sessions)
     if (!state.aCodeScans) state.aCodeScans = {}
-    if (!state.aCodeScans[outletCode]) state.aCodeScans[outletCode] = []
+    state.aCodeScans[outletCode] = [] // Always reset to empty array for new scanning session
     
     // Store outlet info for use during scanning
     if (!state.aCodeOutletInfo) state.aCodeOutletInfo = {}
@@ -2893,6 +2893,8 @@ async function handleCompleteLoading(event) {
         state.selectedOutlet = null
         state.parcels = []
         state.outletContainerCounts = {} // Clear container count tracking
+        state.aCodeScans = {} // Clear A-code scanning state to prevent reuse
+        state.aCodeOutletInfo = {} // Clear A-code outlet info
         
         // Update UI immediately to show empty scanned items list
         updateScannedItemsList()

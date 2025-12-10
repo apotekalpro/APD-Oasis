@@ -682,12 +682,13 @@ app.post('/api/admin/clear-database', authMiddleware, async (c) => {
       transfer_details: 0,
       parcels: 0,
       imports: 0,
-      containers: 0
+      containers: 0,
+      error_parcels: 0
     }
     
     // Delete operational data in correct order (foreign key constraints)
     // Keep: users table, audit_logs (logs)
-    // Delete: transfer_details, parcels, imports, container_inventory
+    // Delete: transfer_details, parcels, imports, container_inventory, error_parcels
     
     // 1. Delete transfer_details
     console.log('Counting transfer_details...')
@@ -759,6 +760,24 @@ app.post('/api/admin/clear-database', authMiddleware, async (c) => {
       })
       totalDeleted.containers = containerList.length
       console.log(`  ✓ Deleted ${totalDeleted.containers} containers`)
+    }
+    
+    // 5. Delete error_parcels
+    console.log('Counting error_parcels...')
+    const errorParcelCountResponse = await supabaseRequest(c, 'error_parcels?select=id')
+    const errorParcelList = await errorParcelCountResponse.json()
+    console.log(`  Found ${errorParcelList.length} error parcels to delete`)
+    
+    if (errorParcelList.length > 0) {
+      console.log('Deleting error_parcels...')
+      const errorParcelDeleteResponse = await supabaseRequest(c, 'error_parcels?created_at=gte.2000-01-01', {
+        method: 'DELETE',
+        headers: {
+          'Prefer': 'return=representation'
+        }
+      })
+      totalDeleted.error_parcels = errorParcelList.length
+      console.log(`  ✓ Deleted ${totalDeleted.error_parcels} error parcels`)
     }
     
     console.log('=== DATABASE CLEARED SUCCESSFULLY ===\n')
