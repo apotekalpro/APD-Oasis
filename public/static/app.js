@@ -2324,10 +2324,12 @@ async function handleWarehouseScan() {
             })
             
             updateScannedItemsList()
-            loadWarehouseData()
+            
+            // CRITICAL: Wait for warehouse data to load before checking completion
+            await loadWarehouseData()
             
             // Check if this outlet is now fully scanned
-            checkOutletCompletionAndPromptContainerCount(response.data.outlet_code)
+            await checkOutletCompletionAndPromptContainerCount(response.data.outlet_code)
         } else {
             console.error('❌ Scan failed:', response.data.error)
             playBeep(false)
@@ -2388,23 +2390,32 @@ function updateScannedItemsList() {
 
 // Check if outlet is fully scanned and prompt for container count
 async function checkOutletCompletionAndPromptContainerCount(outletCode) {
+    console.log(`🔍 Checking completion for outlet: ${outletCode}`)
+    console.log(`📦 Total parcels in state: ${state.parcels?.length || 0}`)
+    
     // Get all parcels for this outlet
     const outletParcels = state.parcels.filter(p => p.outlet_code === outletCode)
-    if (outletParcels.length === 0) return
+    console.log(`🏪 Parcels for outlet ${outletCode}: ${outletParcels.length}`)
+    
+    if (outletParcels.length === 0) {
+        console.warn(`⚠️ No parcels found for outlet ${outletCode} in state.parcels`)
+        console.log(`📋 Available outlet codes in parcels:`, [...new Set(state.parcels.map(p => p.outlet_code))])
+        return
+    }
     
     // Count scanned pallets for this outlet
     const scannedPallets = state.scannedItems.filter(item => item.outlet_code === outletCode)
     const totalPallets = outletParcels.length
     const scannedCount = scannedPallets.length
     
-    console.log(`Outlet ${outletCode}: ${scannedCount}/${totalPallets} pallets scanned`)
+    console.log(`✅ Outlet ${outletCode}: ${scannedCount}/${totalPallets} pallets scanned`)
     
     // Check if outlet is fully scanned
     if (scannedCount === totalPallets && scannedCount > 0) {
         // Check if we already prompted for this outlet
         if (!state.outletContainerCounts) state.outletContainerCounts = {}
         if (state.outletContainerCounts[outletCode]) {
-            console.log(`Already recorded container count for ${outletCode}`)
+            console.log(`⏭️ Already recorded container count for ${outletCode}`)
             return
         }
         
@@ -2412,8 +2423,12 @@ async function checkOutletCompletionAndPromptContainerCount(outletCode) {
         const outletName = outletParcels[0].outlet_name || outletCode
         const outletShortCode = outletParcels[0].outlet_code_short || outletCode
         
+        console.log(`🎉 Outlet ${outletCode} FULLY SCANNED! Showing modal...`)
+        
         // Show container count popup
         showContainerCountModal(outletCode, outletShortCode, outletName, totalPallets)
+    } else {
+        console.log(`⏳ Outlet ${outletCode} not fully scanned yet (${scannedCount}/${totalPallets})`)
     }
 }
 
@@ -2856,6 +2871,10 @@ async function handleCompleteLoading(event) {
         state.availableACodeContainers = []
         state.selectedOutlet = null
         state.parcels = []
+        state.outletContainerCounts = {} // Clear container count tracking
+        
+        // Update UI immediately to show empty scanned items list
+        updateScannedItemsList()
         
         // Force UI refresh to show empty state
         loadWarehouseData()
