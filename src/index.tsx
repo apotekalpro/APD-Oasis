@@ -1243,14 +1243,30 @@ app.post('/api/warehouse/complete', authMiddleware, async (c) => {
       }
     })
     
+    console.log('Update response status:', updateResponse.status)
+    
+    if (!updateResponse.ok) {
+      const errorText = await updateResponse.text()
+      console.error('❌ Update failed! Status:', updateResponse.status)
+      console.error('Error response:', errorText)
+      throw new Error(`Failed to update parcels: ${errorText}`)
+    }
+    
     const updatedParcels = await updateResponse.json()
     console.log(`✅ Updated ${updatedParcels.length} parcels`)
     if (updatedParcels.length > 0) {
       console.log('First updated parcel:', JSON.stringify(updatedParcels[0], null, 2))
+    } else {
+      console.warn('⚠️ WARNING: Update returned 0 parcels! Check if parcels exist with correct status.')
     }
     console.log('=======================================\n')
     
-    return c.json({ success: true, updated_count: updatedParcels.length })
+    return c.json({ 
+      success: true, 
+      updated_count: updatedParcels.length,
+      outlet_code: outlet_code,
+      parcels_updated: updatedParcels.map(p => p.pallet_id)
+    })
   } catch (error) {
     console.error('❌ Warehouse complete error:', error)
     return c.json({ error: 'Failed to complete loading' }, 500)

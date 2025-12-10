@@ -2894,11 +2894,20 @@ async function handleCompleteLoading(event) {
     const outlets = [...new Set(state.scannedItems.map(item => item.outlet_code))]
     
     try {
+        console.log('🚀 Completing loading for outlets:', outlets)
+        console.log('📝 Signature name:', signatureName)
+        
         for (const outlet of outlets) {
-            await axios.post('/api/warehouse/complete', {
+            console.log(`📡 Calling /api/warehouse/complete for outlet: ${outlet}`)
+            const response = await axios.post('/api/warehouse/complete', {
                 outlet_code: outlet,
                 signature_name: signatureName
             })
+            console.log(`✅ Response for ${outlet}:`, response.data)
+            
+            if (response.data.updated_count === 0) {
+                console.warn(`⚠️ WARNING: 0 parcels updated for outlet ${outlet}!`)
+            }
         }
         
         showToast('Loading process completed!', 'success')
@@ -2920,7 +2929,9 @@ async function handleCompleteLoading(event) {
         // Force UI refresh to show empty state
         loadWarehouseData()
     } catch (error) {
-        showToast('Failed to complete loading', 'error')
+        console.error('❌ Complete loading error:', error)
+        console.error('Error details:', error.response?.data)
+        showToast(`Failed to complete loading: ${error.response?.data?.error || error.message}`, 'error')
     }
 }
 
