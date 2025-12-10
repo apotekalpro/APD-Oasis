@@ -1195,21 +1195,46 @@ app.post('/api/warehouse/complete', authMiddleware, async (c) => {
     const user = c.get('user')
     const { outlet_code, signature_name } = await c.req.json()
     
+    console.log('\n=== WAREHOUSE COMPLETE LOADING DEBUG ===')
+    console.log('Outlet Code:', outlet_code)
+    console.log('Signature Name:', signature_name)
+    console.log('User:', user.full_name, '(ID:', user.id, ')')
+    
+    // First, check how many loaded parcels exist for this outlet
+    const checkResponse = await supabaseRequest(c, `parcels?outlet_code=eq.${outlet_code}&status=eq.loaded&select=id,pallet_id,outlet_code,status`)
+    const loadedParcels = await checkResponse.json()
+    console.log(`Found ${loadedParcels.length} parcels with status='loaded' for outlet ${outlet_code}`)
+    console.log('Parcel IDs:', loadedParcels.map(p => p.pallet_id).join(', '))
+    
+    const updateData = {
+      loaded_at: new Date().toISOString(),
+      loaded_by: user.id,  // Warehouse staff who did loading
+      loaded_by_name: signature_name || user.full_name,  // Driver signature who confirmed
+      scanned_loading_by_name: user.full_name  // Track warehouse staff name separately
+    }
+    console.log('Update data:', JSON.stringify(updateData, null, 2))
+    
     // Update all loaded parcels for this outlet
     // loaded_by: warehouse staff who did the scanning/loading
     // loaded_by_name: driver signature who acknowledged and received the load
-    await supabaseRequest(c, `parcels?outlet_code=eq.${outlet_code}&status=eq.loaded`, {
+    const updateResponse = await supabaseRequest(c, `parcels?outlet_code=eq.${outlet_code}&status=eq.loaded`, {
       method: 'PATCH',
-      body: JSON.stringify({
-        loaded_at: new Date().toISOString(),
-        loaded_by: user.id,  // Warehouse staff who did loading
-        loaded_by_name: signature_name || user.full_name,  // Driver signature who confirmed
-        scanned_loading_by_name: user.full_name  // Track warehouse staff name separately
-      })
+      body: JSON.stringify(updateData),
+      headers: {
+        'Prefer': 'return=representation'
+      }
     })
     
-    return c.json({ success: true })
+    const updatedParcels = await updateResponse.json()
+    console.log(`✅ Updated ${updatedParcels.length} parcels`)
+    if (updatedParcels.length > 0) {
+      console.log('First updated parcel:', JSON.stringify(updatedParcels[0], null, 2))
+    }
+    console.log('=======================================\n')
+    
+    return c.json({ success: true, updated_count: updatedParcels.length })
   } catch (error) {
+    console.error('❌ Warehouse complete error:', error)
     return c.json({ error: 'Failed to complete loading' }, 500)
   }
 })
@@ -2416,10 +2441,27 @@ app.get('/api/reports/deliveries', authMiddleware, async (c) => {
       query += `&delivered_at=lte.${end_date}`
     }
     
+    console.log('\n=== DELIVERY REPORT DEBUG ===')
+    console.log('Query:', query)
+    
     const response = await supabaseRequest(c, query)
     const deliveries = await response.json()
+    
+    console.log(`Found ${deliveries.length} delivery records`)
+    if (deliveries.length > 0) {
+      const sample = deliveries[0]
+      console.log('Sample delivery record fields:')
+      console.log('  - loaded_at:', sample.loaded_at)
+      console.log('  - loaded_by_name:', sample.loaded_by_name)
+      console.log('  - scanned_loading_by_name:', sample.scanned_loading_by_name)
+      console.log('  - scanned_unloading_by_name:', sample.scanned_unloading_by_name)
+      console.log('  - status:', sample.status)
+    }
+    console.log('============================\n')
+    
     return c.json({ deliveries })
   } catch (error) {
+    console.error('❌ Delivery report error:', error)
     return c.json({ error: 'Failed to fetch reports' }, 500)
   }
 })
