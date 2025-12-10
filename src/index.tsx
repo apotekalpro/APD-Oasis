@@ -1215,14 +1215,41 @@ app.post('/api/warehouse/complete', authMiddleware, async (c) => {
     
     console.log('\n=== WAREHOUSE COMPLETE LOADING DEBUG ===')
     console.log('Outlet Code:', outlet_code)
+    console.log('Outlet Code type:', typeof outlet_code)
     console.log('Signature Name:', signature_name)
     console.log('User:', user.full_name, '(ID:', user.id, ')')
     
+    if (!outlet_code) {
+      console.error('❌ ERROR: outlet_code is missing or empty!')
+      throw new Error('outlet_code is required')
+    }
+    
     // First, check how many loaded parcels exist for this outlet
-    const checkResponse = await supabaseRequest(c, `parcels?outlet_code=eq.${outlet_code}&status=eq.loaded&select=id,pallet_id,outlet_code,status`)
+    console.log('Querying parcels with:', `parcels?outlet_code=eq.${outlet_code}&status=eq.loaded`)
+    const checkResponse = await supabaseRequest(c, `parcels?outlet_code=eq.${outlet_code}&status=eq.loaded&select=id,pallet_id,outlet_code,outlet_code_short,status`)
+    
+    if (!checkResponse.ok) {
+      const errorText = await checkResponse.text()
+      console.error('❌ Check query failed! Status:', checkResponse.status)
+      console.error('Error:', errorText)
+      throw new Error(`Failed to query parcels: ${errorText}`)
+    }
+    
     const loadedParcels = await checkResponse.json()
-    console.log(`Found ${loadedParcels.length} parcels with status='loaded' for outlet ${outlet_code}`)
-    console.log('Parcel IDs:', loadedParcels.map(p => p.pallet_id).join(', '))
+    console.log(`Found ${loadedParcels.length} parcels with outlet_code='${outlet_code}' and status='loaded'`)
+    
+    // Also check outlet_code_short in case that's what's being used
+    const checkShortResponse = await supabaseRequest(c, `parcels?outlet_code_short=eq.${outlet_code}&status=eq.loaded&select=id,pallet_id,outlet_code,outlet_code_short,status`)
+    const loadedParcelsShort = await checkShortResponse.json()
+    console.log(`Found ${loadedParcelsShort.length} parcels with outlet_code_short='${outlet_code}' and status='loaded'`)
+    
+    const totalParcels = [...loadedParcels, ...loadedParcelsShort]
+    console.log(`Total parcels to update: ${totalParcels.length}`)
+    
+    if (totalParcels.length > 0) {
+      console.log('Parcel IDs:', totalParcels.map(p => p.pallet_id).join(', '))
+      console.log('Sample parcel:', JSON.stringify(totalParcels[0], null, 2))
+    }
     
     const updateData = {
       loaded_at: new Date().toISOString(),
@@ -1233,9 +1260,11 @@ app.post('/api/warehouse/complete', authMiddleware, async (c) => {
     console.log('Update data:', JSON.stringify(updateData, null, 2))
     
     // Update all loaded parcels for this outlet
+    // Use OR query to match either outlet_code OR outlet_code_short
     // loaded_by: warehouse staff who did the scanning/loading
     // loaded_by_name: driver signature who acknowledged and received the load
-    const updateResponse = await supabaseRequest(c, `parcels?outlet_code=eq.${outlet_code}&status=eq.loaded`, {
+    console.log('Executing update query with OR condition...')
+    const updateResponse = await supabaseRequest(c, `parcels?or=(outlet_code.eq.${outlet_code},outlet_code_short.eq.${outlet_code})&status=eq.loaded`, {
       method: 'PATCH',
       body: JSON.stringify(updateData),
       headers: {
@@ -1269,7 +1298,17 @@ app.post('/api/warehouse/complete', authMiddleware, async (c) => {
     })
   } catch (error) {
     console.error('❌ Warehouse complete error:', error)
-    return c.json({ error: 'Failed to complete loading' }, 500)
+    const errorMessage = error instanceof Error ? error.message : String(error)
+    const errorStack = error instanceof Error ? error.stack : undefined
+    console.error('Error message:', errorMessage)
+    if (errorStack) {
+      console.error('Error stack:', errorStack)
+    }
+    return c.json({ 
+      error: 'Failed to complete loading',
+      message: errorMessage,
+      details: errorStack 
+    }, 500)
   }
 })
 
