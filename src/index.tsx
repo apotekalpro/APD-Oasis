@@ -2312,10 +2312,11 @@ app.post('/api/containers/find-outlet', authMiddleware, async (c) => {
     
     console.log(`🔍 Finding outlet for container collection: ${outlet_code}`)
     
-    // Find containers at this outlet with status='delivered' (ready for collection)
+    // Find containers at this outlet with status NOT 'collected' (ready for collection)
+    // Accept both 'at_outlet' and 'delivered' status
     // Support both full outlet_code and outlet_code_short
     const containersResponse = await supabaseRequest(c, 
-      `container_inventory?outlet_code=eq.${outlet_code}&status=eq.delivered&select=*`)
+      `container_inventory?outlet_code=eq.${outlet_code}&status=neq.collected&select=*`)
     const containersByFullCode = await containersResponse.json()
     
     let containers = containersByFullCode
@@ -2335,9 +2336,11 @@ app.post('/api/containers/find-outlet', authMiddleware, async (c) => {
         console.log(`📝 Found outlet info from parcels:`, outletInfo)
         
         // Now search containers using the full outlet_code
+        // Accept any status except 'collected'
         const containersResponse2 = await supabaseRequest(c,
-          `container_inventory?outlet_code=eq.${outletInfo.outlet_code}&status=eq.delivered&select=*`)
+          `container_inventory?outlet_code=eq.${outletInfo.outlet_code}&status=neq.collected&select=*`)
         containers = await containersResponse2.json()
+        console.log(`📦 Found ${containers?.length || 0} containers at outlet ${outletInfo.outlet_code}`)
       }
     } else {
       // Get outlet info from first container

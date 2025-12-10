@@ -1680,16 +1680,21 @@ async function loadDashboardData() {
         })
         
         // Filter containers for pickup:
-        // 1. Must have status='delivered' (ready for collection)
-        // 2. Must belong to outlets scheduled for delivery today
+        // Show ALL containers at outlets scheduled today (regardless of status)
+        // Status can be: 'at_outlet' (not yet delivered) OR 'delivered' (confirmed at outlet)
+        // Both are available for pickup when driver visits
         const containersForPickup = allContainers.filter(c => {
-            return c.status === 'delivered' && outletsScheduledToday.has(c.outlet_code)
+            // Only show containers NOT yet collected
+            const isNotCollected = c.status !== 'collected'
+            const isScheduledOutlet = outletsScheduledToday.has(c.outlet_code)
+            return isNotCollected && isScheduledOutlet
         })
         
         console.log(`📦 Containers for Pickup Logic:`)
         console.log(`   - Outlets scheduled today: ${outletsScheduledToday.size}`)
-        console.log(`   - Total containers with status='delivered': ${allContainers.filter(c => c.status === 'delivered').length}`)
+        console.log(`   - Total containers (not collected): ${allContainers.filter(c => c.status !== 'collected').length}`)
         console.log(`   - Containers for pickup (at scheduled outlets): ${containersForPickup.length}`)
+        console.log(`   - Container statuses:`, containersForPickup.map(c => ({ outlet: c.outlet_code, status: c.status })))
         
         // Group containers by outlet for pickup table
         const pickupByOutlet = new Map()
