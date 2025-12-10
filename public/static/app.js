@@ -1204,11 +1204,16 @@ function cancelImport() {
 async function confirmClearDatabase() {
     // Show confirmation dialog
     const confirmed = confirm(
-        '⚠️ WARNING: This will permanently delete ALL data!\n\n' +
-        'This includes:\n' +
-        '• All parcels\n' +
+        '⚠️ WARNING: This will permanently delete ALL operational data!\n\n' +
+        'This will DELETE:\n' +
+        '• All parcels (F-codes)\n' +
+        '• All containers (A-codes)\n' +
         '• All transfer details\n' +
-        '• All audit logs\n\n' +
+        '• All imports\n' +
+        '• All scanned items in warehouse\n\n' +
+        'This will PRESERVE:\n' +
+        '• User accounts (login)\n' +
+        '• System logs\n\n' +
         'Are you absolutely sure you want to continue?'
     )
     
@@ -1220,13 +1225,26 @@ async function confirmClearDatabase() {
         const response = await axios.post('/api/admin/clear-database')
         
         if (response.data.success) {
+            // Clear frontend state to reflect database clear
+            state.scannedItems = []
+            state.parcels = []
+            state.availablePallets = []
+            state.availableACodeContainers = []
+            state.outletScannedACodes = []
+            state.outletScannedFCodes = []
+            
             showToast(
                 `✅ Database cleared successfully!\n` +
                 `Deleted: ${response.data.deleted.parcels} parcels, ` +
+                `${response.data.deleted.containers} containers, ` +
                 `${response.data.deleted.transfer_details} transfers, ` +
-                `${response.data.deleted.audit_logs} audit logs`,
+                `${response.data.deleted.imports} imports\n` +
+                `Preserved: Users & Logs`,
                 'success'
             )
+            
+            // Reload current view to show empty state
+            render()
         }
     } catch (error) {
         console.error('❌ CLEAR DATABASE ERROR:', error.response?.data)
