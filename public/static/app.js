@@ -2326,7 +2326,11 @@ async function handleWarehouseScan() {
             updateScannedItemsList()
             
             // CRITICAL: Wait for warehouse data to load before checking completion
+            // This ensures state.parcels is populated for outlet completion check
             await loadWarehouseData()
+            
+            // Small delay to ensure data is fully loaded and rendered
+            await new Promise(resolve => setTimeout(resolve, 100))
             
             // Check if this outlet is now fully scanned
             await checkOutletCompletionAndPromptContainerCount(response.data.outlet_code)
@@ -2390,16 +2394,27 @@ function updateScannedItemsList() {
 
 // Check if outlet is fully scanned and prompt for container count
 async function checkOutletCompletionAndPromptContainerCount(outletCode) {
+    console.log(`🔍 ========== OUTLET COMPLETION CHECK ==========`)
     console.log(`🔍 Checking completion for outlet: ${outletCode}`)
     console.log(`📦 Total parcels in state: ${state.parcels?.length || 0}`)
+    console.log(`📦 State parcels:`, state.parcels)
+    
+    // Ensure state.parcels exists
+    if (!state.parcels || state.parcels.length === 0) {
+        console.error(`❌ state.parcels is empty! Cannot check outlet completion.`)
+        console.error(`   This means loadWarehouseData() hasn't loaded data yet.`)
+        return
+    }
     
     // Get all parcels for this outlet
     const outletParcels = state.parcels.filter(p => p.outlet_code === outletCode)
     console.log(`🏪 Parcels for outlet ${outletCode}: ${outletParcels.length}`)
+    console.log(`🏪 Outlet parcels details:`, outletParcels.map(p => ({ pallet_id: p.pallet_id, status: p.status })))
     
     if (outletParcels.length === 0) {
         console.warn(`⚠️ No parcels found for outlet ${outletCode} in state.parcels`)
         console.log(`📋 Available outlet codes in parcels:`, [...new Set(state.parcels.map(p => p.outlet_code))])
+        console.log(`📋 Full parcels list:`, state.parcels.map(p => ({ outlet_code: p.outlet_code, pallet_id: p.pallet_id })))
         return
     }
     
