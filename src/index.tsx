@@ -1762,10 +1762,48 @@ app.post('/api/outlet/confirm-receipt-bulk', authMiddleware, async (c) => {
     let errorCount = 0
     const errors = []
     
-    // Process each pallet
+    // Process each pallet/container
     for (const pallet_id of pallet_ids) {
       try {
-        // Find the pallet
+        // Check if this is an A-code (container) instead of F-code (pallet)
+        const isACode = pallet_id.toUpperCase().startsWith('A')
+        
+        if (isACode) {
+          // This is an A-code container - update container_inventory
+          console.log(`📦 Processing A-code container: ${pallet_id}`)
+          
+          // Find the container
+          const containerResponse = await supabaseRequest(c, 
+            `container_inventory?container_id=eq.${pallet_id}&status=eq.at_outlet&select=*`)
+          const containers = await containerResponse.json()
+          
+          if (!containers || containers.length === 0) {
+            errorCount++
+            errors.push(`${pallet_id}: A-code not found or already delivered`)
+            console.error(`❌ A-code ${pallet_id} not found in container_inventory`)
+            continue
+          }
+          
+          const container = containers[0]
+          
+          // Update container status to delivered
+          await supabaseRequest(c, `container_inventory?id=eq.${container.id}`, {
+            method: 'PATCH',
+            body: JSON.stringify({
+              status: 'delivered',
+              delivered_at: new Date().toISOString(),
+              delivered_by: user.id,
+              delivered_by_name: user.full_name,
+              receiver_name: receiver_name
+            })
+          })
+          
+          successCount++
+          console.log(`✓ A-code ${pallet_id} marked as delivered`)
+          continue // Skip pallet processing for A-codes
+        }
+        
+        // This is an F-code (pallet) - process normally
         const parcelsResponse = await supabaseRequest(c, `parcels?pallet_id=eq.${pallet_id}&outlet_code_short=eq.${outlet_code_short}&status=eq.loaded&select=*`)
         const parcels = await parcelsResponse.json()
         
