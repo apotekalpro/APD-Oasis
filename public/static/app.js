@@ -4775,7 +4775,12 @@ async function loadContainerInventory() {
                 timestamp: Date.now()
             }
         }
-        const containers = response.data.containers || []
+        const allContainers = response.data.containers || []
+        
+        // FILTER: Only show containers that are NOT yet collected
+        // Show containers with status 'at_outlet' or 'delivered' (active in system)
+        // Hide containers with status 'collected' (already picked up by driver)
+        const containers = allContainers.filter(c => c.status !== 'collected')
         
         const listDiv = document.getElementById('containerInventoryList')
         if (!listDiv) return
