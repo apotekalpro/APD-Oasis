@@ -2092,7 +2092,7 @@ async function loadWarehouseData() {
                 outlet_name: p.outlet_name,
                 transfer_count: p.total_count,
                 delivery_date: p.delivery_date,
-                time: p.loaded_at ? new Date(p.loaded_at).toLocaleTimeString() : 'Previously scanned'
+                time: p.loaded_at ? new Date(p.loaded_at).toLocaleTimeString() : 'Complete loaded'
             }))
             updateScannedItemsList()
             console.log('✅ Scanned items restored from database')
