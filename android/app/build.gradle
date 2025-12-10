@@ -10,12 +10,16 @@ if (keystorePropertiesFile.exists()) {
 android {
     namespace "com.apotekalpro.apdoasis"
     compileSdk rootProject.ext.compileSdkVersion
+    
+    // Force Java 17 for all compilation tasks
+    compileOptions.sourceCompatibility = JavaVersion.VERSION_17
+    compileOptions.targetCompatibility = JavaVersion.VERSION_17
     defaultConfig {
         applicationId "com.apotekalpro.apdoasis"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 29
-        versionName "1.1.28l"
+        versionCode 30
+        versionName "1.1.29c"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
@@ -76,4 +80,30 @@ try {
     }
 } catch(Exception e) {
     logger.info("google-services.json not found, google-services plugin not applied. Push Notifications won't work")
+}
+
+// Force Java 17 after all plugins and configurations are applied
+afterEvaluate {
+    tasks.withType(JavaCompile).configureEach { task ->
+        task.sourceCompatibility = JavaVersion.VERSION_17
+        task.targetCompatibility = JavaVersion.VERSION_17
+        task.doFirst {
+            // Remove all -source and -target arguments and their values
+            def args = task.options.compilerArgs
+            def newArgs = []
+            def skipNext = false
+            args.each { arg ->
+                if (skipNext) {
+                    skipNext = false
+                } else if (arg == '-source' || arg == '-target') {
+                    skipNext = true  // Skip the flag and its value
+                } else if (arg ==~ /^\d+$/) {
+                    // Skip standalone numbers (orphaned version numbers from removed flags)
+                } else {
+                    newArgs.add(arg)
+                }
+            }
+            task.options.compilerArgs = newArgs
+        }
+    }
 }
