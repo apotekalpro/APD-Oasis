@@ -1428,13 +1428,12 @@ function renderDashboard() {
                                 <th class="px-4 py-2 text-left">Outlet Code</th>
                                 <th class="px-4 py-2 text-left">Outlet Name</th>
                                 <th class="px-4 py-2 text-center">Containers Ready</th>
-                                <th class="px-4 py-2 text-center">Delivered Today</th>
                                 <th class="px-4 py-2 text-left">Status</th>
                             </tr>
                         </thead>
                         <tbody id="dash-pickup-table-body">
                             <tr>
-                                <td colspan="5" class="text-center py-4 text-gray-500">Loading...</td>
+                                <td colspan="4" class="text-center py-4 text-gray-500">Loading...</td>
                             </tr>
                         </tbody>
                     </table>
@@ -1740,7 +1739,7 @@ async function loadDashboardData() {
         // Update containers pickup table
         const pickupTableBody = document.getElementById('dash-pickup-table-body')
         if (pickupByOutlet.size === 0) {
-            pickupTableBody.innerHTML = '<tr><td colspan=\"5\" class=\"text-center py-4 text-gray-500\">No containers available for pickup</td></tr>'
+            pickupTableBody.innerHTML = '<tr><td colspan=\"4\" class=\"text-center py-4 text-gray-500\">No containers available for pickup</td></tr>'
         } else {
             pickupTableBody.innerHTML = Array.from(pickupByOutlet.values())
                 .sort((a, b) => b.containers.length - a.containers.length)
@@ -1756,9 +1755,6 @@ async function loadDashboardData() {
                                 <span class=\"inline-block px-3 py-1 bg-amber-100 text-amber-800 rounded-full font-bold\">
                                     ${containerCount}
                                 </span>
-                            </td>
-                            <td class=\"px-4 py-3 text-center\">
-                                <i class=\"fas fa-check-circle text-green-500\"></i> Yes
                             </td>
                             <td class=\"px-4 py-3\">
                                 <span class=\"inline-block px-2 py-1 bg-amber-100 text-amber-800 rounded text-xs font-semibold\">
