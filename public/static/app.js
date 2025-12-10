@@ -1630,10 +1630,11 @@ async function loadDashboardData() {
                 // Store latest loaded timestamp
                 if (parcel.loaded_at && (!outlet.last_loaded_at || parcel.loaded_at > outlet.last_loaded_at)) {
                     outlet.last_loaded_at = parcel.loaded_at
+                    console.log(`📅 Outlet ${outlet.code}: loaded_at set to ${parcel.loaded_at}`)
                 }
-                // Track container count (use first non-null value from outlet)
-                if (parcel.container_count_loaded && !outlet.container_count_loaded) {
-                    outlet.container_count_loaded = parcel.container_count_loaded
+                // Track container count (use NEW container_count field, not legacy container_count_loaded)
+                if (parcel.container_count !== null && parcel.container_count !== undefined && !outlet.container_count_loaded) {
+                    outlet.container_count_loaded = parcel.container_count
                 }
                 // NEW: Track box_count and container_count ONCE per outlet (not per parcel)
                 if (parcel.box_count && !outletBoxCounts.has(parcel.outlet_code)) {
