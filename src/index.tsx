@@ -681,7 +681,8 @@ app.post('/api/admin/clear-database', authMiddleware, async (c) => {
       audit_logs: 0,
       transfer_details: 0,
       parcels: 0,
-      imports: 0
+      imports: 0,
+      containers: 0
     }
     
     // Delete in correct order (foreign key constraints)
@@ -757,6 +758,24 @@ app.post('/api/admin/clear-database', authMiddleware, async (c) => {
       })
       totalDeleted.imports = importList.length
       console.log(`  ✓ Deleted ${totalDeleted.imports} imports`)
+    }
+    
+    // 5. Delete container_inventory (A-code containers)
+    console.log('Counting container_inventory...')
+    const containerCountResponse = await supabaseRequest(c, 'container_inventory?select=id')
+    const containerList = await containerCountResponse.json()
+    console.log(`  Found ${containerList.length} containers to delete`)
+    
+    if (containerList.length > 0) {
+      console.log('Deleting container_inventory...')
+      const containerDeleteResponse = await supabaseRequest(c, 'container_inventory?scanned_at=gte.2000-01-01', {
+        method: 'DELETE',
+        headers: {
+          'Prefer': 'return=representation'
+        }
+      })
+      totalDeleted.containers = containerList.length
+      console.log(`  ✓ Deleted ${totalDeleted.containers} containers`)
     }
     
     console.log('=== DATABASE CLEARED SUCCESSFULLY ===\n')
@@ -1474,13 +1493,12 @@ app.post('/api/outlet/find-pallets', authMiddleware, async (c) => {
     })
     console.log(`📝 Query: container_inventory?outlet_code=eq.${firstParcel.outlet_code}&select=*`)
     
-    // Always try to fetch containers, not just when container_count > 0
-    // (in case data is inconsistent)
+    // Fetch ONLY containers at this outlet that are NOT yet delivered (status='at_outlet')
     try {
       const containersResponse = await supabaseRequest(c, 
-        `container_inventory?outlet_code=eq.${firstParcel.outlet_code}&select=*`)
+        `container_inventory?outlet_code=eq.${firstParcel.outlet_code}&status=eq.at_outlet&select=*`)
       const containers = await containersResponse.json()
-      console.log(`✅ Query returned ${containers?.length || 0} A-code containers`)
+      console.log(`✅ Query returned ${containers?.length || 0} A-code containers at outlet (not delivered)`)
       console.log(`📦 Container data:`, JSON.stringify(containers, null, 2))
       
       if (containers && containers.length > 0) {
