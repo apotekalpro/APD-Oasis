@@ -1246,10 +1246,14 @@ app.post('/api/warehouse/complete', authMiddleware, async (c) => {
     const totalParcels = [...loadedParcels, ...loadedParcelsShort]
     console.log(`Total parcels to update: ${totalParcels.length}`)
     
-    if (totalParcels.length > 0) {
-      console.log('Parcel IDs:', totalParcels.map(p => p.pallet_id).join(', '))
-      console.log('Sample parcel:', JSON.stringify(totalParcels[0], null, 2))
+    if (totalParcels.length === 0) {
+      console.error('❌ ERROR: No parcels found with status=loaded!')
+      console.error('This means parcels were not marked as loaded during scanning.')
+      throw new Error('No parcels found to complete. Please ensure parcels are scanned first.')
     }
+    
+    console.log('Parcel IDs:', totalParcels.map(p => p.pallet_id).join(', '))
+    console.log('Sample parcel:', JSON.stringify(totalParcels[0], null, 2))
     
     const updateData = {
       loaded_at: new Date().toISOString(),
@@ -1259,42 +1263,53 @@ app.post('/api/warehouse/complete', authMiddleware, async (c) => {
     }
     console.log('Update data:', JSON.stringify(updateData, null, 2))
     
-    // Update all loaded parcels for this outlet
-    // Use OR query to match either outlet_code OR outlet_code_short
-    // loaded_by: warehouse staff who did the scanning/loading
-    // loaded_by_name: driver signature who acknowledged and received the load
-    console.log('Executing update query with OR condition...')
-    const updateResponse = await supabaseRequest(c, `parcels?or=(outlet_code.eq.${outlet_code},outlet_code_short.eq.${outlet_code})&status=eq.loaded`, {
-      method: 'PATCH',
-      body: JSON.stringify(updateData),
-      headers: {
-        'Prefer': 'return=representation'
+    // Update parcels by ID instead of using OR query
+    // This is more reliable than complex OR conditions
+    console.log('Updating parcels individually by ID...')
+    const parcelIds = totalParcels.map(p => p.id)
+    console.log('Parcel IDs to update:', parcelIds)
+    
+    let updatedCount = 0
+    const updatedParcels = []
+    
+    for (const parcelId of parcelIds) {
+      console.log(`Updating parcel ID: ${parcelId}`)
+      const updateResponse = await supabaseRequest(c, `parcels?id=eq.${parcelId}`, {
+        method: 'PATCH',
+        body: JSON.stringify(updateData),
+        headers: {
+          'Prefer': 'return=representation'
+        }
+      })
+      
+      if (!updateResponse.ok) {
+        const errorText = await updateResponse.text()
+        console.error(`❌ Failed to update parcel ${parcelId}:`, errorText)
+        continue
       }
-    })
-    
-    console.log('Update response status:', updateResponse.status)
-    
-    if (!updateResponse.ok) {
-      const errorText = await updateResponse.text()
-      console.error('❌ Update failed! Status:', updateResponse.status)
-      console.error('Error response:', errorText)
-      throw new Error(`Failed to update parcels: ${errorText}`)
+      
+      const updated = await updateResponse.json()
+      if (updated && updated.length > 0) {
+        updatedCount++
+        updatedParcels.push(updated[0])
+        console.log(`✅ Updated parcel ${parcelId}`)
+      }
     }
     
-    const updatedParcels = await updateResponse.json()
-    console.log(`✅ Updated ${updatedParcels.length} parcels`)
+    console.log(`✅ Successfully updated ${updatedCount} out of ${parcelIds.length} parcels`)
     if (updatedParcels.length > 0) {
       console.log('First updated parcel:', JSON.stringify(updatedParcels[0], null, 2))
     } else {
-      console.warn('⚠️ WARNING: Update returned 0 parcels! Check if parcels exist with correct status.')
+      console.warn('⚠️ WARNING: 0 parcels were updated! Check Supabase RLS policies.')
     }
     console.log('=======================================\n')
     
     return c.json({ 
       success: true, 
-      updated_count: updatedParcels.length,
+      updated_count: updatedCount,
       outlet_code: outlet_code,
-      parcels_updated: updatedParcels.map(p => p.pallet_id)
+      parcels_updated: updatedParcels.map(p => p.pallet_id),
+      total_parcels_found: totalParcels.length
     })
   } catch (error) {
     console.error('❌ Warehouse complete error:', error)
