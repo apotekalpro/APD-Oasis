@@ -1412,13 +1412,13 @@ app.post('/api/warehouse/scan-container', authMiddleware, async (c) => {
       })
     }
     
-    // Create container record linked to outlet
+    // Create container record with 'loaded' status (not yet at outlet)
     console.log(`💾 Saving A-code to container_inventory:`, {
       container_id,
       outlet_code,
       outlet_name,
       delivery_date,
-      status: 'at_outlet'
+      status: 'loaded'  // ✅ FIXED: Only 'loaded' at warehouse, not yet at outlet
     })
     
     const insertResponse = await supabaseRequest(c, 'container_inventory', {
@@ -1428,7 +1428,7 @@ app.post('/api/warehouse/scan-container', authMiddleware, async (c) => {
         outlet_code: outlet_code,
         outlet_name: outlet_name || `Outlet ${outlet_code}`, // Fallback if name not provided
         delivery_date: delivery_date,
-        status: 'at_outlet', // Container loaded and ready for delivery
+        status: 'loaded', // ✅ FIXED: Container loaded at warehouse, not yet delivered
         scanned_at: new Date().toISOString(),
         scanned_by: user.id,
         scanned_by_name: user.full_name
@@ -1436,7 +1436,7 @@ app.post('/api/warehouse/scan-container', authMiddleware, async (c) => {
     })
     
     const insertResult = await insertResponse.json()
-    console.log(`✅ A-code saved successfully:`, insertResult)
+    console.log(`✅ A-code saved successfully with status 'loaded':`, insertResult)
     
     return c.json({ 
       success: true, 
@@ -1887,25 +1887,25 @@ app.post('/api/outlet/confirm-receipt-bulk', authMiddleware, async (c) => {
           // This is an A-code container - update container_inventory
           console.log(`📦 Processing A-code container: ${pallet_id}`)
           
-          // Find the container
+          // ✅ FIXED: Find container with status 'loaded' (from warehouse) 
           const containerResponse = await supabaseRequest(c, 
-            `container_inventory?container_id=eq.${pallet_id}&status=eq.at_outlet&select=*`)
+            `container_inventory?container_id=eq.${pallet_id}&status=eq.loaded&select=*`)
           const containers = await containerResponse.json()
           
           if (!containers || containers.length === 0) {
             errorCount++
             errors.push(`${pallet_id}: A-code not found or already delivered`)
-            console.error(`❌ A-code ${pallet_id} not found in container_inventory`)
+            console.error(`❌ A-code ${pallet_id} not found in container_inventory with status 'loaded'`)
             continue
           }
           
           const container = containers[0]
           
-          // Update container status to delivered
+          // ✅ FIXED: Update container status to 'at_outlet' when outlet receives and signs
           await supabaseRequest(c, `container_inventory?id=eq.${container.id}`, {
             method: 'PATCH',
             body: JSON.stringify({
-              status: 'delivered',
+              status: 'at_outlet',  // ✅ Now at outlet after receipt confirmation
               delivered_at: new Date().toISOString(),
               delivered_by: user.id,
               delivered_by_name: user.full_name,
@@ -1914,7 +1914,7 @@ app.post('/api/outlet/confirm-receipt-bulk', authMiddleware, async (c) => {
           })
           
           successCount++
-          console.log(`✓ A-code ${pallet_id} marked as delivered`)
+          console.log(`✓ A-code ${pallet_id} marked as 'at_outlet' after receipt confirmation`)
           continue // Skip pallet processing for A-codes
         }
         
