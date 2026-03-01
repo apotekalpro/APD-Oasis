@@ -82,8 +82,8 @@ const isMobile = window.location.origin.startsWith('capacitor://') ||
                  window.location.protocol === 'file:'
 
 // Always use Cloudflare Pages backend (has API endpoints)
-// Phase 2 backend with Outlet-to-Outlet module: https://04d2fb2c.apd-oasis.pages.dev
-const API_BASE = 'https://04d2fb2c.apd-oasis.pages.dev'
+// Production backend with all features
+const API_BASE = 'https://apd-oasis.pages.dev'
 
 console.log('Window location origin:', window.location.origin)
 console.log('Window location protocol:', window.location.protocol)
