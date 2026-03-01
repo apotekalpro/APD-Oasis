@@ -4044,21 +4044,36 @@ async function loadOutletPallets() {
                 
                 // Show F codes (pallets)
                 if (unscannedPallets.length > 0) {
-                    html += unscannedPallets.map(pallet => `
-                        <div class="border-2 border-blue-300 rounded-lg p-3 bg-blue-50 mb-2">
+                    html += unscannedPallets.map(pallet => {
+                        // ✨ NEW: Color differentiation for outlet-originated parcels
+                        const isOutletParcel = pallet.origin_type === 'outlet'
+                        const borderColor = isOutletParcel ? 'border-cyan-300' : 'border-blue-300'
+                        const bgColor = isOutletParcel ? 'bg-cyan-50' : 'bg-blue-50'
+                        const iconColor = isOutletParcel ? 'text-cyan-600' : 'text-blue-600'
+                        const badgeColor = isOutletParcel ? 'bg-cyan-500' : 'bg-blue-500'
+                        const originLabel = isOutletParcel ? `🔄 From: ${pallet.origin_outlet_name}` : '📦 From: Warehouse'
+                        
+                        return `
+                        <div class="border-2 ${borderColor} rounded-lg p-3 ${bgColor} mb-2">
                             <div class="flex items-center justify-between mb-1">
                                 <p class="font-bold text-base">
-                                    <i class="fas fa-pallet mr-2 text-blue-600"></i>${pallet.pallet_id}
+                                    <i class="fas fa-pallet mr-2 ${iconColor}"></i>${pallet.pallet_id}
                                 </p>
-                                <span class="px-2 py-1 bg-blue-500 text-white text-xs rounded font-semibold">
-                                    F CODE
+                                <span class="px-2 py-1 ${badgeColor} text-white text-xs rounded font-semibold">
+                                    ${isOutletParcel ? 'OUTLET' : 'F CODE'}
                                 </span>
                             </div>
                             <p class="text-xs text-gray-600">
                                 <i class="fas fa-box mr-1"></i>${pallet.transfer_count} transfers
                             </p>
+                            ${isOutletParcel ? `
+                            <p class="text-xs text-cyan-700 font-semibold mt-1">
+                                ${originLabel}
+                            </p>
+                            ` : ''}
                         </div>
-                    `).join('')
+                        `
+                    }).join('')
                 }
                 
                 // Show A codes (containers)
