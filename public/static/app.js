@@ -3257,177 +3257,655 @@ function renderOutlet() {
         state.outletDeliveryDate = new Date().toISOString().split('T')[0]
     }
     
+    // Initialize outlet tab if not set
+    if (!state.outletTab) {
+        state.outletTab = 'unload' // default tab: unload, create, load
+    }
+    
     return `
         <div class="h-full flex flex-col">
         <div class="container mx-auto px-2 py-2 pb-20 flex-1 overflow-y-auto" style="max-height: 100vh;">
             <!-- Mobile-optimized header -->
             <h2 class="text-lg sm:text-2xl md:text-3xl font-bold mb-2 sm:mb-4 md:mb-6 text-gray-800">
-                <i class="fas fa-store text-blue-600 mr-2"></i>Outlet Unloading
+                <i class="fas fa-store text-blue-600 mr-2"></i>Outlet Operations
             </h2>
             
-            ${!state.selectedOutlet ? `
-                <!-- Step 1: Scan Outlet Code - Mobile optimized -->
-                <div class="bg-white rounded-lg shadow-lg p-4 sm:p-6 md:p-8 max-w-2xl mx-auto">
-                    <div class="text-center mb-4 sm:mb-6">
-                        <div class="bg-blue-100 rounded-full w-16 h-16 sm:w-20 sm:h-20 flex items-center justify-center mx-auto mb-3 sm:mb-4">
-                            <i class="fas fa-store text-3xl sm:text-4xl text-blue-600"></i>
-                        </div>
-                        <h3 class="text-lg sm:text-xl md:text-2xl font-bold mb-2">Step 1: Identify Your Outlet</h3>
-                        <p class="text-sm sm:text-base text-gray-600">Scan or enter your outlet short code</p>
-                    </div>
-                    
-                    <div class="mb-3 sm:mb-4">
-                        <label class="block text-xs sm:text-sm font-medium text-gray-700 mb-2">
-                            Outlet Short Code (e.g., MKC, JBB)
-                        </label>
-                        <input type="text" id="outletCodeInput" 
-                            class="w-full px-3 py-2 sm:px-4 sm:py-3 border-4 border-blue-500 rounded-lg text-base sm:text-lg scan-input"
-                            placeholder="Scan outlet code..."
-                            autofocus
-                            onkeydown="if(event.key==='Enter' || event.keyCode===13) { event.preventDefault(); handleFindOutletPallets(); }"
-                            onkeypress="if(event.key==='Enter') handleFindOutletPallets()">
-                    </div>
-                    
-                    <button onclick="handleFindOutletPallets()" 
-                        class="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 sm:py-4 rounded-lg text-base sm:text-lg">
-                        <i class="fas fa-search mr-2"></i>Find My Pallets
+            <!-- NEW: Tabbed Navigation -->
+            <div class="bg-white rounded-lg shadow-lg mb-4 overflow-hidden">
+                <div class="flex border-b">
+                    <button onclick="switchOutletTab('unload')" 
+                        class="flex-1 px-4 py-3 font-semibold ${state.outletTab === 'unload' ? 'bg-blue-500 text-white border-b-4 border-blue-700' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}">
+                        <i class="fas fa-box-open mr-2"></i>Unload Parcels
                     </button>
-                    
-                    <div class="mt-4 sm:mt-6 bg-blue-50 border-l-4 border-blue-500 p-3 sm:p-4">
-                        <p class="text-xs sm:text-sm text-blue-800">
-                            <i class="fas fa-info-circle mr-1 sm:mr-2"></i>
-                            <strong>Tip:</strong> Your outlet code is the short name (e.g., "MKC")
-                        </p>
-                    </div>
+                    <button onclick="switchOutletTab('create')" 
+                        class="flex-1 px-4 py-3 font-semibold ${state.outletTab === 'create' ? 'bg-green-500 text-white border-b-4 border-green-700' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}">
+                        <i class="fas fa-plus-circle mr-2"></i>Create Parcel
+                    </button>
+                    <button onclick="switchOutletTab('load')" 
+                        class="flex-1 px-4 py-3 font-semibold ${state.outletTab === 'load' ? 'bg-purple-500 text-white border-b-4 border-purple-700' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}">
+                        <i class="fas fa-truck-loading mr-2"></i>Load Parcels
+                    </button>
                 </div>
-            ` : `
-                <!-- Step 2: Scan Pallet IDs -->
-                <div class="mb-6 bg-white rounded-lg shadow p-6">
-                    <div class="flex justify-between items-center mb-4">
-                        <div>
-                            <h3 class="text-2xl font-bold text-gray-800">
-                                ${state.selectedOutlet.code_short} - ${state.selectedOutlet.name}
-                            </h3>
-                            <p class="text-sm text-gray-600">Outlet Code: ${state.selectedOutlet.code}</p>
-                        </div>
-                        <button onclick="clearOutletSelection()" 
-                            class="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-lg">
-                            <i class="fas fa-arrow-left mr-2"></i>Change Outlet
-                        </button>
-                    </div>
-                    
-                    <!-- Container Count & Date Info -->
-                    <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                        <!-- Mobile: Stack vertically, Desktop: Side by side -->
-                        <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3">
-                            <div class="text-center md:text-left">
-                                <p class="text-xs text-gray-600 mb-1">
-                                    <i class="fas fa-box mr-1"></i>Boxes
-                                </p>
-                                <p class="text-2xl font-bold text-green-600">
-                                    ${state.selectedOutlet.box_count || 0}
-                                </p>
-                            </div>
-                            <div class="text-center md:text-left">
-                                <p class="text-xs text-gray-600 mb-1">
-                                    <i class="fas fa-container-storage mr-1"></i>Containers
-                                </p>
-                                <p class="text-2xl font-bold text-purple-600">
-                                    ${state.selectedOutlet.container_count || 0}
-                                </p>
-                            </div>
-                            <div class="text-center md:text-left">
-                                <p class="text-xs text-gray-600 mb-1">
-                                    <i class="fas fa-pallet mr-1"></i>Total TN
-                                </p>
-                                <p class="text-2xl font-bold text-blue-600">
-                                    ${state.availablePallets.length + state.scannedItems.length}
-                                </p>
-                            </div>
-                            <div class="text-center md:text-left">
-                                <label class="text-xs text-gray-600 mb-1 block">
-                                    <i class="fas fa-calendar mr-1"></i>Date
-                                </label>
-                                <input type="date" id="outletDeliveryDate" 
-                                    class="w-full px-2 py-1 border-2 border-blue-300 rounded-lg font-semibold text-center text-sm"
-                                    value="${state.outletDeliveryDate || new Date().toISOString().split('T')[0]}"
-                                    onchange="setOutletDeliveryDate(this.value)">
-                            </div>
-                        </div>
-                        <div class="text-xs text-gray-600 text-center md:text-left border-t border-blue-200 pt-2">
-                            <i class="fas fa-info-circle mr-1"></i>Scan all F codes (pallets) and A codes (containers) to complete
-                        </div>
-                    </div>
-                </div>
-                
-                <!-- Mobile: Stack vertically, Desktop: Side-by-side grid -->
-                <div class="flex flex-col lg:grid lg:grid-cols-3 gap-6">
-                    <!-- Scanning Panel -->
-                    <div class="lg:col-span-2">
-                        <div class="bg-white rounded-lg shadow-lg p-6">
-                            <div class="text-center mb-6">
-                                <div class="bg-green-100 rounded-full w-16 h-16 flex items-center justify-center mx-auto mb-3">
-                                    <i class="fas fa-pallet text-3xl text-green-600"></i>
-                                </div>
-                                <h3 class="text-xl font-bold">Step 2: Scan Pallet IDs</h3>
-                                <p class="text-gray-600 text-sm">Scan each pallet to confirm receipt</p>
-                            </div>
-                            
-                            <div class="mb-4">
-                                <input type="text" id="palletScanInput" 
-                                    class="w-full px-4 py-3 border-4 border-green-500 rounded-lg text-lg scan-input"
-                                    placeholder="Scan or enter Pallet ID..."
-                                    autofocus
-                                    onkeydown="if(event.key==='Enter' || event.keyCode===13) { event.preventDefault(); handleOutletScanPallet(); }"
-                                    onkeypress="if(event.key==='Enter') handleOutletScanPallet()">
-                            </div>
-                            
-                            <button onclick="handleOutletScanPallet()" 
-                                class="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 rounded-lg mb-4">
-                                <i class="fas fa-barcode mr-2"></i>Scan Pallet
-                            </button>
-                            
-                            <div id="outletCompleteButton">
-                                ${state.scannedItems.length > 0 ? `
-                                    <button onclick="showOutletCompletionModal()" 
-                                        class="w-full bg-green-500 hover:bg-green-600 text-white font-bold py-3 rounded-lg">
-                                        <i class="fas fa-check-circle mr-2"></i>Complete Receipt (${state.scannedItems.length} pallets)
-                                    </button>
-                                ` : ''}
-                            </div>
-                            
-                            <!-- Scanned Items -->
-                            <div class="mt-6">
-                                <h4 class="font-semibold mb-3">Scanned Pallets (${state.scannedItems.length})</h4>
-                                <div id="outletScannedList" class="space-y-2 max-h-96 overflow-y-auto">
-                                    <p class="text-gray-500 text-center py-4">No pallets scanned yet</p>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <!-- Available Pallets (Your Deliveries) - Fully scrollable on mobile -->
-                    <div class="lg:col-span-1">
-                        <div class="bg-white rounded-lg shadow-lg p-6">
-                            <h3 class="text-xl font-bold mb-4">Your Deliveries</h3>
-                            <div id="availablePallets" class="space-y-3">
-                                <p class="text-gray-500 text-center py-4">Loading...</p>
-                            </div>
-                            
-                            <button onclick="loadOutletPallets()" 
-                                class="w-full mt-4 bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg">
-                                <i class="fas fa-sync mr-2"></i>Refresh
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            `}
+            </div>
+            
+            <!-- Tab Content -->
+            ${state.outletTab === 'unload' ? renderOutletUnloadTab() : ''}
+            ${state.outletTab === 'create' ? renderOutletCreateTab() : ''}
+            ${state.outletTab === 'load' ? renderOutletLoadTab() : ''}
+            
             <!-- Extra spacing at bottom to ensure full content visibility -->
             <div class="h-16"></div>
         </div>
         </div>
     `
 }
+
+// Switch outlet tab
+function switchOutletTab(tab) {
+    state.outletTab = tab
+    render()
+    
+    // Load data for specific tabs
+    if (tab === 'load') {
+        loadOutletCreatedParcels()
+    }
+}
+
+// Render Unload Tab (existing functionality)
+function renderOutletUnloadTab() {
+    return `
+        ${!state.selectedOutlet ? `
+            <!-- Step 1: Scan Outlet Code - Mobile optimized -->
+            <div class="bg-white rounded-lg shadow-lg p-4 sm:p-6 md:p-8 max-w-2xl mx-auto">
+                <div class="text-center mb-4 sm:mb-6">
+                    <div class="bg-blue-100 rounded-full w-16 h-16 sm:w-20 sm:h-20 flex items-center justify-center mx-auto mb-3 sm:mb-4">
+                        <i class="fas fa-store text-3xl sm:text-4xl text-blue-600"></i>
+                    </div>
+                    <h3 class="text-lg sm:text-xl md:text-2xl font-bold mb-2">Step 1: Identify Your Outlet</h3>
+                    <p class="text-sm sm:text-base text-gray-600">Scan or enter your outlet short code</p>
+                </div>
+                
+                <div class="mb-3 sm:mb-4">
+                    <label class="block text-xs sm:text-sm font-medium text-gray-700 mb-2">
+                        Outlet Short Code (e.g., MKC, JBB)
+                    </label>
+                    <input type="text" id="outletCodeInput" 
+                        class="w-full px-3 py-2 sm:px-4 sm:py-3 border-4 border-blue-500 rounded-lg text-base sm:text-lg scan-input"
+                        placeholder="Scan outlet code..."
+                        autofocus
+                        onkeydown="if(event.key==='Enter' || event.keyCode===13) { event.preventDefault(); handleFindOutletPallets(); }"
+                        onkeypress="if(event.key==='Enter') handleFindOutletPallets()">
+                </div>
+                
+                <button onclick="handleFindOutletPallets()" 
+                    class="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 sm:py-4 rounded-lg text-base sm:text-lg">
+                    <i class="fas fa-search mr-2"></i>Find My Pallets
+                </button>
+                
+                <div class="mt-4 sm:mt-6 bg-blue-50 border-l-4 border-blue-500 p-3 sm:p-4">
+                    <p class="text-xs sm:text-sm text-blue-800">
+                        <i class="fas fa-info-circle mr-1 sm:mr-2"></i>
+                        <strong>Tip:</strong> Your outlet code is the short name (e.g., "MKC")
+                    </p>
+                </div>
+            </div>
+        ` : `
+            <!-- Step 2: Scan Pallet IDs -->
+            <div class="mb-6 bg-white rounded-lg shadow p-6">
+                <div class="flex justify-between items-center mb-4">
+                    <div>
+                        <h3 class="text-2xl font-bold text-gray-800">
+                            ${state.selectedOutlet.code_short} - ${state.selectedOutlet.name}
+                        </h3>
+                        <p class="text-sm text-gray-600">Outlet Code: ${state.selectedOutlet.code}</p>
+                    </div>
+                    <button onclick="clearOutletSelection()" 
+                        class="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-lg">
+                        <i class="fas fa-arrow-left mr-2"></i>Change Outlet
+                    </button>
+                </div>
+                
+                <!-- Container Count & Date Info -->
+                <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                    <!-- Mobile: Stack vertically, Desktop: Side by side -->
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3">
+                        <div class="text-center md:text-left">
+                            <p class="text-xs text-gray-600 mb-1">
+                                <i class="fas fa-box mr-1"></i>Boxes
+                            </p>
+                            <p class="text-2xl font-bold text-green-600">
+                                ${state.selectedOutlet.box_count || 0}
+                            </p>
+                        </div>
+                        <div class="text-center md:text-left">
+                            <p class="text-xs text-gray-600 mb-1">
+                                <i class="fas fa-container-storage mr-1"></i>Containers
+                            </p>
+                            <p class="text-2xl font-bold text-purple-600">
+                                ${state.selectedOutlet.container_count || 0}
+                            </p>
+                        </div>
+                        <div class="text-center md:text-left">
+                            <p class="text-xs text-gray-600 mb-1">
+                                <i class="fas fa-pallet mr-1"></i>Total TN
+                            </p>
+                            <p class="text-2xl font-bold text-blue-600">
+                                ${state.availablePallets.length + state.scannedItems.length}
+                            </p>
+                        </div>
+                        <div class="text-center md:text-left">
+                            <label class="text-xs text-gray-600 mb-1 block">
+                                <i class="fas fa-calendar mr-1"></i>Date
+                            </label>
+                            <input type="date" id="outletDeliveryDate" 
+                                class="w-full px-2 py-1 border-2 border-blue-300 rounded-lg font-semibold text-center text-sm"
+                                value="${state.outletDeliveryDate || new Date().toISOString().split('T')[0]}"
+                                onchange="setOutletDeliveryDate(this.value)">
+                        </div>
+                    </div>
+                    <div class="text-xs text-gray-600 text-center md:text-left border-t border-blue-200 pt-2">
+                        <i class="fas fa-info-circle mr-1"></i>Scan all F codes (pallets) and A codes (containers) to complete
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Mobile: Stack vertically, Desktop: Side-by-side grid -->
+            <div class="flex flex-col lg:grid lg:grid-cols-3 gap-6">
+                <!-- Scanning Panel -->
+                <div class="lg:col-span-2">
+                    <div class="bg-white rounded-lg shadow-lg p-6">
+                        <div class="text-center mb-6">
+                            <div class="bg-green-100 rounded-full w-16 h-16 flex items-center justify-center mx-auto mb-3">
+                                <i class="fas fa-pallet text-3xl text-green-600"></i>
+                            </div>
+                            <h3 class="text-xl font-bold">Step 2: Scan Pallet IDs</h3>
+                            <p class="text-gray-600 text-sm">Scan each pallet to confirm receipt</p>
+                        </div>
+                        
+                        <div class="mb-4">
+                            <input type="text" id="palletScanInput" 
+                                class="w-full px-4 py-3 border-4 border-green-500 rounded-lg text-lg scan-input"
+                                placeholder="Scan or enter Pallet ID..."
+                                autofocus
+                                onkeydown="if(event.key==='Enter' || event.keyCode===13) { event.preventDefault(); handleOutletScanPallet(); }"
+                                onkeypress="if(event.key==='Enter') handleOutletScanPallet()">
+                        </div>
+                        
+                        <button onclick="handleOutletScanPallet()" 
+                            class="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 rounded-lg mb-4">
+                            <i class="fas fa-barcode mr-2"></i>Scan Pallet
+                        </button>
+                        
+                        <div id="outletCompleteButton">
+                            ${state.scannedItems.length > 0 ? `
+                                <button onclick="showOutletCompletionModal()" 
+                                    class="w-full bg-green-500 hover:bg-green-600 text-white font-bold py-3 rounded-lg">
+                                    <i class="fas fa-check-circle mr-2"></i>Complete Receipt (${state.scannedItems.length} pallets)
+                                </button>
+                            ` : ''}
+                        </div>
+                        
+                        <!-- Scanned Items -->
+                        <div class="mt-6">
+                            <h4 class="font-semibold mb-3">Scanned Pallets (${state.scannedItems.length})</h4>
+                            <div id="outletScannedList" class="space-y-2 max-h-96 overflow-y-auto">
+                                <p class="text-gray-500 text-center py-4">No pallets scanned yet</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Available Pallets (Your Deliveries) - Fully scrollable on mobile -->
+                <div class="lg:col-span-1">
+                    <div class="bg-white rounded-lg shadow-lg p-6">
+                        <h3 class="text-xl font-bold mb-4">Your Deliveries</h3>
+                        <div id="availablePallets" class="space-y-3">
+                            <p class="text-gray-500 text-center py-4">Loading...</p>
+                        </div>
+                        
+                        <button onclick="loadOutletPallets()" 
+                            class="w-full mt-4 bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg">
+                            <i class="fas fa-sync mr-2"></i>Refresh
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `}
+    `
+}
+
+// NEW: Render Create Parcel Tab
+function renderOutletCreateTab() {
+    return `
+        <div class="bg-white rounded-lg shadow-lg p-6 max-w-4xl mx-auto">
+            <div class="text-center mb-6">
+                <div class="bg-green-100 rounded-full w-16 h-16 flex items-center justify-center mx-auto mb-3">
+                    <i class="fas fa-plus-circle text-3xl text-green-600"></i>
+                </div>
+                <h3 class="text-2xl font-bold mb-2">Create Outgoing Parcel</h3>
+                <p class="text-gray-600">Send parcels to other outlets or warehouse</p>
+            </div>
+            
+            <form onsubmit="event.preventDefault(); handleCreateOutletParcel();" class="space-y-4">
+                <!-- Destination -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">
+                        <i class="fas fa-map-marker-alt mr-2 text-red-500"></i>Destination *
+                    </label>
+                    <select id="createParcelDestination" 
+                        class="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-green-500"
+                        required
+                        onchange="handleDestinationChange(this.value)">
+                        <option value="">-- Select Destination --</option>
+                        <optgroup label="Warehouse">
+                            <option value="WAREHOUSE|Main Warehouse|warehouse">🏭 Main Warehouse</option>
+                        </optgroup>
+                        <optgroup label="Outlets" id="outletsOptgroup">
+                            <option value="">Loading outlets...</option>
+                        </optgroup>
+                    </select>
+                </div>
+                
+                <!-- Pallet ID -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">
+                        <i class="fas fa-barcode mr-2 text-blue-500"></i>Pallet ID *
+                    </label>
+                    <input type="text" id="createParcelPalletId" 
+                        class="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-green-500"
+                        placeholder="F1001234567"
+                        required>
+                    <p class="text-xs text-gray-500 mt-1">Enter a unique pallet ID (e.g., F1001234567)</p>
+                </div>
+                
+                <!-- Transfer Numbers -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">
+                        <i class="fas fa-list-ol mr-2 text-purple-500"></i>Transfer Numbers *
+                    </label>
+                    <textarea id="createParcelTransferNumbers" 
+                        class="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-green-500"
+                        rows="4"
+                        placeholder="Enter transfer numbers (one per line)&#10;TN001&#10;TN002&#10;TN003"
+                        required></textarea>
+                    <p class="text-xs text-gray-500 mt-1">One transfer number per line</p>
+                </div>
+                
+                <!-- Delivery Date -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">
+                        <i class="fas fa-calendar mr-2 text-orange-500"></i>Delivery Date *
+                    </label>
+                    <input type="date" id="createParcelDeliveryDate" 
+                        class="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-green-500"
+                        value="${new Date().toISOString().split('T')[0]}"
+                        required>
+                </div>
+                
+                <!-- Notes -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">
+                        <i class="fas fa-sticky-note mr-2 text-yellow-500"></i>Notes (Optional)
+                    </label>
+                    <textarea id="createParcelNotes" 
+                        class="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-green-500"
+                        rows="2"
+                        placeholder="Return shipment, damaged goods, etc."></textarea>
+                </div>
+                
+                <!-- Submit Button -->
+                <div class="flex gap-3">
+                    <button type="submit" 
+                        class="flex-1 bg-green-500 hover:bg-green-600 text-white font-bold py-3 rounded-lg">
+                        <i class="fas fa-check mr-2"></i>Create Parcel
+                    </button>
+                    <button type="button" onclick="resetCreateParcelForm()" 
+                        class="bg-gray-500 hover:bg-gray-600 text-white px-6 py-3 rounded-lg">
+                        <i class="fas fa-redo mr-2"></i>Reset
+                    </button>
+                </div>
+            </form>
+            
+            <!-- Info Box -->
+            <div class="mt-6 bg-green-50 border-l-4 border-green-500 p-4">
+                <p class="text-sm text-green-800">
+                    <i class="fas fa-info-circle mr-2"></i>
+                    <strong>How it works:</strong> Create the parcel here, then go to "Load Parcels" tab to load it onto a truck for delivery.
+                </p>
+            </div>
+        </div>
+    `
+}
+
+// NEW: Render Load Parcels Tab
+function renderOutletLoadTab() {
+    return `
+        <div class="bg-white rounded-lg shadow-lg p-6 max-w-4xl mx-auto">
+            <div class="text-center mb-6">
+                <div class="bg-purple-100 rounded-full w-16 h-16 flex items-center justify-center mx-auto mb-3">
+                    <i class="fas fa-truck-loading text-3xl text-purple-600"></i>
+                </div>
+                <h3 class="text-2xl font-bold mb-2">Load Outgoing Parcels</h3>
+                <p class="text-gray-600">Scan parcels to load onto truck for delivery</p>
+            </div>
+            
+            <!-- Pending Parcels List -->
+            <div id="outletPendingParcels" class="mb-6">
+                <h4 class="font-semibold mb-3">Pending Parcels (Not Loaded)</h4>
+                <div class="space-y-3" id="pendingParcelsList">
+                    <p class="text-gray-500 text-center py-4">Loading...</p>
+                </div>
+            </div>
+            
+            <!-- Scan to Load -->
+            <div class="bg-purple-50 border border-purple-200 rounded-lg p-6">
+                <h4 class="font-semibold mb-4">
+                    <i class="fas fa-barcode mr-2"></i>Scan Pallet to Load
+                </h4>
+                <input type="text" id="loadParcelScanInput" 
+                    class="w-full px-4 py-3 border-4 border-purple-500 rounded-lg text-lg mb-4"
+                    placeholder="Scan pallet ID..."
+                    autofocus
+                    onkeydown="if(event.key==='Enter' || event.keyCode===13) { event.preventDefault(); handleLoadOutletParcel(); }"
+                    onkeypress="if(event.key==='Enter') handleLoadOutletParcel()">
+                
+                <button onclick="handleLoadOutletParcel()" 
+                    class="w-full bg-purple-500 hover:bg-purple-600 text-white font-bold py-3 rounded-lg">
+                    <i class="fas fa-truck-loading mr-2"></i>Load Parcel
+                </button>
+            </div>
+            
+            <!-- Loaded Parcels -->
+            <div class="mt-6">
+                <h4 class="font-semibold mb-3">Loaded Parcels</h4>
+                <div id="loadedParcelsList" class="space-y-3">
+                    <p class="text-gray-500 text-center py-4">No parcels loaded yet</p>
+                </div>
+            </div>
+        </div>
+    `
+}
+
+// ============ Outlet-to-Outlet Module Functions ============
+
+// Load outlets list for destination dropdown
+async function loadOutletsForDestination() {
+    try {
+        const response = await axios.get('/api/outlets/list')
+        const outlets = response.data.outlets || []
+        
+        // Update the optgroup with outlets (skip warehouse as it's already in the template)
+        const optgroup = document.getElementById('outletsOptgroup')
+        if (optgroup) {
+            optgroup.innerHTML = outlets
+                .filter(o => o.outlet_code !== 'WAREHOUSE')
+                .map(outlet => `
+                    <option value="${outlet.outlet_code}|${outlet.outlet_name}|outlet">
+                        🏪 ${outlet.outlet_name} (${outlet.outlet_code})
+                    </option>
+                `).join('')
+        }
+        
+        console.log(`✅ Loaded ${outlets.length} outlets for destination dropdown`)
+    } catch (error) {
+        console.error('Failed to load outlets:', error)
+        showToast('Failed to load outlets list', 'error')
+    }
+}
+
+// Handle destination change (for future use if needed)
+function handleDestinationChange(value) {
+    // Can add logic here if needed (e.g., validation, dynamic fields)
+    console.log('Destination selected:', value)
+}
+
+// Reset create parcel form
+function resetCreateParcelForm() {
+    document.getElementById('createParcelDestination').value = ''
+    document.getElementById('createParcelPalletId').value = ''
+    document.getElementById('createParcelTransferNumbers').value = ''
+    document.getElementById('createParcelDeliveryDate').value = new Date().toISOString().split('T')[0]
+    document.getElementById('createParcelNotes').value = ''
+    showToast('Form reset', 'info')
+}
+
+// Handle create outlet parcel
+async function handleCreateOutletParcel() {
+    try {
+        // Get form values
+        const destinationValue = document.getElementById('createParcelDestination').value
+        const palletId = document.getElementById('createParcelPalletId').value.trim().toUpperCase()
+        const transferNumbersText = document.getElementById('createParcelTransferNumbers').value.trim()
+        const deliveryDate = document.getElementById('createParcelDeliveryDate').value
+        const notes = document.getElementById('createParcelNotes').value.trim()
+        
+        // Validation
+        if (!destinationValue) {
+            showToast('Please select a destination', 'error')
+            return
+        }
+        
+        if (!palletId) {
+            showToast('Please enter pallet ID', 'error')
+            return
+        }
+        
+        if (!transferNumbersText) {
+            showToast('Please enter transfer numbers', 'error')
+            return
+        }
+        
+        // Parse destination (format: "outlet_code|outlet_name|destination_type")
+        const [destinationCode, destinationName, destinationType] = destinationValue.split('|')
+        
+        // Parse transfer numbers (one per line)
+        const transferNumbers = transferNumbersText
+            .split('\n')
+            .map(tn => tn.trim())
+            .filter(tn => tn.length > 0)
+        
+        if (transferNumbers.length === 0) {
+            showToast('Please enter at least one transfer number', 'error')
+            return
+        }
+        
+        // Get current user's outlet info
+        const originOutletCode = state.user.outlet_code
+        const originOutletName = state.user.outlet_name || `Outlet ${originOutletCode}`
+        
+        console.log('📦 Creating outlet parcel:', {
+            originOutletCode,
+            originOutletName,
+            destinationCode,
+            destinationName,
+            destinationType,
+            palletId,
+            transferCount: transferNumbers.length
+        })
+        
+        // Show loading state
+        showToast('Creating parcel...', 'info')
+        
+        // Create parcel via API
+        const response = await axios.post('/api/outlet/create-parcel', {
+            origin_outlet_code: originOutletCode,
+            origin_outlet_name: originOutletName,
+            destination_outlet_code: destinationCode,
+            destination_outlet_name: destinationName,
+            destination_type: destinationType,
+            pallet_id: palletId,
+            transfer_numbers: transferNumbers,
+            delivery_date: deliveryDate,
+            notes: notes
+        })
+        
+        if (response.data.success) {
+            showToast(`✅ Parcel created successfully: ${palletId}`, 'success')
+            console.log('✅ Parcel created:', response.data)
+            
+            // Reset form
+            resetCreateParcelForm()
+            
+            // Suggest next step
+            setTimeout(() => {
+                if (confirm('Parcel created! Go to "Load Parcels" tab to load it onto truck?')) {
+                    switchOutletTab('load')
+                }
+            }, 1000)
+        } else {
+            showToast(response.data.error || 'Failed to create parcel', 'error')
+        }
+    } catch (error) {
+        console.error('Create parcel error:', error)
+        const errorMsg = error.response?.data?.error || 'Failed to create parcel'
+        showToast(errorMsg, 'error')
+    }
+}
+
+// Load outlet created parcels (pending and loaded)
+async function loadOutletCreatedParcels() {
+    try {
+        const outletCode = state.user.outlet_code
+        const deliveryDate = state.outletDeliveryDate || new Date().toISOString().split('T')[0]
+        
+        console.log('📦 Loading outlet parcels for:', outletCode, deliveryDate)
+        
+        const response = await axios.get(`/api/outlet/my-outgoing-parcels?outlet_code=${outletCode}&delivery_date=${deliveryDate}`)
+        const parcels = response.data.parcels || []
+        
+        console.log(`✅ Loaded ${parcels.length} outlet parcels`)
+        
+        // Separate pending and loaded
+        const pendingParcels = parcels.filter(p => p.status === 'pending')
+        const loadedParcels = parcels.filter(p => p.status === 'loaded')
+        
+        // Render pending parcels list
+        const pendingList = document.getElementById('pendingParcelsList')
+        if (pendingList) {
+            if (pendingParcels.length === 0) {
+                pendingList.innerHTML = '<p class="text-gray-500 text-center py-4">No pending parcels</p>'
+            } else {
+                pendingList.innerHTML = pendingParcels.map(parcel => `
+                    <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                        <div class="flex justify-between items-start">
+                            <div>
+                                <p class="font-semibold text-lg">${parcel.pallet_id}</p>
+                                <p class="text-sm text-gray-600">
+                                    <i class="fas fa-arrow-right mr-1"></i>
+                                    To: ${parcel.outlet_name}
+                                </p>
+                                <p class="text-xs text-gray-500">
+                                    ${parcel.total_count} transfer(s) • Created: ${new Date(parcel.created_at).toLocaleString()}
+                                </p>
+                            </div>
+                            <span class="bg-yellow-100 text-yellow-800 px-3 py-1 rounded-full text-xs font-semibold">
+                                Pending
+                            </span>
+                        </div>
+                    </div>
+                `).join('')
+            }
+        }
+        
+        // Render loaded parcels list
+        const loadedList = document.getElementById('loadedParcelsList')
+        if (loadedList) {
+            if (loadedParcels.length === 0) {
+                loadedList.innerHTML = '<p class="text-gray-500 text-center py-4">No parcels loaded yet</p>'
+            } else {
+                loadedList.innerHTML = loadedParcels.map(parcel => `
+                    <div class="bg-green-50 border border-green-200 rounded-lg p-4">
+                        <div class="flex justify-between items-start">
+                            <div>
+                                <p class="font-semibold text-lg">${parcel.pallet_id}</p>
+                                <p class="text-sm text-gray-600">
+                                    <i class="fas fa-arrow-right mr-1"></i>
+                                    To: ${parcel.outlet_name}
+                                </p>
+                                <p class="text-xs text-gray-500">
+                                    ${parcel.total_count} transfer(s) • Loaded: ${new Date(parcel.loaded_at).toLocaleString()}
+                                </p>
+                                <p class="text-xs text-gray-500">
+                                    Loaded by: ${parcel.loaded_by_name || 'Unknown'}
+                                </p>
+                            </div>
+                            <span class="bg-green-100 text-green-800 px-3 py-1 rounded-full text-xs font-semibold">
+                                ✓ Loaded
+                            </span>
+                        </div>
+                    </div>
+                `).join('')
+            }
+        }
+    } catch (error) {
+        console.error('Failed to load outlet parcels:', error)
+        showToast('Failed to load parcels list', 'error')
+    }
+}
+
+// Handle load outlet parcel
+async function handleLoadOutletParcel() {
+    try {
+        const input = document.getElementById('loadParcelScanInput')
+        const palletId = input.value.trim().toUpperCase()
+        
+        if (!palletId) {
+            showToast('Please scan or enter pallet ID', 'error')
+            return
+        }
+        
+        // Get signature
+        const signatureName = prompt('Enter driver/staff name for signature:')
+        if (!signatureName || signatureName.trim() === '') {
+            showToast('Signature required to load parcel', 'error')
+            return
+        }
+        
+        console.log(`🚚 Loading parcel ${palletId} by ${signatureName}`)
+        
+        // Show loading state
+        showToast('Loading parcel...', 'info')
+        
+        // Load parcel via API
+        const response = await axios.post('/api/outlet/load-parcel', {
+            pallet_id: palletId,
+            delivery_date: state.outletDeliveryDate || new Date().toISOString().split('T')[0],
+            signature_name: signatureName.trim()
+        })
+        
+        if (response.data.success) {
+            showToast(`✅ Parcel loaded: ${palletId}`, 'success')
+            console.log('✅ Parcel loaded:', response.data)
+            
+            // Clear input
+            input.value = ''
+            input.focus()
+            
+            // Reload parcels list
+            loadOutletCreatedParcels()
+        } else {
+            showToast(response.data.error || 'Failed to load parcel', 'error')
+        }
+    } catch (error) {
+        console.error('Load parcel error:', error)
+        const errorMsg = error.response?.data?.error || 'Failed to load parcel'
+        showToast(errorMsg, 'error')
+    }
+}
+
+// Load outlets when create tab is shown
+document.addEventListener('DOMContentLoaded', function() {
+    // Add event listener for outlet tab changes
+    const originalSwitchOutletTab = window.switchOutletTab
+    window.switchOutletTab = function(tab) {
+        originalSwitchOutletTab(tab)
+        
+        // Load outlets list when create tab is shown
+        if (tab === 'create') {
+            setTimeout(loadOutletsForDestination, 100)
+        }
+    }
+})
 
 // NEW: Step 1 - Find pallets for outlet by short code
 async function handleFindOutletPallets() {
