@@ -353,6 +353,244 @@ app.post('/api/admin/outlets', authMiddleware, async (c) => {
   }
 })
 
+// ============ Outlet-to-Outlet/Outlet-to-Warehouse Module ============
+
+// Get list of all outlets for destination dropdown
+app.get('/api/outlets/list', authMiddleware, async (c) => {
+  try {
+    const response = await supabaseRequest(c, 'outlets?select=outlet_code,outlet_code_short,outlet_name&order=outlet_name.asc')
+    const outlets = await response.json()
+    
+    // Add warehouse as an option
+    const allDestinations = [
+      {
+        outlet_code: 'WAREHOUSE',
+        outlet_code_short: 'WH',
+        outlet_name: 'Main Warehouse'
+      },
+      ...outlets
+    ]
+    
+    return c.json({ outlets: allDestinations })
+  } catch (error) {
+    console.error('Failed to fetch outlets:', error)
+    return c.json({ error: 'Failed to fetch outlets list' }, 500)
+  }
+})
+
+// Create parcel from outlet (outlet-to-outlet or outlet-to-warehouse)
+app.post('/api/outlet/create-parcel', authMiddleware, async (c) => {
+  try {
+    const user = c.get('user')
+    const {
+      origin_outlet_code,
+      origin_outlet_name,
+      destination_outlet_code,
+      destination_outlet_name,
+      destination_type,
+      pallet_id,
+      transfer_numbers,
+      delivery_date,
+      notes
+    } = await c.req.json()
+    
+    console.log(`📦 Creating outlet parcel from ${origin_outlet_code} to ${destination_outlet_code}`)
+    
+    // Validate required fields
+    if (!origin_outlet_code || !destination_outlet_code || !pallet_id || !transfer_numbers || transfer_numbers.length === 0) {
+      return c.json({ error: 'Missing required fields' }, 400)
+    }
+    
+    // Security: Ensure user can only create parcels from their own outlet
+    if (user.role === 'outlet' && user.outlet_code !== origin_outlet_code) {
+      return c.json({ error: 'You can only create parcels from your assigned outlet' }, 403)
+    }
+    
+    // Check if pallet ID already exists
+    const existingResponse = await supabaseRequest(c, `parcels?pallet_id=eq.${pallet_id}&select=id`)
+    const existing = await existingResponse.json()
+    
+    if (existing && existing.length > 0) {
+      return c.json({ error: 'Pallet ID already exists. Please use a unique pallet ID.' }, 400)
+    }
+    
+    // Create parcel record with outlet origin
+    const parcelData = {
+      outlet_code: destination_outlet_code, // Destination outlet
+      outlet_code_short: destination_outlet_code,
+      outlet_name: destination_outlet_name,
+      pallet_id: pallet_id,
+      transfer_numbers: transfer_numbers,
+      total_count: transfer_numbers.length,
+      status: 'pending',
+      delivery_date: delivery_date || new Date().toISOString().split('T')[0],
+      // NEW FIELDS for outlet-originated parcels
+      origin_type: 'outlet',
+      origin_outlet_code: origin_outlet_code,
+      origin_outlet_name: origin_outlet_name,
+      destination_type: destination_type || 'outlet',
+      created_at_outlet: true,
+      notes: notes || ''
+    }
+    
+    console.log('Creating parcel:', parcelData)
+    
+    const parcelResponse = await supabaseRequest(c, 'parcels', {
+      method: 'POST',
+      body: JSON.stringify(parcelData)
+    })
+    
+    const insertedParcel = await parcelResponse.json()
+    
+    if (!insertedParcel || !insertedParcel.id) {
+      throw new Error('Failed to create parcel')
+    }
+    
+    console.log(`✓ Parcel created: ${insertedParcel.id}`)
+    
+    // Create transfer details
+    const transferDetails = transfer_numbers.map((tn: string) => ({
+      parcel_id: insertedParcel.id,
+      transfer_number: tn,
+      delivery_date: delivery_date || new Date().toISOString().split('T')[0],
+      outlet_code: destination_outlet_code,
+      outlet_code_short: destination_outlet_code,
+      outlet_name: destination_outlet_name,
+      pallet_id: pallet_id,
+      status: 'pending'
+    }))
+    
+    await supabaseRequest(c, 'transfer_details', {
+      method: 'POST',
+      body: JSON.stringify(transferDetails)
+    })
+    
+    console.log(`✓ ${transferDetails.length} transfer details created`)
+    
+    return c.json({
+      success: true,
+      parcel_id: insertedParcel.id,
+      pallet_id: pallet_id,
+      message: `Parcel created successfully: ${origin_outlet_name} → ${destination_outlet_name}`
+    })
+  } catch (error) {
+    console.error('Create outlet parcel error:', error)
+    return c.json({ error: 'Failed to create parcel' }, 500)
+  }
+})
+
+// Load outlet-created parcel to lorry (similar to warehouse loading)
+app.post('/api/outlet/load-parcel', authMiddleware, async (c) => {
+  try {
+    const user = c.get('user')
+    const { pallet_id, delivery_date, signature_name } = await c.req.json()
+    
+    console.log(`🚚 Loading outlet parcel ${pallet_id} by ${signature_name}`)
+    
+    // Find the parcel
+    const parcelResponse = await supabaseRequest(c, 
+      `parcels?pallet_id=eq.${pallet_id}&status=eq.pending&created_at_outlet=eq.true&select=*`)
+    const parcels = await parcelResponse.json()
+    
+    if (!parcels || parcels.length === 0) {
+      return c.json({ error: 'Parcel not found or already loaded' }, 404)
+    }
+    
+    const parcel = parcels[0]
+    
+    // Security check: outlet users can only load from their outlet
+    if (user.role === 'outlet' && parcel.origin_outlet_code !== user.outlet_code) {
+      return c.json({ error: 'You can only load parcels from your assigned outlet' }, 403)
+    }
+    
+    // Update parcel status to loaded
+    await supabaseRequest(c, `parcels?id=eq.${parcel.id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({
+        status: 'loaded',
+        loaded_at: new Date().toISOString(),
+        loaded_by: user.id,
+        loaded_by_name: user.full_name,
+        scanned_loading_by_name: signature_name
+      })
+    })
+    
+    // Update transfer details
+    await supabaseRequest(c, `transfer_details?parcel_id=eq.${parcel.id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({
+        status: 'loaded',
+        is_scanned_loading: true,
+        scanned_loading_at: new Date().toISOString(),
+        scanned_loading_by: user.id
+      })
+    })
+    
+    console.log(`✓ Outlet parcel ${pallet_id} loaded successfully`)
+    
+    return c.json({
+      success: true,
+      parcel_id: parcel.id,
+      message: `Parcel loaded: ${parcel.origin_outlet_name} → ${parcel.outlet_name}`
+    })
+  } catch (error) {
+    console.error('Load outlet parcel error:', error)
+    return c.json({ error: 'Failed to load parcel' }, 500)
+  }
+})
+
+// Get outgoing parcels created by this outlet
+app.get('/api/outlet/my-outgoing-parcels', authMiddleware, async (c) => {
+  try {
+    const outlet_code = c.req.query('outlet_code')
+    const delivery_date = c.req.query('delivery_date')
+    
+    if (!outlet_code) {
+      return c.json({ error: 'outlet_code is required' }, 400)
+    }
+    
+    let query = `parcels?origin_outlet_code=eq.${outlet_code}&created_at_outlet=eq.true&select=*&order=created_at.desc`
+    
+    if (delivery_date) {
+      query += `&delivery_date=eq.${delivery_date}`
+    }
+    
+    const response = await supabaseRequest(c, query)
+    const parcels = await response.json()
+    
+    return c.json({ parcels: parcels || [] })
+  } catch (error) {
+    console.error('Fetch outgoing parcels error:', error)
+    return c.json({ error: 'Failed to fetch outgoing parcels' }, 500)
+  }
+})
+
+// Get incoming parcels from other outlets to this outlet
+app.get('/api/outlet/incoming-outlet-parcels', authMiddleware, async (c) => {
+  try {
+    const outlet_code = c.req.query('outlet_code')
+    const delivery_date = c.req.query('delivery_date')
+    
+    if (!outlet_code) {
+      return c.json({ error: 'outlet_code is required' }, 400)
+    }
+    
+    let query = `parcels?outlet_code=eq.${outlet_code}&created_at_outlet=eq.true&select=*&order=created_at.desc`
+    
+    if (delivery_date) {
+      query += `&delivery_date=eq.${delivery_date}`
+    }
+    
+    const response = await supabaseRequest(c, query)
+    const parcels = await response.json()
+    
+    return c.json({ parcels: parcels || [] })
+  } catch (error) {
+    console.error('Fetch incoming outlet parcels error:', error)
+    return c.json({ error: 'Failed to fetch incoming parcels' }, 500)
+  }
+})
+
 // ============ Import Routes ============
 
 // Import pick and pack report
@@ -1640,7 +1878,13 @@ app.post('/api/outlet/find-pallets', authMiddleware, async (c) => {
         id: p.id,
         pallet_id: p.pallet_id,
         transfer_count: p.total_count,
-        status: p.status
+        status: p.status,
+        // NEW: Include origin info for outlet-originated parcels
+        origin_type: p.origin_type || 'warehouse',
+        origin_outlet_code: p.origin_outlet_code,
+        origin_outlet_name: p.origin_outlet_name,
+        destination_type: p.destination_type || 'outlet',
+        created_at_outlet: p.created_at_outlet || false
       }))
     })
   } catch (error) {
