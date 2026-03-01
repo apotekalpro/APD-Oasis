@@ -3305,10 +3305,10 @@ function switchOutletTab(tab) {
     state.outletTab = tab
     render()
     
-    // Load data for specific tabs
-    if (tab === 'load') {
-        loadOutletCreatedParcels()
-    }
+    // Initialize tab-specific functionality
+    setTimeout(() => {
+        initOutletParcelTab(tab)
+    }, 100)
 }
 
 // Render Unload Tab (existing functionality)
@@ -3486,23 +3486,17 @@ function renderOutletCreateTab() {
                 <p class="text-gray-600">Send parcels to other outlets or warehouse</p>
             </div>
             
-            <form onsubmit="event.preventDefault(); handleCreateOutletParcel();" class="space-y-4">
+            <form id="createParcelForm" onsubmit="handleCreateParcel(event)" class="space-y-4">
                 <!-- Destination -->
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-2">
                         <i class="fas fa-map-marker-alt mr-2 text-red-500"></i>Destination *
                     </label>
-                    <select id="createParcelDestination" 
+                    <select id="parcel_destination" 
                         class="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-green-500"
-                        required
-                        onchange="handleDestinationChange(this.value)">
+                        required>
                         <option value="">-- Select Destination --</option>
-                        <optgroup label="Warehouse">
-                            <option value="WAREHOUSE|Main Warehouse|warehouse">🏭 Main Warehouse</option>
-                        </optgroup>
-                        <optgroup label="Outlets" id="outletsOptgroup">
-                            <option value="">Loading outlets...</option>
-                        </optgroup>
+                        <option value="WAREHOUSE">🏭 WAREHOUSE (Main Hub)</option>
                     </select>
                 </div>
                 
@@ -3511,11 +3505,13 @@ function renderOutletCreateTab() {
                     <label class="block text-sm font-medium text-gray-700 mb-2">
                         <i class="fas fa-barcode mr-2 text-blue-500"></i>Pallet ID *
                     </label>
-                    <input type="text" id="createParcelPalletId" 
+                    <input type="text" id="parcel_pallet_id" 
                         class="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-green-500"
-                        placeholder="F1001234567"
+                        placeholder="F-1234"
+                        pattern="F-\\d{4}"
+                        title="Format: F-XXXX (e.g., F-1234)"
                         required>
-                    <p class="text-xs text-gray-500 mt-1">Enter a unique pallet ID (e.g., F1001234567)</p>
+                    <p class="text-xs text-gray-500 mt-1">Format: F-XXXX (e.g., F-1234)</p>
                 </div>
                 
                 <!-- Transfer Numbers -->
@@ -3523,7 +3519,7 @@ function renderOutletCreateTab() {
                     <label class="block text-sm font-medium text-gray-700 mb-2">
                         <i class="fas fa-list-ol mr-2 text-purple-500"></i>Transfer Numbers *
                     </label>
-                    <textarea id="createParcelTransferNumbers" 
+                    <textarea id="parcel_transfer_numbers" 
                         class="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-green-500"
                         rows="4"
                         placeholder="Enter transfer numbers (one per line)&#10;TN001&#10;TN002&#10;TN003"
@@ -3536,7 +3532,7 @@ function renderOutletCreateTab() {
                     <label class="block text-sm font-medium text-gray-700 mb-2">
                         <i class="fas fa-calendar mr-2 text-orange-500"></i>Delivery Date *
                     </label>
-                    <input type="date" id="createParcelDeliveryDate" 
+                    <input type="date" id="parcel_delivery_date" 
                         class="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-green-500"
                         value="${new Date().toISOString().split('T')[0]}"
                         required>
@@ -3547,7 +3543,7 @@ function renderOutletCreateTab() {
                     <label class="block text-sm font-medium text-gray-700 mb-2">
                         <i class="fas fa-sticky-note mr-2 text-yellow-500"></i>Notes (Optional)
                     </label>
-                    <textarea id="createParcelNotes" 
+                    <textarea id="parcel_notes" 
                         class="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-green-500"
                         rows="2"
                         placeholder="Return shipment, damaged goods, etc."></textarea>
@@ -3559,7 +3555,7 @@ function renderOutletCreateTab() {
                         class="flex-1 bg-green-500 hover:bg-green-600 text-white font-bold py-3 rounded-lg">
                         <i class="fas fa-check mr-2"></i>Create Parcel
                     </button>
-                    <button type="button" onclick="resetCreateParcelForm()" 
+                    <button type="button" onclick="document.getElementById('createParcelForm').reset()" 
                         class="bg-gray-500 hover:bg-gray-600 text-white px-6 py-3 rounded-lg">
                         <i class="fas fa-redo mr-2"></i>Reset
                     </button>
@@ -3590,26 +3586,27 @@ function renderOutletLoadTab() {
             </div>
             
             <!-- Pending Parcels List -->
-            <div id="outletPendingParcels" class="mb-6">
-                <h4 class="font-semibold mb-3">Pending Parcels (Not Loaded)</h4>
+            <div class="mb-6">
+                <h4 class="font-semibold mb-3">
+                    <i class="fas fa-clock mr-2 text-yellow-600"></i>Pending Parcels (Not Loaded)
+                </h4>
                 <div class="space-y-3" id="pendingParcelsList">
                     <p class="text-gray-500 text-center py-4">Loading...</p>
                 </div>
             </div>
             
             <!-- Scan to Load -->
-            <div class="bg-purple-50 border border-purple-200 rounded-lg p-6">
+            <div class="bg-purple-50 border-2 border-purple-300 rounded-lg p-6">
                 <h4 class="font-semibold mb-4">
-                    <i class="fas fa-barcode mr-2"></i>Scan Pallet to Load
+                    <i class="fas fa-barcode mr-2 text-purple-600"></i>Scan Pallet to Load
                 </h4>
-                <input type="text" id="loadParcelScanInput" 
+                <input type="text" id="loadParcelScan" 
                     class="w-full px-4 py-3 border-4 border-purple-500 rounded-lg text-lg mb-4"
-                    placeholder="Scan pallet ID..."
+                    placeholder="Scan pallet ID (F-XXXX)..."
                     autofocus
-                    onkeydown="if(event.key==='Enter' || event.keyCode===13) { event.preventDefault(); handleLoadOutletParcel(); }"
-                    onkeypress="if(event.key==='Enter') handleLoadOutletParcel()">
+                    onkeydown="if(event.key==='Enter' || event.keyCode===13) { event.preventDefault(); handleLoadParcelScan(); }">
                 
-                <button onclick="handleLoadOutletParcel()" 
+                <button onclick="handleLoadParcelScan()" 
                     class="w-full bg-purple-500 hover:bg-purple-600 text-white font-bold py-3 rounded-lg">
                     <i class="fas fa-truck-loading mr-2"></i>Load Parcel
                 </button>
@@ -3617,7 +3614,9 @@ function renderOutletLoadTab() {
             
             <!-- Loaded Parcels -->
             <div class="mt-6">
-                <h4 class="font-semibold mb-3">Loaded Parcels</h4>
+                <h4 class="font-semibold mb-3">
+                    <i class="fas fa-check-circle mr-2 text-green-600"></i>Loaded Parcels
+                </h4>
                 <div id="loadedParcelsList" class="space-y-3">
                     <p class="text-gray-500 text-center py-4">No parcels loaded yet</p>
                 </div>
@@ -3626,51 +3625,7 @@ function renderOutletLoadTab() {
     `
 }
 
-// ============ Outlet-to-Outlet Module Functions ============
-
-// Load outlets list for destination dropdown
-async function loadOutletsForDestination() {
-    try {
-        const response = await axios.get('/api/outlets/list')
-        const outlets = response.data.outlets || []
-        
-        // Update the optgroup with outlets (skip warehouse as it's already in the template)
-        const optgroup = document.getElementById('outletsOptgroup')
-        if (optgroup) {
-            optgroup.innerHTML = outlets
-                .filter(o => o.outlet_code !== 'WAREHOUSE')
-                .map(outlet => `
-                    <option value="${outlet.outlet_code}|${outlet.outlet_name}|outlet">
-                        🏪 ${outlet.outlet_name} (${outlet.outlet_code})
-                    </option>
-                `).join('')
-        }
-        
-        console.log(`✅ Loaded ${outlets.length} outlets for destination dropdown`)
-    } catch (error) {
-        console.error('Failed to load outlets:', error)
-        showToast('Failed to load outlets list', 'error')
-    }
-}
-
-// Handle destination change (for future use if needed)
-function handleDestinationChange(value) {
-    // Can add logic here if needed (e.g., validation, dynamic fields)
-    console.log('Destination selected:', value)
-}
-
-// Reset create parcel form
-function resetCreateParcelForm() {
-    document.getElementById('createParcelDestination').value = ''
-    document.getElementById('createParcelPalletId').value = ''
-    document.getElementById('createParcelTransferNumbers').value = ''
-    document.getElementById('createParcelDeliveryDate').value = new Date().toISOString().split('T')[0]
-    document.getElementById('createParcelNotes').value = ''
-    showToast('Form reset', 'info')
-}
-
-// Handle create outlet parcel
-async function handleCreateOutletParcel() {
+// ============ Container Collection Page ============
     try {
         // Get form values
         const destinationValue = document.getElementById('createParcelDestination').value
@@ -4681,6 +4636,301 @@ async function handleCompleteUnloading(event) {
         render()
     } catch (error) {
         showToast('Failed to complete unloading', 'error')
+    }
+}
+
+// ============ Outlet-to-Outlet/Warehouse Module Functions ============
+
+// Load outlet list for destination dropdown
+async function loadOutletDestinations() {
+    try {
+        const response = await axios.get('/api/outlets/list')
+        const destinations = response.data.outlets || []
+        console.log('📋 Loaded destinations:', destinations.length)
+        
+        const select = document.getElementById('parcel_destination')
+        if (select) {
+            select.innerHTML = `
+                <option value="">-- Select Destination --</option>
+                <option value="WAREHOUSE">🏭 WAREHOUSE (Main Hub)</option>
+                ${destinations.map(outlet => `
+                    <option value="${outlet.code}">${outlet.code_short} - ${outlet.name}</option>
+                `).join('')}
+            `
+        }
+    } catch (error) {
+        console.error('❌ Failed to load destinations:', error)
+        showToast('Failed to load destination list', 'error')
+    }
+}
+
+// Create new outlet-originated parcel
+async function handleCreateParcel(event) {
+    event.preventDefault()
+    
+    const destination = document.getElementById('parcel_destination').value
+    const palletId = document.getElementById('parcel_pallet_id').value.trim().toUpperCase()
+    const transferNumbers = document.getElementById('parcel_transfer_numbers').value.trim()
+    const deliveryDate = document.getElementById('parcel_delivery_date').value
+    const notes = document.getElementById('parcel_notes').value.trim()
+    
+    // Validation
+    if (!destination) {
+        showToast('Please select a destination', 'error')
+        return
+    }
+    
+    if (!palletId) {
+        showToast('Please enter a Pallet ID', 'error')
+        return
+    }
+    
+    // Validate pallet ID format (F-XXXX)
+    if (!palletId.match(/^F-\d{4}$/)) {
+        showToast('Invalid Pallet ID format. Use F-XXXX (e.g., F-1234)', 'error')
+        return
+    }
+    
+    if (!transferNumbers) {
+        showToast('Please enter transfer numbers', 'error')
+        return
+    }
+    
+    if (!deliveryDate) {
+        showToast('Please select delivery date', 'error')
+        return
+    }
+    
+    try {
+        const user = state.user
+        const outlet = user.outlet_code // Current outlet code
+        const outletName = user.outlet_name
+        
+        // Determine destination type
+        const destinationType = destination === 'WAREHOUSE' ? 'warehouse' : 'outlet'
+        
+        const response = await axios.post('/api/outlet/create-parcel', {
+            origin_outlet_code: outlet,
+            origin_outlet_name: outletName,
+            destination_code: destination,
+            destination_type: destinationType,
+            pallet_id: palletId,
+            transfer_numbers: transferNumbers,
+            delivery_date: deliveryDate,
+            notes: notes
+        })
+        
+        console.log('✅ Parcel created:', response.data)
+        showToast(`Parcel ${palletId} created successfully!`, 'success')
+        
+        // Clear form
+        document.getElementById('createParcelForm').reset()
+        
+        // Switch to Load tab to scan the parcel
+        switchOutletTab('load')
+        
+        // Refresh pending parcels list
+        await loadPendingParcels()
+        
+    } catch (error) {
+        console.error('❌ Create parcel failed:', error)
+        const message = error.response?.data?.error || 'Failed to create parcel'
+        showToast(message, 'error')
+    }
+}
+
+// Load pending parcels for current outlet
+async function loadPendingParcels() {
+    try {
+        const response = await axios.get('/api/outlet/my-outgoing-parcels')
+        const parcels = response.data.parcels || []
+        
+        console.log('📦 Pending parcels:', parcels.length)
+        
+        const listDiv = document.getElementById('pendingParcelsList')
+        if (!listDiv) return
+        
+        if (parcels.length === 0) {
+            listDiv.innerHTML = `
+                <div class="text-center py-8 text-gray-500">
+                    <i class="fas fa-box-open text-4xl mb-3"></i>
+                    <p>No pending parcels to load</p>
+                    <p class="text-sm mt-2">Create parcels in the "Create Parcel" tab</p>
+                </div>
+            `
+            return
+        }
+        
+        // Group by destination
+        const grouped = {}
+        parcels.forEach(p => {
+            const dest = p.destination_type === 'warehouse' ? 'WAREHOUSE' : p.outlet_code
+            if (!grouped[dest]) {
+                grouped[dest] = {
+                    name: p.destination_type === 'warehouse' ? 'WAREHOUSE' : `${p.outlet_code} - ${p.outlet_name}`,
+                    parcels: []
+                }
+            }
+            grouped[dest].parcels.push(p)
+        })
+        
+        listDiv.innerHTML = Object.entries(grouped).map(([dest, data]) => `
+            <div class="mb-4">
+                <h4 class="font-bold text-gray-700 mb-2">
+                    <i class="fas fa-map-marker-alt text-blue-600 mr-2"></i>
+                    To: ${data.name}
+                </h4>
+                <div class="space-y-2">
+                    ${data.parcels.map(p => `
+                        <div class="bg-white border-2 border-gray-300 rounded-lg p-3">
+                            <div class="flex justify-between items-start">
+                                <div class="flex-1">
+                                    <p class="font-mono font-bold text-blue-600">${p.pallet_id}</p>
+                                    <p class="text-sm text-gray-600">
+                                        Transfer: ${p.transfer_numbers || 'N/A'} | 
+                                        Date: ${formatDate(p.delivery_date)}
+                                    </p>
+                                    ${p.notes ? `<p class="text-xs text-gray-500 mt-1">📝 ${p.notes}</p>` : ''}
+                                </div>
+                                <div class="text-right">
+                                    <span class="inline-block px-2 py-1 rounded text-xs font-bold ${
+                                        p.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                                        p.status === 'loaded' ? 'bg-green-100 text-green-800' :
+                                        'bg-gray-100 text-gray-800'
+                                    }">
+                                        ${p.status.toUpperCase()}
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                    `).join('')}
+                </div>
+            </div>
+        `).join('')
+        
+    } catch (error) {
+        console.error('❌ Failed to load pending parcels:', error)
+        const listDiv = document.getElementById('pendingParcelsList')
+        if (listDiv) {
+            listDiv.innerHTML = `
+                <div class="text-center py-8 text-red-600">
+                    <i class="fas fa-exclamation-triangle text-4xl mb-3"></i>
+                    <p>Failed to load pending parcels</p>
+                </div>
+            `
+        }
+    }
+}
+
+// Handle scanning pallet for loading
+async function handleLoadParcelScan() {
+    const input = document.getElementById('loadParcelScan')
+    const palletId = input.value.trim().toUpperCase()
+    
+    if (!palletId) return
+    
+    try {
+        const response = await axios.post('/api/outlet/load-parcel', {
+            pallet_id: palletId
+        })
+        
+        console.log('✅ Parcel loaded:', response.data)
+        showToast(`Parcel ${palletId} loaded successfully!`, 'success')
+        
+        // Clear input
+        input.value = ''
+        
+        // Refresh lists
+        await loadPendingParcels()
+        await loadLoadedParcels()
+        
+    } catch (error) {
+        console.error('❌ Load parcel failed:', error)
+        const message = error.response?.data?.error || 'Failed to load parcel'
+        showToast(message, 'error')
+        input.value = ''
+    }
+}
+
+// Load already-loaded parcels
+async function loadLoadedParcels() {
+    try {
+        const response = await axios.get('/api/outlet/my-outgoing-parcels')
+        const allParcels = response.data.parcels || []
+        const loadedParcels = allParcels.filter(p => p.status === 'loaded')
+        
+        console.log('📦 Loaded parcels:', loadedParcels.length)
+        
+        const listDiv = document.getElementById('loadedParcelsList')
+        if (!listDiv) return
+        
+        if (loadedParcels.length === 0) {
+            listDiv.innerHTML = `
+                <div class="text-center py-4 text-gray-500">
+                    <p class="text-sm">No loaded parcels yet</p>
+                </div>
+            `
+            return
+        }
+        
+        listDiv.innerHTML = loadedParcels.map(p => `
+            <div class="bg-green-50 border-2 border-green-300 rounded-lg p-3 mb-2">
+                <div class="flex justify-between items-start">
+                    <div class="flex-1">
+                        <p class="font-mono font-bold text-green-700">${p.pallet_id}</p>
+                        <p class="text-sm text-gray-600">
+                            To: ${p.destination_type === 'warehouse' ? 'WAREHOUSE' : `${p.outlet_code} - ${p.outlet_name}`}
+                        </p>
+                        <p class="text-xs text-gray-500">
+                            Loaded: ${formatTimestamp(p.loaded_at)} by ${p.loaded_by_name || 'Unknown'}
+                        </p>
+                    </div>
+                    <div>
+                        <i class="fas fa-check-circle text-2xl text-green-600"></i>
+                    </div>
+                </div>
+            </div>
+        `).join('')
+        
+    } catch (error) {
+        console.error('❌ Failed to load loaded parcels:', error)
+    }
+}
+
+// Helper function to format timestamp
+function formatTimestamp(timestamp) {
+    if (!timestamp) return 'N/A'
+    const date = new Date(timestamp)
+    return date.toLocaleString('en-MY', {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+    })
+}
+
+// Initialize outlet parcel tab when switched to
+function initOutletParcelTab(tab) {
+    if (tab === 'create') {
+        // Load destinations dropdown
+        loadOutletDestinations()
+        
+        // Set today's date as default delivery date
+        const dateInput = document.getElementById('parcel_delivery_date')
+        if (dateInput && !dateInput.value) {
+            dateInput.value = new Date().toISOString().split('T')[0]
+        }
+    } else if (tab === 'load') {
+        // Load pending and loaded parcels
+        loadPendingParcels()
+        loadLoadedParcels()
+        
+        // Focus on scan input
+        setTimeout(() => {
+            const input = document.getElementById('loadParcelScan')
+            if (input) input.focus()
+        }, 100)
     }
 }
 
