@@ -4564,9 +4564,10 @@ async function handleCompleteUnloading(event) {
 // Load outlet list for destination dropdown
 async function loadOutletDestinations() {
     try {
+        console.log('🔄 Loading outlet destinations...')
         const response = await axios.get('/api/outlets/list')
         const destinations = response.data.outlets || []
-        console.log('📋 Loaded destinations:', destinations.length)
+        console.log('📋 API returned:', destinations.length, 'outlets')
         
         // Store destinations in state for filtering
         state.availableDestinations = [
@@ -4588,12 +4589,26 @@ async function loadOutletDestinations() {
                     <option value="${dest.code}">${dest.display}</option>
                 `).join('')}
             `
+            console.log('✅ Dropdown populated with', state.availableDestinations.length, 'destinations')
+        } else {
+            console.warn('⚠️ parcel_destination select element not found!')
         }
         
-        console.log('✅ Loaded', state.availableDestinations.length, 'destinations')
     } catch (error) {
         console.error('❌ Failed to load destinations:', error)
-        showToast('Failed to load destination list', 'error')
+        console.error('Error details:', error.response?.data || error.message)
+        
+        // Fallback: Show at least WAREHOUSE option
+        const select = document.getElementById('parcel_destination')
+        if (select) {
+            select.innerHTML = `
+                <option value="">-- Select Destination --</option>
+                <option value="WAREHOUSE">🏭 WAREHOUSE - Main Hub</option>
+            `
+            console.log('⚠️ Loaded fallback (WAREHOUSE only) due to error')
+        }
+        
+        showToast('Could not load all outlets. Please refresh or contact support.', 'error')
     }
 }
 
