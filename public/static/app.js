@@ -3489,17 +3489,21 @@ function renderOutletCreateTab() {
             </div>
             
             <form id="createParcelForm" onsubmit="handleCreateParcel(event)" class="space-y-4">
-                <!-- Destination -->
+                <!-- Destination with Search -->
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-2">
                         <i class="fas fa-map-marker-alt mr-2 text-red-500"></i>Destination *
                     </label>
-                    <select id="parcel_destination" 
+                    <input list="destination_list" 
+                        id="parcel_destination" 
                         class="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-green-500"
+                        placeholder="Search outlets or select warehouse..."
+                        autocomplete="off"
                         required>
-                        <option value="">-- Select Destination --</option>
-                        <option value="WAREHOUSE">🏭 WAREHOUSE (Main Hub)</option>
-                    </select>
+                    <datalist id="destination_list">
+                        <option value="">-- Loading outlets... --</option>
+                    </datalist>
+                    <p class="text-xs text-gray-500 mt-1">Type to search or select from list</p>
                 </div>
                 
                 <!-- Pallet ID -->
@@ -4560,16 +4564,27 @@ async function loadOutletDestinations() {
         const destinations = response.data.outlets || []
         console.log('📋 Loaded destinations:', destinations.length)
         
-        const select = document.getElementById('parcel_destination')
-        if (select) {
-            select.innerHTML = `
-                <option value="">-- Select Destination --</option>
-                <option value="WAREHOUSE">🏭 WAREHOUSE (Main Hub)</option>
+        // Store destinations in state for validation
+        state.availableDestinations = [
+            { code: 'WAREHOUSE', name: 'WAREHOUSE - Main Hub' },
+            ...destinations.map(outlet => ({ 
+                code: outlet.code, 
+                name: `${outlet.code_short} - ${outlet.name}` 
+            }))
+        ]
+        
+        // Populate datalist for searchable dropdown
+        const datalist = document.getElementById('destination_list')
+        if (datalist) {
+            datalist.innerHTML = `
+                <option value="WAREHOUSE">🏭 WAREHOUSE - Main Hub</option>
                 ${destinations.map(outlet => `
                     <option value="${outlet.code}">${outlet.code_short} - ${outlet.name}</option>
                 `).join('')}
             `
         }
+        
+        console.log('✅ Loaded', destinations.length + 1, 'destinations (including warehouse)')
     } catch (error) {
         console.error('❌ Failed to load destinations:', error)
         showToast('Failed to load destination list', 'error')
