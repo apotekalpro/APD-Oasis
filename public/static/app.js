@@ -3489,21 +3489,25 @@ function renderOutletCreateTab() {
             </div>
             
             <form id="createParcelForm" onsubmit="handleCreateParcel(event)" class="space-y-4">
-                <!-- Destination with Search -->
+                <!-- Destination Dropdown with Search Input -->
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-2">
                         <i class="fas fa-map-marker-alt mr-2 text-red-500"></i>Destination *
                     </label>
-                    <input list="destination_list" 
-                        id="parcel_destination" 
+                    <!-- Search Input -->
+                    <input type="text" 
+                        id="parcel_destination_search" 
+                        class="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-green-500 mb-2"
+                        placeholder="🔍 Type to search outlets..."
+                        oninput="filterDestinations(this.value)">
+                    <!-- Dropdown Select -->
+                    <select id="parcel_destination" 
                         class="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-green-500"
-                        placeholder="Search outlets or select warehouse..."
-                        autocomplete="off"
+                        size="6"
                         required>
-                    <datalist id="destination_list">
                         <option value="">-- Loading outlets... --</option>
-                    </datalist>
-                    <p class="text-xs text-gray-500 mt-1">Type to search or select from list</p>
+                    </select>
+                    <p class="text-xs text-gray-500 mt-1">Search above or scroll to select</p>
                 </div>
                 
                 <!-- Pallet ID -->
@@ -4564,31 +4568,69 @@ async function loadOutletDestinations() {
         const destinations = response.data.outlets || []
         console.log('📋 Loaded destinations:', destinations.length)
         
-        // Store destinations in state for validation
+        // Store destinations in state for filtering
         state.availableDestinations = [
-            { code: 'WAREHOUSE', name: 'WAREHOUSE - Main Hub' },
+            { code: 'WAREHOUSE', name: 'WAREHOUSE - Main Hub', display: '🏭 WAREHOUSE - Main Hub' },
             ...destinations.map(outlet => ({ 
                 code: outlet.code, 
-                name: `${outlet.code_short} - ${outlet.name}` 
+                name: outlet.name,
+                codeShort: outlet.code_short,
+                display: `${outlet.code_short} - ${outlet.name}` 
             }))
         ]
         
-        // Populate datalist for searchable dropdown
-        const datalist = document.getElementById('destination_list')
-        if (datalist) {
-            datalist.innerHTML = `
-                <option value="WAREHOUSE">🏭 WAREHOUSE - Main Hub</option>
-                ${destinations.map(outlet => `
-                    <option value="${outlet.code}">${outlet.code_short} - ${outlet.name}</option>
+        // Populate select dropdown
+        const select = document.getElementById('parcel_destination')
+        if (select) {
+            select.innerHTML = `
+                <option value="">-- Select Destination --</option>
+                ${state.availableDestinations.map(dest => `
+                    <option value="${dest.code}">${dest.display}</option>
                 `).join('')}
             `
         }
         
-        console.log('✅ Loaded', destinations.length + 1, 'destinations (including warehouse)')
+        console.log('✅ Loaded', state.availableDestinations.length, 'destinations')
     } catch (error) {
         console.error('❌ Failed to load destinations:', error)
         showToast('Failed to load destination list', 'error')
     }
+}
+
+// Filter destinations based on search input
+function filterDestinations(searchText) {
+    const select = document.getElementById('parcel_destination')
+    if (!select || !state.availableDestinations) return
+    
+    const search = searchText.toLowerCase().trim()
+    
+    // If search is empty, show all
+    if (!search) {
+        select.innerHTML = `
+            <option value="">-- Select Destination --</option>
+            ${state.availableDestinations.map(dest => `
+                <option value="${dest.code}">${dest.display}</option>
+            `).join('')}
+        `
+        return
+    }
+    
+    // Filter destinations
+    const filtered = state.availableDestinations.filter(dest => 
+        dest.code.toLowerCase().includes(search) ||
+        dest.name.toLowerCase().includes(search) ||
+        (dest.codeShort && dest.codeShort.toLowerCase().includes(search))
+    )
+    
+    // Update select with filtered results
+    select.innerHTML = `
+        <option value="">-- ${filtered.length} results found --</option>
+        ${filtered.map(dest => `
+            <option value="${dest.code}">${dest.display}</option>
+        `).join('')}
+    `
+    
+    console.log('🔍 Filtered:', filtered.length, 'of', state.availableDestinations.length)
 }
 
 // Create new outlet-originated parcel
