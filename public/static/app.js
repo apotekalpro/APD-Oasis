@@ -83,7 +83,7 @@ const isMobile = window.location.origin.startsWith('capacitor://') ||
 
 // Always use Cloudflare Pages backend (has API endpoints)
 // Production backend with all features
-const API_BASE = 'https://apd-oasis.pages.dev'
+const API_BASE = 'https://cd61ab42.apd-oasis.pages.dev'
 
 console.log('Window location origin:', window.location.origin)
 console.log('Window location protocol:', window.location.protocol)
