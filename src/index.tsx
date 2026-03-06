@@ -1608,12 +1608,12 @@ app.post('/api/outlet/find-pallets', authMiddleware, async (c) => {
     })
     console.log(`📝 Query: container_inventory?outlet_code=eq.${firstParcel.outlet_code}&select=*`)
     
-    // Fetch ONLY containers at this outlet that are NOT yet delivered (status='at_outlet')
+    // Fetch ONLY containers loaded for this outlet that are ready for unloading (status='loaded')
     try {
       const containersResponse = await supabaseRequest(c, 
-        `container_inventory?outlet_code=eq.${firstParcel.outlet_code}&status=eq.at_outlet&select=*`)
+        `container_inventory?outlet_code=eq.${firstParcel.outlet_code}&status=eq.loaded&select=*`)
       const containers = await containersResponse.json()
-      console.log(`✅ Query returned ${containers?.length || 0} A-code containers at outlet (not delivered)`)
+      console.log(`✅ Query returned ${containers?.length || 0} A-code containers loaded for unloading`)
       console.log(`📦 Container data:`, JSON.stringify(containers, null, 2))
       
       if (containers && containers.length > 0) {
