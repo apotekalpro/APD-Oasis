@@ -871,8 +871,10 @@ app.get('/api/warehouse/transfers', authMiddleware, async (c) => {
     let query = 'transfer_details?select=*&order=outlet_code.asc,transfer_number.asc'
     if (outlet_code) {
       // Try both outlet_code and outlet_code_short
-      query = `transfer_details?or=(outlet_code.eq.${outlet_code},outlet_code_short.eq.${outlet_code})&select=*&order=transfer_number.asc`
-      console.log('Query for specific outlet:', query)
+      // FILTER: Only show current round (status='pending' OR status='loaded')
+      // Exclude 'delivered', 'received' (old completed transfers)
+      query = `transfer_details?or=(outlet_code.eq.${outlet_code},outlet_code_short.eq.${outlet_code})&status=in.(pending,loaded)&select=*&order=transfer_number.asc`
+      console.log('Query for specific outlet (current round only):', query)
     } else {
       // Otherwise, get only pending transfers
       query = 'transfer_details?status=eq.pending&select=*&order=outlet_code.asc'
