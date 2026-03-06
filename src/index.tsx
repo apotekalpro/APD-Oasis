@@ -1398,27 +1398,57 @@ app.post('/api/warehouse/scan-container', authMiddleware, async (c) => {
     console.log(`🔍 Scanning A code container: ${container_id} for outlet ${outlet_code}`)
     console.log(`📝 Scan details:`, { container_id, outlet_code, outlet_name, delivery_date, user: user.full_name })
     
-    // Check if A code already scanned for this outlet
+    // Check if A code already exists (any status, any outlet)
     const existingResponse = await supabaseRequest(c, 
-      `container_inventory?container_id=eq.${container_id}&outlet_code=eq.${outlet_code}&select=*`)
+      `container_inventory?container_id=eq.${container_id}&select=*`)
     const existing = await existingResponse.json()
     
     if (existing && existing.length > 0) {
-      console.log(`⚠️ Duplicate scan detected: ${container_id} already exists for outlet ${outlet_code}`)
+      // Container exists - RESET its status to 'loaded' regardless of previous status
+      const existingContainer = existing[0]
+      console.log(`🔄 Container ${container_id} already exists with status '${existingContainer.status}'`)
+      console.log(`   Previous outlet: ${existingContainer.outlet_code}, New outlet: ${outlet_code}`)
+      console.log(`   Resetting to 'loaded' status and updating outlet info...`)
+      
+      // UPDATE existing record: reset to 'loaded' and update outlet info
+      const updateResponse = await supabaseRequest(c, `container_inventory?id=eq.${existingContainer.id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({
+          outlet_code: outlet_code,
+          outlet_name: outlet_name || `Outlet ${outlet_code}`,
+          delivery_date: delivery_date,
+          status: 'loaded', // ✅ RESET: Back to 'loaded' (warehouse scan)
+          scanned_at: new Date().toISOString(), // Update scan time
+          scanned_by: user.id,
+          scanned_by_name: user.full_name,
+          delivered_at: null, // Clear delivery timestamp
+          delivered_by: null, // Clear delivery info
+          delivered_by_name: null,
+          receiver_name: null
+        })
+      })
+      
+      const updateResult = await updateResponse.json()
+      console.log(`✅ Container ${container_id} RESET to 'loaded' status for outlet ${outlet_code}`)
+      
       return c.json({ 
-        success: false, 
-        error: 'Container already scanned for this outlet',
-        container_id 
+        success: true, 
+        container_id,
+        outlet_code,
+        action: 'updated',
+        previous_status: existingContainer.status,
+        new_status: 'loaded',
+        saved_data: updateResult
       })
     }
     
-    // Create container record with 'loaded' status (not yet at outlet)
-    console.log(`💾 Saving A-code to container_inventory:`, {
+    // Container doesn't exist - CREATE new record with 'loaded' status
+    console.log(`💾 Creating new A-code in container_inventory:`, {
       container_id,
       outlet_code,
       outlet_name,
       delivery_date,
-      status: 'loaded'  // ✅ FIXED: Only 'loaded' at warehouse, not yet at outlet
+      status: 'loaded'
     })
     
     const insertResponse = await supabaseRequest(c, 'container_inventory', {
@@ -1426,9 +1456,9 @@ app.post('/api/warehouse/scan-container', authMiddleware, async (c) => {
       body: JSON.stringify({
         container_id: container_id,
         outlet_code: outlet_code,
-        outlet_name: outlet_name || `Outlet ${outlet_code}`, // Fallback if name not provided
+        outlet_name: outlet_name || `Outlet ${outlet_code}`,
         delivery_date: delivery_date,
-        status: 'loaded', // ✅ FIXED: Container loaded at warehouse, not yet delivered
+        status: 'loaded', // ✅ NEW: Container loaded at warehouse
         scanned_at: new Date().toISOString(),
         scanned_by: user.id,
         scanned_by_name: user.full_name
@@ -1436,12 +1466,13 @@ app.post('/api/warehouse/scan-container', authMiddleware, async (c) => {
     })
     
     const insertResult = await insertResponse.json()
-    console.log(`✅ A-code saved successfully with status 'loaded':`, insertResult)
+    console.log(`✅ A-code created successfully with status 'loaded':`, insertResult)
     
     return c.json({ 
       success: true, 
       container_id,
       outlet_code,
+      action: 'created',
       saved_data: insertResult
     })
   } catch (error) {
