@@ -81,7 +81,7 @@ const isMobile = window.location.origin.startsWith('capacitor://') ||
                  window.location.protocol === 'capacitor:' ||
                  window.location.protocol === 'file:'
 
-const API_BASE = 'https://production.apd-oasis.pages.dev' // Stable production URL (branch alias)
+const API_BASE = 'https://apd-oasis.pages.dev' // Main production URL
 
 console.log('Window location origin:', window.location.origin)
 console.log('Window location protocol:', window.location.protocol)
