@@ -81,7 +81,7 @@ const isMobile = window.location.origin.startsWith('capacitor://') ||
                  window.location.protocol === 'capacitor:' ||
                  window.location.protocol === 'file:'
 
-const API_BASE = isMobile ? 'https://bdc7ed26.apd-oasis.pages.dev' : window.location.origin
+const API_BASE = 'https://e7420423.apd-oasis.pages.dev' // Use latest stable deployment for all platforms
 
 console.log('Window location origin:', window.location.origin)
 console.log('Window location protocol:', window.location.protocol)
