@@ -1639,18 +1639,37 @@ app.post('/api/outlet/find-pallets', authMiddleware, async (c) => {
       outlet_code_short: firstParcel.outlet_code_short,
       outlet_name: firstParcel.outlet_name
     })
-    console.log(`📝 Query: container_inventory?outlet_code=eq.${firstParcel.outlet_code}&select=*`)
+    
+    // 🔧 FIX: Try BOTH outlet_code AND outlet_code_short to handle all cases
+    // Some containers might be scanned with short code (BTTGBI1) while parcels use full code (0010)
+    console.log(`📝 Query 1 (by full outlet_code): container_inventory?outlet_code=eq.${firstParcel.outlet_code}&status=eq.loaded&select=*`)
+    console.log(`📝 Query 2 (by short code): container_inventory?outlet_code=eq.${firstParcel.outlet_code_short}&status=eq.loaded&select=*`)
     
     // Fetch ONLY containers loaded for this outlet that are ready for unloading (status='loaded')
     try {
-      const containersResponse = await supabaseRequest(c, 
+      // Try query by FULL outlet_code first
+      const containersResponse1 = await supabaseRequest(c, 
         `container_inventory?outlet_code=eq.${firstParcel.outlet_code}&status=eq.loaded&select=*`)
-      const containers = await containersResponse.json()
-      console.log(`✅ Query returned ${containers?.length || 0} A-code containers loaded for unloading`)
-      console.log(`📦 Container data:`, JSON.stringify(containers, null, 2))
+      const containers1 = await containersResponse1.json()
+      console.log(`✅ Query 1 (full code) returned ${containers1?.length || 0} A-code containers`)
       
-      if (containers && containers.length > 0) {
-        aCodeContainers = containers.map((cont: any) => ({
+      // Try query by SHORT outlet_code_short
+      const containersResponse2 = await supabaseRequest(c, 
+        `container_inventory?outlet_code=eq.${firstParcel.outlet_code_short}&status=eq.loaded&select=*`)
+      const containers2 = await containersResponse2.json()
+      console.log(`✅ Query 2 (short code) returned ${containers2?.length || 0} A-code containers`)
+      
+      // Combine both results and deduplicate by container_id
+      const allContainers = [...(containers1 || []), ...(containers2 || [])]
+      const uniqueContainers = Array.from(
+        new Map(allContainers.map(cont => [cont.container_id, cont])).values()
+      )
+      
+      console.log(`✅ Total unique containers: ${uniqueContainers.length}`)
+      console.log(`📦 Container data:`, JSON.stringify(uniqueContainers, null, 2))
+      
+      if (uniqueContainers && uniqueContainers.length > 0) {
+        aCodeContainers = uniqueContainers.map((cont: any) => ({
           container_id: cont.container_id,
           scanned_at: cont.scanned_at,
           status: cont.status
