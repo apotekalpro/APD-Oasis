@@ -1504,8 +1504,18 @@ app.post('/api/warehouse/scan-container', authMiddleware, async (c) => {
       saved_data: insertResult
     })
   } catch (error) {
-    console.error('Scan container error:', error)
-    return c.json({ error: 'Failed to scan container' }, 500)
+    console.error('🔥 ❌ SCAN CONTAINER ERROR:', error)
+    console.error('🔥 Error type:', error.constructor.name)
+    console.error('🔥 Error message:', error.message)
+    console.error('🔥 Error stack:', error.stack)
+    
+    // Return detailed error message
+    return c.json({ 
+      error: 'Failed to scan container', 
+      message: error.message,
+      type: error.constructor.name,
+      details: error.toString()
+    }, 500)
   }
 })
 
