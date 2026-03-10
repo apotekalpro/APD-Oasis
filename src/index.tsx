@@ -1391,9 +1391,21 @@ app.post('/api/warehouse/set-container-count', authMiddleware, async (c) => {
 app.post('/api/warehouse/scan-container', authMiddleware, async (c) => {
   try {
     const user = c.get('user')
-    const { container_id, outlet_code, outlet_name, delivery_date } = await c.req.json()
+    const body = await c.req.json()
+    const { container_id, outlet_code, outlet_name, delivery_date } = body
+    
+    console.log('🔥 === WAREHOUSE SCAN CONTAINER API CALLED ===')
+    console.log('🔥 Full request body:', JSON.stringify(body, null, 2))
+    console.log('🔥 User:', user ? user.full_name : 'NO USER')
+    console.log('🔥 Container ID:', container_id)
+    console.log('🔥 Outlet Code:', outlet_code)
+    console.log('🔥 Delivery Date:', delivery_date)
     
     if (!container_id || !outlet_code || !delivery_date) {
+      console.error('🔥 ❌ VALIDATION FAILED - Missing required fields')
+      console.error('🔥 container_id:', container_id)
+      console.error('🔥 outlet_code:', outlet_code)
+      console.error('🔥 delivery_date:', delivery_date)
       return c.json({ error: 'Missing required fields: container_id, outlet_code, delivery_date' }, 400)
     }
     
@@ -1445,7 +1457,7 @@ app.post('/api/warehouse/scan-container', authMiddleware, async (c) => {
     }
     
     // Container doesn't exist - CREATE new record with 'loaded' status
-    console.log(`💾 Creating new A-code in container_inventory:`, {
+    console.log(`🔥 💾 Creating new A-code in container_inventory:`, {
       container_id,
       outlet_code,
       outlet_name,
@@ -1453,22 +1465,36 @@ app.post('/api/warehouse/scan-container', authMiddleware, async (c) => {
       status: 'loaded'
     })
     
+    const insertPayload = {
+      container_id: container_id,
+      outlet_code: outlet_code,
+      outlet_name: outlet_name || `Outlet ${outlet_code}`,
+      delivery_date: delivery_date,
+      status: 'loaded', // ✅ NEW: Container loaded at warehouse
+      scanned_at: new Date().toISOString(),
+      scanned_by: user.id,
+      scanned_by_name: user.full_name
+    }
+    
+    console.log('🔥 Insert payload:', JSON.stringify(insertPayload, null, 2))
+    
     const insertResponse = await supabaseRequest(c, 'container_inventory', {
       method: 'POST',
-      body: JSON.stringify({
-        container_id: container_id,
-        outlet_code: outlet_code,
-        outlet_name: outlet_name || `Outlet ${outlet_code}`,
-        delivery_date: delivery_date,
-        status: 'loaded', // ✅ NEW: Container loaded at warehouse
-        scanned_at: new Date().toISOString(),
-        scanned_by: user.id,
-        scanned_by_name: user.full_name
-      })
+      body: JSON.stringify(insertPayload)
     })
     
+    console.log('🔥 Supabase response status:', insertResponse.status)
     const insertResult = await insertResponse.json()
-    console.log(`✅ A-code created successfully with status 'loaded':`, insertResult)
+    console.log(`🔥 ✅ Insert result:`, JSON.stringify(insertResult, null, 2))
+    
+    if (insertResponse.status !== 201 && insertResponse.status !== 200) {
+      console.error('🔥 ❌ SUPABASE INSERT FAILED!')
+      console.error('🔥 Status:', insertResponse.status)
+      console.error('🔥 Result:', insertResult)
+      return c.json({ error: 'Database error: ' + (insertResult.message || 'Unknown error'), details: insertResult }, 500)
+    }
+    
+    console.log(`🔥 ✅ A-code created successfully with status 'loaded'`)
     
     return c.json({ 
       success: true, 
