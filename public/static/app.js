@@ -4021,7 +4021,11 @@ async function handleConfirmOutletCompletion(event) {
     }
     
     // Show double confirmation dialog
-    const palletIds = state.scannedItems.map(item => item.pallet_id)
+    // CRITICAL FIX: Collect both pallet IDs (F-codes) and container IDs (A-codes)
+    // Use container_id for containers, pallet_id for pallets
+    const palletIds = state.scannedItems.map(item => 
+        item.type === 'container' ? item.container_id : item.pallet_id
+    )
     showFinalConfirmationDialog(receiverName, boxesDelivered, containersDelivered, palletIds)
 }
 
