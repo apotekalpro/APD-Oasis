@@ -1973,36 +1973,52 @@ app.post('/api/outlet/confirm-receipt-bulk', authMiddleware, async (c) => {
         
         if (isACode) {
           // This is an A-code container - update container_inventory
-          console.log(`📦 Processing A-code container: ${pallet_id}`)
+          console.log(`🔥 === A-CODE RECEIPT PROCESSING ===`)
+          console.log(`🔥 Container ID: ${pallet_id}`)
+          console.log(`🔥 Outlet Code Short: ${outlet_code_short}`)
+          console.log(`🔥 Receiver Name: ${receiver_name}`)
           
           // ✅ FIXED: Find container with status 'loaded' (from warehouse) 
-          const containerResponse = await supabaseRequest(c, 
-            `container_inventory?container_id=eq.${pallet_id}&status=eq.loaded&select=*`)
+          const containerQuery = `container_inventory?container_id=eq.${pallet_id}&status=eq.loaded&select=*`
+          console.log(`🔥 Query: ${containerQuery}`)
+          
+          const containerResponse = await supabaseRequest(c, containerQuery)
+          console.log(`🔥 Response status: ${containerResponse.status}`)
+          
           const containers = await containerResponse.json()
+          console.log(`🔥 Found containers:`, JSON.stringify(containers, null, 2))
           
           if (!containers || containers.length === 0) {
             errorCount++
             errors.push(`${pallet_id}: A-code not found or already delivered`)
-            console.error(`❌ A-code ${pallet_id} not found in container_inventory with status 'loaded'`)
+            console.error(`🔥 ❌ A-code ${pallet_id} not found in container_inventory with status 'loaded'`)
             continue
           }
           
           const container = containers[0]
+          console.log(`🔥 Container to update:`, JSON.stringify(container, null, 2))
           
           // ✅ FIXED: Update container status to 'at_outlet' when outlet receives and signs
-          await supabaseRequest(c, `container_inventory?id=eq.${container.id}`, {
+          const updatePayload = {
+            status: 'at_outlet',  // ✅ Now at outlet after receipt confirmation
+            delivered_at: new Date().toISOString(),
+            delivered_by: user.id,
+            delivered_by_name: user.full_name,
+            receiver_name: receiver_name
+          }
+          console.log(`🔥 Update payload:`, JSON.stringify(updatePayload, null, 2))
+          
+          const updateResponse = await supabaseRequest(c, `container_inventory?id=eq.${container.id}`, {
             method: 'PATCH',
-            body: JSON.stringify({
-              status: 'at_outlet',  // ✅ Now at outlet after receipt confirmation
-              delivered_at: new Date().toISOString(),
-              delivered_by: user.id,
-              delivered_by_name: user.full_name,
-              receiver_name: receiver_name
-            })
+            body: JSON.stringify(updatePayload)
           })
           
+          console.log(`🔥 Update response status: ${updateResponse.status}`)
+          const updateResult = await updateResponse.json()
+          console.log(`🔥 Update result:`, JSON.stringify(updateResult, null, 2))
+          
           successCount++
-          console.log(`✓ A-code ${pallet_id} marked as 'at_outlet' after receipt confirmation`)
+          console.log(`🔥 ✅ A-code ${pallet_id} marked as 'at_outlet' after receipt confirmation`)
           continue // Skip pallet processing for A-codes
         }
         
