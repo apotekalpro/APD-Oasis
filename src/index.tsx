@@ -2003,8 +2003,8 @@ app.post('/api/outlet/confirm-receipt-bulk', authMiddleware, async (c) => {
             status: 'at_outlet',  // ✅ Now at outlet after receipt confirmation
             delivered_at: new Date().toISOString(),
             delivered_by: user.id,
-            delivered_by_name: user.full_name,
-            receiver_name: receiver_name
+            delivered_by_name: user.full_name
+            // Note: receiver_name field doesn't exist in container_inventory table
           }
           console.log(`🔥 Update payload:`, JSON.stringify(updatePayload, null, 2))
           

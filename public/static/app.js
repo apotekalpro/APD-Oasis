@@ -4023,9 +4023,13 @@ async function handleConfirmOutletCompletion(event) {
     // Show double confirmation dialog
     // CRITICAL FIX: Collect both pallet IDs (F-codes) and container IDs (A-codes)
     // Use container_id for containers, pallet_id for pallets
-    const palletIds = state.scannedItems.map(item => 
-        item.type === 'container' ? item.container_id : item.pallet_id
-    )
+    console.log('🔍 DEBUG: state.scannedItems:', state.scannedItems)
+    const palletIds = state.scannedItems.map(item => {
+        const id = item.type === 'container' ? item.container_id : item.pallet_id
+        console.log(`🔍 Item type: ${item.type}, extracted ID: ${id}`)
+        return id
+    })
+    console.log('🔍 DEBUG: palletIds to send:', palletIds)
     showFinalConfirmationDialog(receiverName, boxesDelivered, containersDelivered, palletIds)
 }
 
@@ -4108,14 +4112,24 @@ async function proceedWithOutletCompletion() {
     
     const { receiverName, boxesDelivered, containersDelivered, palletIds } = state.pendingOutletCompletion
     
+    console.log('🔥 === SENDING OUTLET RECEIPT TO BACKEND ===')
+    console.log('🔥 Outlet code short:', state.selectedOutlet.code_short)
+    console.log('🔥 Pallet IDs:', palletIds)
+    console.log('🔥 Receiver name:', receiverName)
+    console.log('🔥 Boxes delivered:', boxesDelivered)
+    console.log('🔥 Containers delivered:', containersDelivered)
+    
     try {
-        const response = await axios.post('/api/outlet/confirm-receipt-bulk', {
+        const requestPayload = {
             outlet_code_short: state.selectedOutlet.code_short,
             pallet_ids: palletIds,
             receiver_name: receiverName,
             boxes_delivered: boxesDelivered,
             containers_delivered: containersDelivered
-        })
+        }
+        console.log('🔥 Full request payload:', JSON.stringify(requestPayload, null, 2))
+        
+        const response = await axios.post('/api/outlet/confirm-receipt-bulk', requestPayload)
         
         showToast(`✓ Receipt completed! ${boxesDelivered} boxes, ${containersDelivered} containers with ${palletIds.length} pallet(s) received by ${receiverName}`, 'success')
         
