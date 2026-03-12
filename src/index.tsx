@@ -1437,8 +1437,8 @@ app.post('/api/warehouse/scan-container', authMiddleware, async (c) => {
           scanned_by_name: user.full_name,
           delivered_at: null, // Clear delivery timestamp
           delivered_by: null, // Clear delivery info
-          delivered_by_name: null,
-          receiver_name: null
+          delivered_by_name: null
+          // Note: receiver_name field doesn't exist - removed
         })
       })
       
