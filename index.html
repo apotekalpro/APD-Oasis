@@ -73,7 +73,33 @@
     </style>
 </head>
 <body class="bg-gray-50">
+    <!-- Development/UAT Environment Indicator -->
+    <div id="env-indicator" style="display: none; position: fixed; top: 0; left: 0; right: 0; background: linear-gradient(135deg, #FF9800 0%, #FF5722 100%); color: white; padding: 8px 16px; text-align: center; z-index: 9999; font-weight: bold; box-shadow: 0 2px 8px rgba(0,0,0,0.2);">
+        <i class="fas fa-flask"></i> DEVELOPMENT/UAT ENVIRONMENT - Safe Testing Mode
+    </div>
+    
     <div id="app"></div>
+    
+    <!-- Environment Detection Script -->
+    <script>
+        (function() {
+            const hostname = window.location.hostname;
+            const isDevelopment = hostname.includes('apd-oasis-dev') || 
+                                 hostname.includes('localhost') ||
+                                 hostname.includes('127.0.0.1') ||
+                                 hostname.includes('sandbox') ||
+                                 hostname.includes('novita');
+            
+            if (isDevelopment) {
+                document.getElementById('env-indicator').style.display = 'block';
+                document.getElementById('app').style.paddingTop = '44px'; // Add padding for banner
+                console.log('%c🧪 DEVELOPMENT/UAT MODE', 'background: #FF9800; color: white; font-size: 16px; font-weight: bold; padding: 8px 16px;');
+                console.log('%c✅ Safe Testing Environment - Production database NOT affected', 'color: #4CAF50; font-size: 12px; font-weight: bold;');
+            } else {
+                console.log('%c🚀 PRODUCTION MODE', 'background: #4CAF50; color: white; font-size: 16px; font-weight: bold; padding: 8px 16px;');
+            }
+        })();
+    </script>
     
     <!-- Load application script -->
     <script src="/static/app.js"></script>
