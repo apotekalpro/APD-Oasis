@@ -394,6 +394,13 @@ function renderNavBar() {
                         </button>
                     ` : ''}
                     
+                    ${['admin', 'warehouse_staff', 'warehouse_supervisor', 'outlet', 'driver'].includes(state.user.role) ? `
+                        <button onclick="navigateTo('inter-transfer-list')" 
+                            class="flex-1 min-w-[120px] px-4 py-2 rounded ${state.currentPage.startsWith('inter-transfer') ? 'bg-blue-800' : 'bg-blue-500 hover:bg-blue-700'}">
+                            <i class="fas fa-truck-moving mr-2"></i>Inter-Transfer
+                        </button>
+                    ` : ''}
+                    
                     ${showAllTabs ? `
                         <button onclick="navigateTo('reports')" 
                             class="flex-1 min-w-[120px] px-4 py-2 rounded ${state.currentPage === 'reports' ? 'bg-blue-800' : 'bg-blue-500 hover:bg-blue-700'}">
@@ -5499,6 +5506,21 @@ function render() {
             break
         case 'containers':
             content = renderContainers()
+            break
+        case 'inter-transfer-list':
+            content = renderTransferList()
+            break
+        case 'inter-transfer-create':
+            content = renderCreateTransfer()
+            break
+        case 'inter-transfer-loading':
+            content = renderLoadingPage()
+            break
+        case 'inter-transfer-unloading':
+            content = renderUnloadingPage()
+            break
+        case 'inter-transfer-crossdock':
+            content = renderCrossdockQueue()
             break
         case 'reports':
             content = renderReports()
