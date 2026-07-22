@@ -12,3 +12,14 @@ routes = [
 # Force new deployment with version tag
 [env.production.vars]
 APP_VERSION = "1.0.4-fix-outlets-20251119"
+
+# Development/UAT environment configuration
+[env.development]
+name = "apd-oasis-dev"
+routes = [
+  { pattern = "apd-oasis-dev.pages.dev/*", zone_name = "pages.dev" }
+]
+
+[env.development.vars]
+APP_VERSION = "1.0.0-dev-uat"
+ENVIRONMENT = "development"
