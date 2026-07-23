@@ -846,11 +846,6 @@ function printTransferLabel(transferId) {
                 </div>
             </div>
 
-            <div class="container-info">
-                <div class="label">CONTAINER ${index + 1} OF ${transfer.items.length}</div>
-                <div class="container-id">${item.container_number}</div>
-            </div>
-
             ${transfer.notes ? `
                 <div class="notes-section">
                     <div class="notes-label">NOTES</div>
@@ -929,20 +924,6 @@ function printTransferLabel(transferId) {
                     font-size: 24px; 
                     font-weight: bold; 
                     margin-top: 5px; 
-                }
-                .container-info {
-                    border: 3px solid #000;
-                    background: #f9f9f9;
-                    padding: 20px;
-                    text-align: center;
-                    border-radius: 8px;
-                }
-                .container-id {
-                    font-size: 28px;
-                    font-weight: bold;
-                    font-family: monospace;
-                    margin-top: 10px;
-                    letter-spacing: 2px;
                 }
                 .notes-section {
                     margin-top: 15px;
