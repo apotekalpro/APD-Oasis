@@ -1421,6 +1421,82 @@ function renderDashboard() {
                 </div>
             </div>
             
+            <!-- Inter-Transfer Statistics Cards -->
+            <div class="bg-gradient-to-r from-blue-500 to-purple-600 rounded-lg shadow-lg p-4 mb-4">
+                <h3 class="text-white text-lg font-bold mb-3">
+                    <i class="fas fa-exchange-alt mr-2"></i>Inter-Branch Transfer Summary
+                </h3>
+                <div class="grid grid-cols-2 md:grid-cols-5 gap-3">
+                    <div class="bg-white bg-opacity-90 rounded-lg p-3">
+                        <div class="flex flex-col">
+                            <p class="text-gray-600 text-xs mb-1">Total</p>
+                            <p id="dash-inter-total" class="text-xl font-bold text-gray-800">-</p>
+                        </div>
+                    </div>
+                    <div class="bg-white bg-opacity-90 rounded-lg p-3">
+                        <div class="flex flex-col">
+                            <p class="text-blue-600 text-xs mb-1">In Transit</p>
+                            <p id="dash-inter-transit" class="text-xl font-bold text-blue-600">-</p>
+                        </div>
+                    </div>
+                    <div class="bg-white bg-opacity-90 rounded-lg p-3">
+                        <div class="flex flex-col">
+                            <p class="text-orange-600 text-xs mb-1">Crossdock</p>
+                            <p id="dash-inter-crossdock" class="text-xl font-bold text-orange-600">-</p>
+                        </div>
+                    </div>
+                    <div class="bg-white bg-opacity-90 rounded-lg p-3">
+                        <div class="flex flex-col">
+                            <p class="text-green-600 text-xs mb-1">Completed</p>
+                            <p id="dash-inter-completed" class="text-xl font-bold text-green-600">-</p>
+                        </div>
+                    </div>
+                    <div class="bg-white bg-opacity-90 rounded-lg p-3">
+                        <div class="flex flex-col">
+                            <p class="text-purple-600 text-xs mb-1">Created</p>
+                            <p id="dash-inter-created" class="text-xl font-bold text-purple-600">-</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Inter-Transfer Active Table -->
+            <div class="bg-white rounded-lg shadow-lg p-6 mb-6">
+                <div class="mb-4 flex items-center justify-between">
+                    <h3 class="text-xl font-bold">
+                        <i class="fas fa-truck text-blue-600 mr-2"></i>
+                        Active Inter-Branch Transfers
+                    </h3>
+                    <button onclick="navigateTo('inter-transfer-list')" class="text-sm text-blue-600 hover:text-blue-800">
+                        <i class="fas fa-external-link-alt mr-1"></i>View All
+                    </button>
+                </div>
+                <p class="text-sm text-gray-600 mb-4">
+                    <i class="fas fa-info-circle mr-1"></i>
+                    Transfers currently in progress (created, loaded, in_transit, crossdock)
+                </p>
+                
+                <div id="dash-inter-transfer-table" class="overflow-x-auto">
+                    <table class="w-full text-sm">
+                        <thead class="bg-gray-100">
+                            <tr>
+                                <th class="px-3 py-2 text-left">TN Code</th>
+                                <th class="px-3 py-2 text-left">From</th>
+                                <th class="px-3 py-2 text-left">To</th>
+                                <th class="px-3 py-2 text-center">Items</th>
+                                <th class="px-3 py-2 text-center">Status</th>
+                                <th class="px-3 py-2 text-left">Created</th>
+                            </tr>
+                        </thead>
+                        <tbody id="dash-inter-transfer-body">
+                            <tr>
+                                <td colspan="6" class="text-center py-4 text-gray-500">Loading...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            
             <!-- Containers to Pickup Section -->
             <div class="bg-white rounded-lg shadow-lg p-6 mb-6">
                 <div class="mb-4 flex items-center justify-between">
@@ -1788,6 +1864,87 @@ async function loadDashboardData() {
         // Update containers returning statistic
         document.getElementById('dash-containers-returning').textContent = containersReturning.length
         document.getElementById('dash-returning-date').textContent = `As of ${dateLabel}`
+        
+        // Load Inter-Transfer Statistics
+        if (typeof InterTransferService !== 'undefined') {
+            const interTransfers = InterTransferService.getTransfers()
+            const interStats = InterTransferService.getStatistics()
+            
+            // Update inter-transfer cards
+            document.getElementById('dash-inter-total').textContent = interStats.total || 0
+            document.getElementById('dash-inter-transit').textContent = interStats.in_transit || 0
+            document.getElementById('dash-inter-crossdock').textContent = interStats.crossdock || 0
+            document.getElementById('dash-inter-completed').textContent = interStats.completed || 0
+            document.getElementById('dash-inter-created').textContent = interStats.created || 0
+            
+            // Get active transfers (not completed)
+            const activeTransfers = interTransfers.filter(t => t.status !== 'completed')
+                .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+                .slice(0, 10) // Show latest 10
+            
+            const interTableBody = document.getElementById('dash-inter-transfer-body')
+            if (activeTransfers.length === 0) {
+                interTableBody.innerHTML = '<tr><td colspan="6" class="text-center py-4 text-gray-500">No active inter-branch transfers</td></tr>'
+            } else {
+                const outlets = InterTransferService.getOutlets()
+                interTableBody.innerHTML = activeTransfers.map(transfer => {
+                    const sender = outlets.find(o => o.outlet_code === transfer.sender_outlet)
+                    const receiver = outlets.find(o => o.outlet_code === transfer.receiver_outlet)
+                    
+                    // Status badge colors
+                    const statusColors = {
+                        'created': 'bg-gray-100 text-gray-800',
+                        'loaded': 'bg-blue-100 text-blue-800',
+                        'in_transit': 'bg-blue-500 text-white',
+                        'crossdock': 'bg-orange-500 text-white'
+                    }
+                    const statusColor = statusColors[transfer.status] || 'bg-gray-100 text-gray-800'
+                    
+                    return `
+                        <tr class="border-b hover:bg-gray-50">
+                            <td class="px-3 py-2">
+                                <span class="font-mono text-xs font-semibold">${transfer.transfer_number}</span>
+                            </td>
+                            <td class="px-3 py-2 text-xs">
+                                <div class="font-semibold">${transfer.sender_outlet}</div>
+                                <div class="text-gray-600">${sender?.outlet_name || ''}</div>
+                            </td>
+                            <td class="px-3 py-2 text-xs">
+                                <div class="font-semibold">${transfer.receiver_outlet}</div>
+                                <div class="text-gray-600">${receiver?.outlet_name || ''}</div>
+                            </td>
+                            <td class="px-3 py-2 text-center">
+                                <span class="inline-block px-2 py-1 bg-gray-100 rounded text-xs font-semibold">
+                                    ${transfer.items.length}
+                                </span>
+                            </td>
+                            <td class="px-3 py-2 text-center">
+                                <span class="inline-block px-2 py-1 rounded text-xs font-semibold ${statusColor}">
+                                    ${transfer.status.replace('_', ' ').toUpperCase()}
+                                </span>
+                            </td>
+                            <td class="px-3 py-2 text-xs text-gray-600">
+                                ${new Date(transfer.created_at).toLocaleString('en-US', { 
+                                    month: 'short', 
+                                    day: 'numeric', 
+                                    hour: '2-digit', 
+                                    minute: '2-digit' 
+                                })}
+                            </td>
+                        </tr>
+                    `
+                }).join('')
+            }
+        } else {
+            // Inter-transfer service not loaded
+            document.getElementById('dash-inter-total').textContent = 'N/A'
+            document.getElementById('dash-inter-transit').textContent = 'N/A'
+            document.getElementById('dash-inter-crossdock').textContent = 'N/A'
+            document.getElementById('dash-inter-completed').textContent = 'N/A'
+            document.getElementById('dash-inter-created').textContent = 'N/A'
+            document.getElementById('dash-inter-transfer-body').innerHTML = 
+                '<tr><td colspan="6" class="text-center py-4 text-gray-500">Inter-transfer service not available</td></tr>'
+        }
         
         // Group returning containers by outlet
         const returningByOutlet = new Map()
