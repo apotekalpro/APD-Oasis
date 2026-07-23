@@ -526,7 +526,7 @@ function renderTransferList() {
 
             <!-- Search and Filter -->
             <div class="bg-white rounded-lg shadow p-4 mb-4">
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1">Search</label>
                         <input type="text" id="transferSearch" 
@@ -548,6 +548,16 @@ function renderTransferList() {
                             <option value="unloaded">Unloaded</option>
                             <option value="completed">Completed</option>
                         </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Show Completed</label>
+                        <label class="flex items-center px-4 py-2 border rounded cursor-pointer hover:bg-gray-50">
+                            <input type="checkbox" id="showCompletedToggle" 
+                                class="mr-2 h-5 w-5 text-blue-600 focus:ring-2 focus:ring-blue-500 rounded"
+                                onchange="filterTransfers()"
+                            />
+                            <span class="text-sm">Include completed transfers</span>
+                        </label>
                     </div>
                 </div>
             </div>
@@ -828,6 +838,13 @@ function printTransferLabel(transferId) {
                 <div class="container-id">${item.container_number}</div>
             </div>
 
+            ${transfer.notes ? `
+                <div class="notes-section">
+                    <div class="notes-label">NOTES</div>
+                    <div class="notes-content">${transfer.notes}</div>
+                </div>
+            ` : ''}
+
             <div class="footer">
                 Created: ${new Date(transfer.created_at).toLocaleString()}
             </div>
@@ -913,6 +930,25 @@ function printTransferLabel(transferId) {
                     font-family: monospace;
                     margin-top: 10px;
                     letter-spacing: 2px;
+                }
+                .notes-section {
+                    margin-top: 15px;
+                    border: 2px solid #666;
+                    padding: 12px;
+                    border-radius: 6px;
+                    background: #fff;
+                }
+                .notes-label {
+                    font-weight: bold;
+                    color: #666;
+                    font-size: 12px;
+                    text-transform: uppercase;
+                    margin-bottom: 6px;
+                }
+                .notes-content {
+                    font-size: 14px;
+                    color: #333;
+                    line-height: 1.4;
                 }
                 .footer {
                     margin-top: 20px; 
@@ -1529,6 +1565,14 @@ function filterTransfers() {
     
     if (isOutletUser && userOutlet) {
         transfers = transfers.filter(t => t.sender_outlet === userOutlet || t.receiver_outlet === userOutlet);
+    }
+    
+    // Hide completed transfers by default (unless toggle is checked)
+    const showCompletedToggle = document.getElementById('showCompletedToggle');
+    const showCompleted = showCompletedToggle?.checked || false;
+    
+    if (!showCompleted) {
+        transfers = transfers.filter(t => t.status !== 'completed');
     }
     
     // Apply status filter

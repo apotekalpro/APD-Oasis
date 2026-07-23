@@ -2077,6 +2077,25 @@ function renderWarehouse() {
                     </div>
                 </div>
             </div>
+            
+            <!-- Inter-Branch Transfers Section -->
+            <div class="mt-6">
+                <div class="bg-white rounded-lg shadow-lg p-4 sm:p-6">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="text-lg sm:text-xl font-bold text-gray-800">
+                            <i class="fas fa-exchange-alt text-orange-600 mr-2"></i>Inter-Branch Transfers
+                        </h3>
+                        <button onclick="navigateTo('inter-transfer-list')"
+                            class="px-3 py-2 sm:px-4 sm:py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-lg text-xs sm:text-sm font-semibold">
+                            <i class="fas fa-arrow-right mr-1 sm:mr-2"></i>View All
+                        </button>
+                    </div>
+                    
+                    <div id="warehouseInterTransfers" class="overflow-x-auto">
+                        <p class="text-gray-500 text-center py-4">Loading inter-branch transfers...</p>
+                    </div>
+                </div>
+            </div>
         </div>
     `
 }
@@ -2263,8 +2282,108 @@ async function loadWarehouseData() {
         }
         
         summary.innerHTML = html
+        
+        // Load inter-branch transfers
+        loadWarehouseInterTransfers()
     } catch (error) {
         console.error('Error loading warehouse data:', error)
+    }
+}
+
+// Load inter-branch transfers for warehouse dashboard
+function loadWarehouseInterTransfers() {
+    const container = document.getElementById('warehouseInterTransfers')
+    if (!container) return
+    
+    try {
+        // Get active inter-branch transfers (not completed)
+        const allTransfers = typeof InterTransferService !== 'undefined' 
+            ? InterTransferService.getTransfers() 
+            : []
+        
+        // Filter for active transfers (created, loaded, in_transit, crossdock)
+        const activeTransfers = allTransfers.filter(t => 
+            t.status !== 'completed' && t.status !== 'unloaded'
+        )
+        
+        if (activeTransfers.length === 0) {
+            container.innerHTML = `
+                <p class="text-gray-500 text-center py-8">
+                    <i class="fas fa-inbox text-3xl mb-2"></i><br/>
+                    No active inter-branch transfers
+                </p>
+            `
+            return
+        }
+        
+        // Render transfers table
+        const html = `
+            <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Transfer Number</th>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">From → To</th>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Created</th>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                    </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-200">
+                    ${activeTransfers.map(t => {
+                        const outlets = typeof InterTransferService !== 'undefined' 
+                            ? InterTransferService.getOutlets() 
+                            : []
+                        const sender = outlets.find(o => o.outlet_code === t.sender_outlet)
+                        const receiver = outlets.find(o => o.outlet_code === t.receiver_outlet)
+                        
+                        const statusColors = {
+                            created: 'bg-gray-100 text-gray-700',
+                            loaded: 'bg-blue-100 text-blue-700',
+                            in_transit: 'bg-indigo-100 text-indigo-700',
+                            crossdock: 'bg-orange-100 text-orange-700'
+                        }
+                        
+                        return `
+                            <tr class="hover:bg-gray-50">
+                                <td class="px-4 py-3 whitespace-nowrap">
+                                    <div class="font-mono font-semibold text-sm">${t.transfer_number}</div>
+                                </td>
+                                <td class="px-4 py-3">
+                                    <div class="text-sm">
+                                        <div class="font-medium">${sender?.outlet_name || t.sender_outlet}</div>
+                                        <div class="text-gray-500 text-xs">↓</div>
+                                        <div class="font-medium">${receiver?.outlet_name || t.receiver_outlet}</div>
+                                    </div>
+                                </td>
+                                <td class="px-4 py-3 whitespace-nowrap">
+                                    <span class="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${statusColors[t.status] || 'bg-gray-100 text-gray-700'}">
+                                        ${t.status.toUpperCase().replace('_', ' ')}
+                                    </span>
+                                </td>
+                                <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
+                                    ${new Date(t.created_at).toLocaleDateString()}
+                                </td>
+                                <td class="px-4 py-3 whitespace-nowrap text-sm">
+                                    <button onclick="navigateTo('inter-transfer-list')" 
+                                        class="text-orange-600 hover:text-orange-900">
+                                        <i class="fas fa-eye"></i> View
+                                    </button>
+                                </td>
+                            </tr>
+                        `
+                    }).join('')}
+                </tbody>
+            </table>
+        `
+        
+        container.innerHTML = html
+    } catch (error) {
+        console.error('Error loading warehouse inter-transfers:', error)
+        container.innerHTML = `
+            <p class="text-red-500 text-center py-4">
+                Error loading inter-branch transfers
+            </p>
+        `
     }
 }
 
