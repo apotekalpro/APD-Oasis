@@ -255,73 +255,78 @@ function renderCreateTransfer() {
     const userOutlet = state.user?.outlet_code || '';
     
     return `
-        <div class="max-w-4xl mx-auto p-4">
-            <div class="bg-white rounded-lg shadow p-6">
-                <h2 class="text-2xl font-bold mb-6 flex items-center gap-2">
-                    <i class="fas fa-truck"></i>
-                    Create Inter-Branch Transfer
-                </h2>
+        <div class="h-full overflow-y-auto">
+            <div class="max-w-4xl mx-auto p-4 pb-20">
+                <div class="bg-white rounded-lg shadow p-6">
+                    <h2 class="text-2xl font-bold mb-6 flex items-center gap-2">
+                        <i class="fas fa-truck"></i>
+                        Create Inter-Branch Transfer
+                    </h2>
 
-                <form id="createTransferForm" class="space-y-6">
-                    <!-- Sender Outlet (Read-only - current user's outlet) -->
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-2">
-                            Sender Outlet
-                        </label>
-                        <input type="text" readonly
-                            value="${userOutlet} - ${outlets.find(o => o.outlet_code === userOutlet)?.outlet_name || 'Unknown'}"
-                            class="w-full px-4 py-2 border rounded bg-gray-100"
-                        />
-                    </div>
+                    <form id="createTransferForm" class="space-y-6">
+                        <!-- Sender Outlet (Read-only - current user's outlet) -->
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">
+                                Sender Outlet
+                            </label>
+                            <input type="text" readonly
+                                value="${userOutlet} - ${outlets.find(o => o.outlet_code === userOutlet)?.outlet_name || 'Unknown'}"
+                                class="w-full px-4 py-2 border rounded bg-gray-100"
+                            />
+                        </div>
 
-                    <!-- Receiver Outlet (Searchable Dropdown) -->
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-2">
-                            Receiver Outlet *
-                        </label>
-                        <select id="receiverOutlet" required
-                            class="w-full px-4 py-2 border rounded focus:ring-2 focus:ring-blue-500">
-                            <option value="">Select receiver outlet...</option>
-                            ${outlets
-                                .filter(o => o.outlet_code !== userOutlet)
-                                .map(o => `<option value="${o.outlet_code}">${o.outlet_code} - ${o.outlet_name}</option>`)
-                                .join('')}
-                        </select>
-                    </div>
+                        <!-- Receiver Outlet (Searchable Dropdown) -->
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">
+                                Receiver Outlet *
+                            </label>
+                            <select id="receiverOutlet" required
+                                class="w-full px-4 py-2 border rounded focus:ring-2 focus:ring-blue-500">
+                                <option value="">Select receiver outlet...</option>
+                                ${outlets
+                                    .filter(o => o.outlet_code !== userOutlet)
+                                    .map(o => `<option value="${o.outlet_code}">${o.outlet_code} - ${o.outlet_name}</option>`)
+                                    .join('')}
+                            </select>
+                        </div>
 
-                    <!-- Container Numbers -->
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-2">
-                            Container Numbers *
-                        </label>
-                        <textarea id="containerNumbers" required rows="4"
-                            placeholder="Enter container numbers, one per line"
-                            class="w-full px-4 py-2 border rounded focus:ring-2 focus:ring-blue-500"></textarea>
-                        <p class="text-sm text-gray-500 mt-1">Enter one container number per line</p>
-                    </div>
+                        <!-- Number of Parcels (Auto-generate containers) -->
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">
+                                Number of Parcels *
+                            </label>
+                            <input type="number" id="parcelCount" required min="1" max="99"
+                                placeholder="Enter number of parcels to send"
+                                class="w-full px-4 py-2 border rounded focus:ring-2 focus:ring-blue-500"
+                            />
+                            <p class="text-sm text-gray-500 mt-1">
+                                Container IDs will be auto-generated (e.g., 2 parcels → TN...01, TN...02)
+                            </p>
+                        </div>
 
-                    <!-- Notes -->
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-2">
-                            Notes (Optional)
-                        </label>
-                        <textarea id="transferNotes" rows="3"
-                            placeholder="Add any notes or special instructions..."
-                            class="w-full px-4 py-2 border rounded focus:ring-2 focus:ring-blue-500"></textarea>
-                    </div>
+                        <!-- Notes -->
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">
+                                Notes (Optional)
+                            </label>
+                            <textarea id="transferNotes" rows="3"
+                                placeholder="Add any notes or special instructions..."
+                                class="w-full px-4 py-2 border rounded focus:ring-2 focus:ring-blue-500"></textarea>
+                        </div>
 
-                    <!-- Buttons -->
-                    <div class="flex gap-4">
-                        <button type="submit"
-                            class="flex-1 bg-blue-500 hover:bg-blue-600 text-white px-6 py-3 rounded font-semibold">
-                            <i class="fas fa-plus mr-2"></i>Create Transfer
-                        </button>
-                        <button type="button" onclick="navigateTo('inter-transfer-list')"
-                            class="px-6 py-3 border border-gray-300 rounded hover:bg-gray-50">
-                            Cancel
-                        </button>
-                    </div>
-                </form>
+                        <!-- Buttons -->
+                        <div class="flex gap-4">
+                            <button type="submit"
+                                class="flex-1 bg-blue-500 hover:bg-blue-600 text-white px-6 py-3 rounded font-semibold">
+                                <i class="fas fa-plus mr-2"></i>Create Transfer
+                            </button>
+                            <button type="button" onclick="navigateTo('inter-transfer-list')"
+                                class="px-6 py-3 border border-gray-300 rounded hover:bg-gray-50">
+                                <i class="fas fa-arrow-left mr-2"></i>Back
+                            </button>
+                        </div>
+                    </form>
+                </div>
             </div>
         </div>
     `;
@@ -333,9 +338,10 @@ function renderTransferList() {
     const stats = InterTransferService.getStatistics();
     
     return `
-        <div class="max-w-6xl mx-auto p-4">
-            <!-- Statistics Cards -->
-            <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+        <div class="h-full overflow-y-auto">
+            <div class="max-w-6xl mx-auto p-4 pb-20">
+                <!-- Statistics Cards -->
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
                 <div class="bg-white rounded-lg shadow p-4">
                     <div class="text-sm text-gray-600">Total</div>
                     <div class="text-2xl font-bold">${stats.total}</div>
@@ -387,6 +393,7 @@ function renderTransferList() {
             <!-- Transfer List -->
             <div id="transferListContainer" class="space-y-4">
                 ${renderTransferItems(transfers)}
+            </div>
             </div>
         </div>
     `;
@@ -642,41 +649,49 @@ function renderLoadingPage() {
         .filter(t => t.status === 'created' || t.status === 'loaded');
 
     return `
-        <div class="max-w-4xl mx-auto p-4">
-            <div class="bg-white rounded-lg shadow p-6">
-                <h2 class="text-2xl font-bold mb-6">
-                    <i class="fas fa-qrcode mr-2"></i>Load Transfers
-                </h2>
+        <div class="h-full overflow-y-auto">
+            <div class="max-w-4xl mx-auto p-4 pb-20">
+                <div class="bg-white rounded-lg shadow p-6">
+                    <div class="flex justify-between items-center mb-6">
+                        <h2 class="text-2xl font-bold">
+                            <i class="fas fa-qrcode mr-2"></i>Load Transfers
+                        </h2>
+                        <button onclick="navigateTo('inter-transfer-list')"
+                            class="px-4 py-2 border border-gray-300 rounded hover:bg-gray-50">
+                            <i class="fas fa-arrow-left mr-2"></i>Back
+                        </button>
+                    </div>
 
-                <!-- Scan Section -->
-                <div class="mb-6">
-                    <label class="block text-sm font-medium text-gray-700 mb-2">
-                        Scan Transfer Barcode or Enter Number
-                    </label>
-                    <input type="text" id="loadScanInput" 
-                        placeholder="Scan or type transfer number..."
-                        class="w-full px-4 py-3 border-2 rounded text-lg focus:ring-2 focus:ring-blue-500"
-                        onkeyup="handleLoadScan(event)"
-                    />
-                </div>
+                    <!-- Scan Section -->
+                    <div class="mb-6">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">
+                            Scan Transfer Barcode or Enter Number
+                        </label>
+                        <input type="text" id="loadScanInput" 
+                            placeholder="Scan or type transfer number..."
+                            class="w-full px-4 py-3 border-2 rounded text-lg focus:ring-2 focus:ring-blue-500"
+                            onkeyup="handleLoadScan(event)"
+                        />
+                    </div>
 
-                <!-- Pending Transfers -->
-                <div>
-                    <h3 class="font-semibold mb-3">Pending Transfers (${pendingTransfers.length})</h3>
-                    <div class="space-y-3">
-                        ${pendingTransfers.length === 0 ? 
-                            '<p class="text-gray-500 text-center py-4">No pending transfers</p>' :
-                            pendingTransfers.map(t => `
-                                <div class="border rounded p-4">
-                                    <div class="font-bold">${t.transfer_number}</div>
-                                    <div class="text-sm text-gray-600">${t.items.length} containers</div>
-                                    <button onclick="loadTransferById('${t.id}')"
-                                        class="mt-2 bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded">
-                                        Load Transfer
-                                    </button>
-                                </div>
-                            `).join('')
-                        }
+                    <!-- Pending Transfers -->
+                    <div>
+                        <h3 class="font-semibold mb-3">Pending Transfers (${pendingTransfers.length})</h3>
+                        <div class="space-y-3">
+                            ${pendingTransfers.length === 0 ? 
+                                '<p class="text-gray-500 text-center py-4">No pending transfers</p>' :
+                                pendingTransfers.map(t => `
+                                    <div class="border rounded p-4">
+                                        <div class="font-bold">${t.transfer_number}</div>
+                                        <div class="text-sm text-gray-600">${t.items.length} containers</div>
+                                        <button onclick="loadTransferById('${t.id}')"
+                                            class="mt-2 bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded">
+                                            Load Transfer
+                                        </button>
+                                    </div>
+                                `).join('')
+                            }
+                        </div>
                     </div>
                 </div>
             </div>
@@ -741,48 +756,56 @@ function renderUnloadingPage() {
         .filter(t => t.status === 'in_transit' || t.status === 'loaded');
 
     return `
-        <div class="max-w-4xl mx-auto p-4">
-            <div class="bg-white rounded-lg shadow p-6">
-                <h2 class="text-2xl font-bold mb-6">
-                    <i class="fas fa-truck-loading mr-2"></i>Unload Transfers
-                </h2>
+        <div class="h-full overflow-y-auto">
+            <div class="max-w-4xl mx-auto p-4 pb-20">
+                <div class="bg-white rounded-lg shadow p-6">
+                    <div class="flex justify-between items-center mb-6">
+                        <h2 class="text-2xl font-bold">
+                            <i class="fas fa-truck-loading mr-2"></i>Unload Transfers
+                        </h2>
+                        <button onclick="navigateTo('inter-transfer-list')"
+                            class="px-4 py-2 border border-gray-300 rounded hover:bg-gray-50">
+                            <i class="fas fa-arrow-left mr-2"></i>Back
+                        </button>
+                    </div>
 
-                <!-- Scan Section -->
-                <div class="mb-6">
-                    <label class="block text-sm font-medium text-gray-700 mb-2">
-                        Scan Transfer Barcode or Enter Number
-                    </label>
-                    <input type="text" id="unloadScanInput" 
-                        placeholder="Scan or type transfer number..."
-                        class="w-full px-4 py-3 border-2 rounded text-lg focus:ring-2 focus:ring-purple-500"
-                        onkeyup="handleUnloadScan(event)"
-                    />
-                </div>
+                    <!-- Scan Section -->
+                    <div class="mb-6">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">
+                            Scan Transfer Barcode or Enter Number
+                        </label>
+                        <input type="text" id="unloadScanInput" 
+                            placeholder="Scan or type transfer number..."
+                            class="w-full px-4 py-3 border-2 rounded text-lg focus:ring-2 focus:ring-purple-500"
+                            onkeyup="handleUnloadScan(event)"
+                        />
+                    </div>
 
-                <!-- In-Transit Transfers -->
-                <div>
-                    <h3 class="font-semibold mb-3">In-Transit Transfers (${inTransitTransfers.length})</h3>
-                    <div class="space-y-3">
-                        ${inTransitTransfers.length === 0 ? 
-                            '<p class="text-gray-500 text-center py-4">No in-transit transfers</p>' :
-                            inTransitTransfers.map(t => {
-                                const outlets = InterTransferService.getOutlets();
-                                const receiver = outlets.find(o => o.outlet_code === t.receiver_outlet);
-                                return `
-                                    <div class="border rounded p-4">
-                                        <div class="font-bold">${t.transfer_number}</div>
-                                        <div class="text-sm text-gray-600">
-                                            To: ${receiver?.outlet_name || t.receiver_outlet}<br/>
-                                            ${t.items.length} containers
+                    <!-- In-Transit Transfers -->
+                    <div>
+                        <h3 class="font-semibold mb-3">In-Transit Transfers (${inTransitTransfers.length})</h3>
+                        <div class="space-y-3">
+                            ${inTransitTransfers.length === 0 ? 
+                                '<p class="text-gray-500 text-center py-4">No in-transit transfers</p>' :
+                                inTransitTransfers.map(t => {
+                                    const outlets = InterTransferService.getOutlets();
+                                    const receiver = outlets.find(o => o.outlet_code === t.receiver_outlet);
+                                    return `
+                                        <div class="border rounded p-4">
+                                            <div class="font-bold">${t.transfer_number}</div>
+                                            <div class="text-sm text-gray-600">
+                                                To: ${receiver?.outlet_name || t.receiver_outlet}<br/>
+                                                ${t.items.length} containers
+                                            </div>
+                                            <button onclick="unloadTransferById('${t.id}')"
+                                                class="mt-2 bg-purple-500 hover:bg-purple-600 text-white px-4 py-2 rounded">
+                                                Unload Transfer
+                                            </button>
                                         </div>
-                                        <button onclick="unloadTransferById('${t.id}')"
-                                            class="mt-2 bg-purple-500 hover:bg-purple-600 text-white px-4 py-2 rounded">
-                                            Unload Transfer
-                                        </button>
-                                    </div>
-                                `;
-                            }).join('')
-                        }
+                                    `;
+                                }).join('')
+                            }
+                        </div>
                     </div>
                 </div>
             </div>
@@ -856,61 +879,69 @@ function renderCrossdockQueue() {
     const crossdockTransfers = InterTransferService.getCrossdockQueue();
 
     return `
-        <div class="max-w-4xl mx-auto p-4">
-            <div class="bg-white rounded-lg shadow p-6">
-                <h2 class="text-2xl font-bold mb-6 flex items-center gap-2">
-                    <i class="fas fa-exchange-alt text-orange-500"></i>
-                    Crossdock Reload Queue
-                </h2>
+        <div class="h-full overflow-y-auto">
+            <div class="max-w-4xl mx-auto p-4 pb-20">
+                <div class="bg-white rounded-lg shadow p-6">
+                    <div class="flex justify-between items-center mb-6">
+                        <h2 class="text-2xl font-bold flex items-center gap-2">
+                            <i class="fas fa-exchange-alt text-orange-500"></i>
+                            Crossdock Reload Queue
+                        </h2>
+                        <button onclick="navigateTo('inter-transfer-list')"
+                            class="px-4 py-2 border border-gray-300 rounded hover:bg-gray-50">
+                            <i class="fas fa-arrow-left mr-2"></i>Back
+                        </button>
+                    </div>
 
-                <div class="bg-orange-50 border border-orange-200 rounded p-4 mb-6">
-                    <p class="text-orange-800">
-                        <i class="fas fa-info-circle mr-2"></i>
-                        These transfers arrived at the warehouse but need to be reloaded for delivery to their final destination.
-                    </p>
-                </div>
+                    <div class="bg-orange-50 border border-orange-200 rounded p-4 mb-6">
+                        <p class="text-orange-800">
+                            <i class="fas fa-info-circle mr-2"></i>
+                            These transfers arrived at the warehouse but need to be reloaded for delivery to their final destination.
+                        </p>
+                    </div>
 
-                <div class="space-y-4">
-                    ${crossdockTransfers.length === 0 ? 
-                        '<p class="text-gray-500 text-center py-8">No crossdock transfers in queue</p>' :
-                        crossdockTransfers.map(t => {
-                            const outlets = InterTransferService.getOutlets();
-                            const sender = outlets.find(o => o.outlet_code === t.sender_outlet);
-                            const receiver = outlets.find(o => o.outlet_code === t.receiver_outlet);
-                            
-                            return `
-                                <div class="border-2 border-orange-300 rounded p-4 bg-orange-50">
-                                    <div class="flex justify-between items-start mb-2">
-                                        <div>
-                                            <div class="font-bold text-lg">${t.transfer_number}</div>
-                                            <div class="text-sm text-gray-600">
-                                                From: ${sender?.outlet_name || t.sender_outlet}<br/>
-                                                Final Destination: ${receiver?.outlet_name || t.receiver_outlet}
+                    <div class="space-y-4">
+                        ${crossdockTransfers.length === 0 ? 
+                            '<p class="text-gray-500 text-center py-8">No crossdock transfers in queue</p>' :
+                            crossdockTransfers.map(t => {
+                                const outlets = InterTransferService.getOutlets();
+                                const sender = outlets.find(o => o.outlet_code === t.sender_outlet);
+                                const receiver = outlets.find(o => o.outlet_code === t.receiver_outlet);
+                                
+                                return `
+                                    <div class="border-2 border-orange-300 rounded p-4 bg-orange-50">
+                                        <div class="flex justify-between items-start mb-2">
+                                            <div>
+                                                <div class="font-bold text-lg">${t.transfer_number}</div>
+                                                <div class="text-sm text-gray-600">
+                                                    From: ${sender?.outlet_name || t.sender_outlet}<br/>
+                                                    Final Destination: ${receiver?.outlet_name || t.receiver_outlet}
+                                                </div>
                                             </div>
+                                            <span class="px-3 py-1 bg-orange-500 text-white rounded font-semibold">
+                                                CROSSDOCK
+                                            </span>
                                         </div>
-                                        <span class="px-3 py-1 bg-orange-500 text-white rounded font-semibold">
-                                            CROSSDOCK
-                                        </span>
+                                        
+                                        <div class="text-sm text-gray-700 mb-3">
+                                            <i class="fas fa-boxes mr-2"></i>${t.items.length} containers
+                                        </div>
+                                        
+                                        <div class="flex gap-2">
+                                            <button onclick="viewTransferDetails('${t.id}')"
+                                                class="flex-1 bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded">
+                                                <i class="fas fa-eye mr-2"></i>View Details
+                                            </button>
+                                            <button onclick="printTransferLabel('${t.id}')"
+                                                class="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded">
+                                                <i class="fas fa-print mr-2"></i>Print
+                                            </button>
+                                        </div>
                                     </div>
-                                    
-                                    <div class="text-sm text-gray-700 mb-3">
-                                        <i class="fas fa-boxes mr-2"></i>${t.items.length} containers
-                                    </div>
-                                    
-                                    <div class="flex gap-2">
-                                        <button onclick="viewTransferDetails('${t.id}')"
-                                            class="flex-1 bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded">
-                                            <i class="fas fa-eye mr-2"></i>View Details
-                                        </button>
-                                        <button onclick="printTransferLabel('${t.id}')"
-                                            class="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded">
-                                            <i class="fas fa-print mr-2"></i>Print
-                                        </button>
-                                    </div>
-                                </div>
-                            `;
-                        }).join('')
-                    }
+                                `;
+                            }).join('')
+                        }
+                    </div>
                 </div>
             </div>
         </div>
@@ -944,7 +975,7 @@ document.addEventListener('submit', function(e) {
         e.preventDefault();
         
         const receiverOutlet = document.getElementById('receiverOutlet').value;
-        const containerNumbers = document.getElementById('containerNumbers').value;
+        const parcelCount = parseInt(document.getElementById('parcelCount').value);
         const notes = document.getElementById('transferNotes').value;
         
         if (!receiverOutlet) {
@@ -952,26 +983,49 @@ document.addEventListener('submit', function(e) {
             return;
         }
         
-        const containers = containerNumbers
-            .split('\n')
-            .map(c => c.trim())
-            .filter(c => c);
-            
-        if (containers.length === 0) {
-            alert('Please enter at least one container number');
+        if (!parcelCount || parcelCount < 1) {
+            alert('Please enter number of parcels (minimum 1)');
             return;
         }
         
-        const transfer = InterTransferService.createTransfer({
+        if (parcelCount > 99) {
+            alert('Maximum 99 parcels per transfer');
+            return;
+        }
+        
+        // First create the transfer to get the transfer number
+        const tempTransfer = {
             sender_outlet: state.user?.outlet_code || 'JKJSTT1',
             receiver_outlet: receiverOutlet,
             created_by: state.user?.username || 'user',
-            items: containers.map(c => ({ container_number: c })),
+            items: [],
+            notes: notes
+        };
+        
+        // Generate transfer number
+        const transferNumber = InterTransferService.generateTransferNumber(
+            tempTransfer.sender_outlet,
+            tempTransfer.receiver_outlet
+        );
+        
+        // Auto-generate container IDs based on transfer number
+        const containers = [];
+        for (let i = 1; i <= parcelCount; i++) {
+            const serial = String(i).padStart(2, '0');
+            containers.push({ container_number: `${transferNumber}-${serial}` });
+        }
+        
+        // Create transfer with auto-generated containers
+        const transfer = InterTransferService.createTransfer({
+            sender_outlet: tempTransfer.sender_outlet,
+            receiver_outlet: receiverOutlet,
+            created_by: tempTransfer.created_by,
+            items: containers,
             notes: notes
         });
         
         if (transfer) {
-            alert(`✅ Transfer created successfully!\n\nTransfer Number: ${transfer.transfer_number}\nContainers: ${containers.length}\n\nYou can now print the label.`);
+            alert(`✅ Transfer created successfully!\n\nTransfer Number: ${transfer.transfer_number}\nParcels: ${parcelCount}\nContainer IDs: ${transfer.transfer_number}-01 to ${transfer.transfer_number}-${String(parcelCount).padStart(2, '0')}\n\nYou can now print the label.`);
             
             // Ask if user wants to print label
             if (confirm('Do you want to print the transfer label now?')) {

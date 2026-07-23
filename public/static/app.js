@@ -2273,9 +2273,90 @@ let warehouseScanTimeout = null
 
 async function handleWarehouseScan() {
     const input = document.getElementById('warehouseScanInput')
-    const palletId = input.value.trim().toUpperCase()
+    const scannedCode = input.value.trim().toUpperCase()
     
-    if (!palletId) return
+    if (!scannedCode) return
+    
+    // 🚚 INTER-BRANCH TRANSFER DETECTION
+    // If scanned code starts with "TN", handle as inter-branch transfer
+    if (scannedCode.startsWith('TN')) {
+        console.log('🚚 Inter-branch transfer detected:', scannedCode)
+        input.value = ''
+        
+        // Check if transfer exists
+        const transfer = InterTransferService.getTransferByNumber(scannedCode)
+        if (!transfer) {
+            playBeep(false)
+            showToast(`❌ Transfer not found: ${scannedCode}`, 'error')
+            setTimeout(() => input.focus(), 100)
+            return
+        }
+        
+        // Determine action based on current status
+        if (transfer.status === 'created' || transfer.status === 'loaded') {
+            // Load the transfer
+            const userOutlet = state.user?.outlet_code || 'APDWHS1'
+            const loadedBy = state.user?.username || 'driver'
+            const pendingItems = transfer.items.filter(i => i.status === 'pending')
+            const containerNumbers = pendingItems.map(i => i.container_number)
+            
+            if (containerNumbers.length === 0) {
+                playBeep(false)
+                showToast(`⚠️ Transfer ${scannedCode} - All items already loaded`, 'warning')
+                setTimeout(() => input.focus(), 100)
+                return
+            }
+            
+            const updated = InterTransferService.loadTransfer(transfer.id, loadedBy, containerNumbers)
+            if (updated) {
+                playBeep(true)
+                showToast(`✅ Transfer ${scannedCode} loaded!\nStatus: ${updated.status.toUpperCase()}\n${containerNumbers.length} containers`, 'success')
+                setTimeout(() => input.focus(), 100)
+                return
+            }
+        } else if (transfer.status === 'in_transit') {
+            // Unload the transfer
+            const userOutlet = state.user?.outlet_code || 'APDWHS1'
+            const unloadedBy = state.user?.username || 'driver'
+            const loadedItems = transfer.items.filter(i => i.status === 'loaded' || i.status === 'in_transit')
+            const containerNumbers = loadedItems.map(i => i.container_number)
+            
+            if (containerNumbers.length === 0) {
+                playBeep(false)
+                showToast(`⚠️ Transfer ${scannedCode} - No items to unload`, 'warning')
+                setTimeout(() => input.focus(), 100)
+                return
+            }
+            
+            const updated = InterTransferService.unloadTransfer(transfer.id, unloadedBy, userOutlet, containerNumbers)
+            if (updated) {
+                playBeep(true)
+                let message = `✅ Transfer ${scannedCode} unloaded!\nStatus: ${updated.status.toUpperCase()}`
+                
+                if (updated.is_crossdock) {
+                    message += '\n\n⚠️ CROSSDOCK DETECTED!\nAdded to reload queue'
+                }
+                
+                showToast(message, updated.is_crossdock ? 'warning' : 'success')
+                setTimeout(() => input.focus(), 100)
+                return
+            }
+        } else {
+            playBeep(false)
+            showToast(`ℹ️ Transfer ${scannedCode}\nStatus: ${transfer.status.toUpperCase()}\nNo action needed`, 'info')
+            setTimeout(() => input.focus(), 100)
+            return
+        }
+        
+        // If we reach here, something went wrong
+        playBeep(false)
+        showToast(`❌ Failed to process transfer ${scannedCode}`, 'error')
+        setTimeout(() => input.focus(), 100)
+        return
+    }
+    
+    // Regular pallet scanning logic below
+    const palletId = scannedCode
     
     // Get selected delivery date (check both input field and state for APK compatibility)
     const deliveryDateInput = document.getElementById('warehouseDeliveryDate')
