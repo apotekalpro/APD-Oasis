@@ -263,6 +263,15 @@ const InterTransferService = {
         const transfer = transfers[index];
         const now = new Date().toISOString();
 
+        // FIXED v4.3.2: Reset items' status from 'unloaded' to 'loaded' when reloading
+        // This allows the transfer to be unloaded again at the final destination
+        transfer.items.forEach(item => {
+            if (item.status === 'unloaded') {
+                item.status = 'loaded';
+                item.reloaded_at = now;
+            }
+        });
+
         transfer.status = 'in_transit';
         transfer.reloaded_at = now;
         transfer.reloaded_by = reloadedBy;
