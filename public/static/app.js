@@ -2341,6 +2341,11 @@ async function handleWarehouseScan() {
                 setTimeout(() => input.focus(), 100)
                 return
             }
+        } else if (transfer.status === 'crossdock') {
+            // Crossdock transfer - needs reloading confirmation
+            input.value = ''
+            showCrossdockReloadConfirmation(transfer)
+            return
         } else {
             playBeep(false)
             showToast(`ℹ️ Transfer ${scannedCode}\nStatus: ${transfer.status.toUpperCase()}\nNo action needed`, 'info')

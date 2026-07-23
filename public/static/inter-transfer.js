@@ -264,15 +264,20 @@ function renderCreateTransfer() {
                     </h2>
 
                     <form id="createTransferForm" class="space-y-6">
-                        <!-- Sender Outlet (Read-only - current user's outlet) -->
+                        <!-- Sender Outlet (Editable - defaults to current user's outlet) -->
                         <div>
                             <label class="block text-sm font-medium text-gray-700 mb-2">
-                                Sender Outlet
+                                Sender Outlet *
                             </label>
-                            <input type="text" readonly
-                                value="${userOutlet} - ${outlets.find(o => o.outlet_code === userOutlet)?.outlet_name || 'Unknown'}"
-                                class="w-full px-4 py-2 border rounded bg-gray-100"
-                            />
+                            <select id="senderOutlet" required
+                                class="w-full px-4 py-2 border rounded focus:ring-2 focus:ring-blue-500">
+                                ${outlets.map(o => `
+                                    <option value="${o.outlet_code}" ${o.outlet_code === userOutlet ? 'selected' : ''}>
+                                        ${o.outlet_code} - ${o.outlet_name}
+                                    </option>
+                                `).join('')}
+                            </select>
+                            <p class="text-sm text-gray-500 mt-1">Default: Your outlet (${userOutlet})</p>
                         </div>
 
                         <!-- Receiver Outlet (Searchable Dropdown) -->
@@ -283,10 +288,9 @@ function renderCreateTransfer() {
                             <select id="receiverOutlet" required
                                 class="w-full px-4 py-2 border rounded focus:ring-2 focus:ring-blue-500">
                                 <option value="">Select receiver outlet...</option>
-                                ${outlets
-                                    .filter(o => o.outlet_code !== userOutlet)
-                                    .map(o => `<option value="${o.outlet_code}">${o.outlet_code} - ${o.outlet_name}</option>`)
-                                    .join('')}
+                                ${outlets.map(o => `
+                                    <option value="${o.outlet_code}">${o.outlet_code} - ${o.outlet_name}</option>
+                                `).join('')}
                             </select>
                         </div>
 
@@ -553,7 +557,7 @@ function viewTransferDetails(transferId) {
     document.body.insertAdjacentHTML('beforeend', detailsHTML);
 }
 
-// Print transfer label (A5 landscape)
+// Print transfer label (A5 landscape) - One label per container
 function printTransferLabel(transferId) {
     const transfer = InterTransferService.getTransferById(transferId);
     if (!transfer) return;
@@ -561,46 +565,19 @@ function printTransferLabel(transferId) {
     const outlets = InterTransferService.getOutlets();
     const sender = outlets.find(o => o.outlet_code === transfer.sender_outlet);
     const receiver = outlets.find(o => o.outlet_code === transfer.receiver_outlet);
-    const barcodeData = generateBarcode(transfer.transfer_number);
 
     const printWindow = window.open('', '_blank');
-    printWindow.document.write(`
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <title>Transfer Label - ${transfer.transfer_number}</title>
-            <style>
-                @page { size: A5 landscape; margin: 10mm; }
-                @media print {
-                    body { margin: 0; }
-                    .no-print { display: none; }
-                }
-                body { 
-                    font-family: Arial, sans-serif; 
-                    padding: 20px;
-                    width: 210mm;
-                    height: 148mm;
-                }
-                .header { text-align: center; margin-bottom: 20px; }
-                .barcode { text-align: center; margin: 20px 0; }
-                .barcode img { max-width: 80%; height: auto; }
-                .info { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
-                .info-box { border: 2px solid #333; padding: 15px; }
-                .label { font-weight: bold; color: #666; font-size: 12px; }
-                .value { font-size: 18px; font-weight: bold; margin-top: 5px; }
-                .containers { margin-top: 20px; border-top: 2px dashed #ccc; padding-top: 15px; }
-                .container-list { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
-                .container-item { background: #f0f0f0; padding: 8px; text-align: center; font-family: monospace; }
-            </style>
-        </head>
-        <body>
+    
+    // Generate separate labels for each container
+    const labelPages = transfer.items.map((item, index) => `
+        <div class="label-page" style="page-break-after: ${index < transfer.items.length - 1 ? 'always' : 'auto'};">
             <div class="header">
                 <h1 style="margin: 0;">INTER-BRANCH TRANSFER</h1>
                 <h2 style="margin: 10px 0;">${transfer.transfer_number}</h2>
             </div>
 
             <div class="barcode">
-                <img src="${barcodeData}" alt="Barcode" />
+                <svg id="barcode-${index}"></svg>
             </div>
 
             <div class="info">
@@ -616,27 +593,137 @@ function printTransferLabel(transferId) {
                 </div>
             </div>
 
-            <div class="containers">
-                <div class="label">CONTAINERS (${transfer.items.length})</div>
-                <div class="container-list">
-                    ${transfer.items.map(item => `
-                        <div class="container-item">${item.container_number}</div>
-                    `).join('')}
-                </div>
+            <div class="container-info">
+                <div class="label">CONTAINER ${index + 1} OF ${transfer.items.length}</div>
+                <div class="container-id">${item.container_number}</div>
             </div>
 
-            <div style="margin-top: 20px; text-align: center; font-size: 12px; color: #666;">
+            <div class="footer">
                 Created: ${new Date(transfer.created_at).toLocaleString()}
             </div>
-
-            <div class="no-print" style="text-align: center; margin-top: 20px;">
-                <button onclick="window.print()" style="padding: 10px 20px; font-size: 16px; cursor: pointer;">
-                    Print Label
+        </div>
+    `).join('');
+    
+    printWindow.document.write(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>Transfer Labels - ${transfer.transfer_number}</title>
+            <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
+            <style>
+                @page { 
+                    size: A5 landscape; 
+                    margin: 10mm; 
+                }
+                @media print {
+                    body { margin: 0; }
+                    .no-print { display: none; }
+                    .label-page { 
+                        width: 210mm;
+                        height: 148mm;
+                        position: relative;
+                    }
+                }
+                body { 
+                    font-family: Arial, sans-serif; 
+                    margin: 0;
+                    padding: 0;
+                }
+                .label-page {
+                    width: 210mm;
+                    height: 148mm;
+                    padding: 15mm;
+                    box-sizing: border-box;
+                    position: relative;
+                }
+                .header { 
+                    text-align: center; 
+                    margin-bottom: 15px; 
+                }
+                .barcode { 
+                    text-align: center; 
+                    margin: 15px 0; 
+                }
+                .barcode svg { 
+                    max-width: 70%;
+                    height: auto;
+                }
+                .info { 
+                    display: grid; 
+                    grid-template-columns: 1fr 1fr; 
+                    gap: 15px;
+                    margin-bottom: 20px;
+                }
+                .info-box { 
+                    border: 3px solid #333; 
+                    padding: 15px;
+                    border-radius: 8px;
+                }
+                .label { 
+                    font-weight: bold; 
+                    color: #666; 
+                    font-size: 14px;
+                    text-transform: uppercase;
+                }
+                .value { 
+                    font-size: 24px; 
+                    font-weight: bold; 
+                    margin-top: 5px; 
+                }
+                .container-info {
+                    border: 3px solid #000;
+                    background: #f9f9f9;
+                    padding: 20px;
+                    text-align: center;
+                    border-radius: 8px;
+                }
+                .container-id {
+                    font-size: 28px;
+                    font-weight: bold;
+                    font-family: monospace;
+                    margin-top: 10px;
+                    letter-spacing: 2px;
+                }
+                .footer {
+                    margin-top: 20px; 
+                    text-align: center; 
+                    font-size: 12px; 
+                    color: #666;
+                }
+                .no-print {
+                    text-align: center;
+                    padding: 20px;
+                    background: #f0f0f0;
+                    border-top: 2px solid #ccc;
+                }
+            </style>
+        </head>
+        <body>
+            ${labelPages}
+            
+            <div class="no-print">
+                <p><strong>${transfer.items.length} label(s) ready to print</strong></p>
+                <button onclick="window.print()" style="padding: 12px 24px; font-size: 16px; cursor: pointer; background: #4CAF50; color: white; border: none; border-radius: 4px; margin: 5px;">
+                    <i class="fas fa-print"></i> Print All Labels
                 </button>
-                <button onclick="window.close()" style="padding: 10px 20px; font-size: 16px; cursor: pointer; margin-left: 10px;">
+                <button onclick="window.close()" style="padding: 12px 24px; font-size: 16px; cursor: pointer; background: #666; color: white; border: none; border-radius: 4px; margin: 5px;">
                     Close
                 </button>
             </div>
+            
+            <script>
+                // Generate barcodes for each label
+                ${transfer.items.map((item, index) => `
+                    JsBarcode("#barcode-${index}", "${transfer.transfer_number}", {
+                        format: "CODE128",
+                        width: 2,
+                        height: 80,
+                        displayValue: true,
+                        fontSize: 20,
+                        margin: 10
+                    });
+                `).join('')}
+            </script>
         </body>
         </html>
     `);
@@ -969,17 +1056,136 @@ function closeModal(event) {
     modals.forEach(modal => modal.remove());
 }
 
+// Show crossdock reload confirmation
+function showCrossdockReloadConfirmation(transfer) {
+    const outlets = InterTransferService.getOutlets();
+    const sender = outlets.find(o => o.outlet_code === transfer.sender_outlet);
+    const receiver = outlets.find(o => o.outlet_code === transfer.receiver_outlet);
+    
+    const confirmHTML = `
+        <div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4" onclick="closeModal(event)">
+            <div class="bg-white rounded-lg max-w-2xl w-full" onclick="event.stopPropagation()">
+                <div class="bg-orange-500 text-white p-6 rounded-t-lg">
+                    <h3 class="text-2xl font-bold flex items-center gap-2">
+                        <i class="fas fa-exclamation-triangle"></i>
+                        Crossdock Transfer - Reload Confirmation
+                    </h3>
+                </div>
+                
+                <div class="p-6 space-y-4">
+                    <div class="bg-orange-50 border-l-4 border-orange-500 p-4">
+                        <p class="font-semibold text-orange-800">
+                            This transfer has arrived at the warehouse but needs to be reloaded for final delivery.
+                        </p>
+                    </div>
+                    
+                    <div class="grid grid-cols-2 gap-4">
+                        <div class="border rounded p-4">
+                            <div class="text-sm text-gray-600">Transfer Number</div>
+                            <div class="font-bold text-lg">${transfer.transfer_number}</div>
+                        </div>
+                        <div class="border rounded p-4">
+                            <div class="text-sm text-gray-600">Containers</div>
+                            <div class="font-bold text-lg">${transfer.items.length} parcels</div>
+                        </div>
+                    </div>
+                    
+                    <div class="grid grid-cols-2 gap-4">
+                        <div class="border rounded p-4">
+                            <div class="text-sm text-gray-600">From</div>
+                            <div class="font-semibold">${sender?.outlet_name || transfer.sender_outlet}</div>
+                            <div class="text-xs text-gray-500">${transfer.sender_outlet}</div>
+                        </div>
+                        <div class="border rounded p-4 bg-blue-50">
+                            <div class="text-sm text-blue-600 font-semibold">Final Destination</div>
+                            <div class="font-semibold text-blue-800">${receiver?.outlet_name || transfer.receiver_outlet}</div>
+                            <div class="text-xs text-blue-600">${transfer.receiver_outlet}</div>
+                        </div>
+                    </div>
+                    
+                    <div class="border rounded p-4 bg-gray-50">
+                        <div class="text-sm text-gray-600 mb-2">Container IDs:</div>
+                        <div class="grid grid-cols-2 gap-2">
+                            ${transfer.items.map(item => `
+                                <div class="bg-white px-3 py-1 rounded border font-mono text-sm">
+                                    ${item.container_number}
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                    
+                    <div class="bg-blue-50 border border-blue-200 rounded p-4">
+                        <p class="text-blue-800">
+                            <i class="fas fa-info-circle mr-2"></i>
+                            <strong>Action Required:</strong> Confirm to reload this transfer onto the lorry for delivery to ${receiver?.outlet_name}.
+                        </p>
+                    </div>
+                </div>
+                
+                <div class="p-6 bg-gray-50 rounded-b-lg flex gap-3">
+                    <button onclick="confirmCrossdockReload('${transfer.id}')"
+                        class="flex-1 bg-green-500 hover:bg-green-600 text-white px-6 py-3 rounded font-semibold text-lg">
+                        <i class="fas fa-check-circle mr-2"></i>Confirm Reload
+                    </button>
+                    <button onclick="closeModal()"
+                        class="px-6 py-3 border-2 border-gray-300 rounded hover:bg-gray-100 font-semibold">
+                        Cancel
+                    </button>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    document.body.insertAdjacentHTML('beforeend', confirmHTML);
+}
+
+// Confirm crossdock reload
+function confirmCrossdockReload(transferId) {
+    const transfer = InterTransferService.getTransferById(transferId);
+    if (!transfer) return;
+    
+    const loadedBy = state.user?.username || 'driver';
+    const containerNumbers = transfer.items.map(i => i.container_number);
+    
+    // Reload the transfer (mark as in_transit again)
+    const updated = InterTransferService.loadTransfer(transferId, loadedBy, containerNumbers);
+    
+    if (updated) {
+        playBeep(true);
+        closeModal();
+        showToast(`✅ Transfer ${transfer.transfer_number} reloaded!\nStatus: IN_TRANSIT for delivery to ${transfer.receiver_outlet}\n${containerNumbers.length} containers loaded`, 'success');
+        
+        // Refocus warehouse scan input
+        const input = document.getElementById('warehouseScanInput');
+        if (input) setTimeout(() => input.focus(), 100);
+    } else {
+        playBeep(false);
+        showToast(`❌ Failed to reload transfer`, 'error');
+    }
+}
+
 // Handle create transfer form
 document.addEventListener('submit', function(e) {
     if (e.target.id === 'createTransferForm') {
         e.preventDefault();
         
+        const senderOutlet = document.getElementById('senderOutlet').value;
         const receiverOutlet = document.getElementById('receiverOutlet').value;
         const parcelCount = parseInt(document.getElementById('parcelCount').value);
         const notes = document.getElementById('transferNotes').value;
         
+        if (!senderOutlet) {
+            alert('Please select sender outlet');
+            return;
+        }
+        
         if (!receiverOutlet) {
             alert('Please select receiver outlet');
+            return;
+        }
+        
+        if (senderOutlet === receiverOutlet) {
+            alert('Sender and receiver cannot be the same outlet');
             return;
         }
         
@@ -995,7 +1201,7 @@ document.addEventListener('submit', function(e) {
         
         // First create the transfer to get the transfer number
         const tempTransfer = {
-            sender_outlet: state.user?.outlet_code || 'JKJSTT1',
+            sender_outlet: senderOutlet,
             receiver_outlet: receiverOutlet,
             created_by: state.user?.username || 'user',
             items: [],
