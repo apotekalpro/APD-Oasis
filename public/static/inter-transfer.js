@@ -77,34 +77,56 @@ const InterTransferService = {
         return transfers.find(t => t.transfer_number === transferNumber) || null;
     },
 
-    // Create new transfer
+    // Create new transfer - UPDATED: Each parcel gets its own unique TN
     createTransfer(data) {
         const transfers = this.getTransfers();
+        const createdTransfers = [];
+        const now = new Date().toISOString();
         
-        const transfer = {
-            id: `transfer_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-            transfer_number: this.generateTransferNumber(data.sender_outlet, data.receiver_outlet),
-            sender_outlet: data.sender_outlet,
-            receiver_outlet: data.receiver_outlet,
-            created_by: data.created_by,
-            created_at: new Date().toISOString(),
-            status: 'created',
-            items: data.items.map(item => ({
-                id: `item_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-                container_number: item.container_number,
-                status: 'pending'
-            })),
-            notes: data.notes || ''
-        };
+        // Create separate transfer for each parcel
+        data.items.forEach((item, index) => {
+            // Generate unique TN for this parcel
+            const transferNumber = this.generateTransferNumber(data.sender_outlet, data.receiver_outlet);
+            
+            const transfer = {
+                id: `transfer_${Date.now()}_${Math.random().toString(36).substr(2, 9)}_${index}`,
+                transfer_number: transferNumber,
+                sender_outlet: data.sender_outlet,
+                receiver_outlet: data.receiver_outlet,
+                created_by: data.created_by,
+                created_by_outlet: data.created_by_outlet || data.sender_outlet,
+                created_at: now,
+                status: 'created',
+                items: [{
+                    id: `item_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+                    // Container number IS the transfer number (no suffix)
+                    container_number: transferNumber,
+                    status: 'pending'
+                }],
+                notes: data.notes || '',
+                tracking_log: [
+                    {
+                        timestamp: now,
+                        action: 'created',
+                        user: data.created_by,
+                        outlet: data.created_by_outlet || data.sender_outlet,
+                        details: `Transfer created (parcel ${index + 1} of ${data.items.length})`
+                    }
+                ]
+            };
+            
+            transfers.push(transfer);
+            createdTransfers.push(transfer);
+        });
 
-        transfers.push(transfer);
         localStorage.setItem(this.STORAGE_KEY, JSON.stringify(transfers));
         
-        return transfer;
+        // Return array of created transfers or single transfer for backward compatibility
+        return createdTransfers.length === 1 ? createdTransfers[0] : createdTransfers;
     },
 
-    // Load transfer
-    loadTransfer(transferId, loadedBy, containerNumbers) {
+    // Load transfer with audit trail
+    loadTransfer(transferId, loadedBy, loadedByOutlet, driverName, containerNumbers) {
         const transfers = this.getTransfers();
         const index = transfers.findIndex(t => t.id === transferId);
         
@@ -128,6 +150,19 @@ const InterTransferService = {
             transfer.status = 'in_transit';
             transfer.loaded_at = now;
             transfer.loaded_by = loadedBy;
+            transfer.loaded_by_outlet = loadedByOutlet;
+            transfer.driver_name = driverName;
+            
+            // Add to tracking log
+            if (!transfer.tracking_log) transfer.tracking_log = [];
+            transfer.tracking_log.push({
+                timestamp: now,
+                action: 'loaded',
+                user: loadedBy,
+                outlet: loadedByOutlet,
+                driver: driverName,
+                details: `Loaded by driver ${driverName}`
+            });
         }
 
         transfers[index] = transfer;
@@ -136,8 +171,8 @@ const InterTransferService = {
         return transfer;
     },
 
-    // Unload transfer with crossdock detection
-    unloadTransfer(transferId, unloadedBy, unloadLocation, containerNumbers) {
+    // Unload transfer with crossdock detection and audit trail
+    unloadTransfer(transferId, unloadedBy, unloadedByOutlet, unloadLocation, receiverName, containerNumbers, unloadType = 'destination') {
         const transfers = this.getTransfers();
         const index = transfers.findIndex(t => t.id === transferId);
         
@@ -158,15 +193,30 @@ const InterTransferService = {
         const allUnloaded = transfer.items.every(item => item.status === 'unloaded');
 
         if (allUnloaded) {
-            // Crossdock detection
-            const isCrossdock = unloadLocation === 'APDWHS1' && transfer.receiver_outlet !== 'APDWHS1';
+            // Determine status based on unload type
+            const isCrossdock = unloadType === 'crossdock';
             
             transfer.unloaded_at = now;
             transfer.unloaded_by = unloadedBy;
+            transfer.unloaded_by_outlet = unloadedByOutlet;
             transfer.unload_location = unloadLocation;
+            transfer.receiver_name = receiverName;
             transfer.is_crossdock = isCrossdock;
-            transfer.status = isCrossdock ? 'crossdock' : 
-                            (unloadLocation === transfer.receiver_outlet ? 'completed' : 'unloaded');
+            transfer.unload_type = unloadType;
+            transfer.status = isCrossdock ? 'crossdock' : 'completed';
+            
+            // Add to tracking log
+            if (!transfer.tracking_log) transfer.tracking_log = [];
+            transfer.tracking_log.push({
+                timestamp: now,
+                action: isCrossdock ? 'unloaded_crossdock' : 'unloaded_destination',
+                user: unloadedBy,
+                outlet: unloadedByOutlet,
+                receiver: receiverName,
+                details: isCrossdock ? 
+                    `Unloaded at warehouse for crossdock, received by ${receiverName}` :
+                    `Delivered to destination, received by ${receiverName}`
+            });
         }
 
         transfers[index] = transfer;
@@ -201,6 +251,39 @@ const InterTransferService = {
             t.transfer_number.toLowerCase().includes(searchLower) ||
             t.items.some(item => item.container_number.toLowerCase().includes(searchLower))
         );
+    },
+
+    // Reload crossdock transfer with audit trail
+    reloadCrossdock(transferId, reloadedBy, reloadedByOutlet, driverName) {
+        const transfers = this.getTransfers();
+        const index = transfers.findIndex(t => t.id === transferId);
+        
+        if (index === -1) return null;
+
+        const transfer = transfers[index];
+        const now = new Date().toISOString();
+
+        transfer.status = 'in_transit';
+        transfer.reloaded_at = now;
+        transfer.reloaded_by = reloadedBy;
+        transfer.reloaded_by_outlet = reloadedByOutlet;
+        transfer.reload_driver = driverName;
+        
+        // Add to tracking log
+        if (!transfer.tracking_log) transfer.tracking_log = [];
+        transfer.tracking_log.push({
+            timestamp: now,
+            action: 'reloaded_from_crossdock',
+            user: reloadedBy,
+            outlet: reloadedByOutlet,
+            driver: driverName,
+            details: `Reloaded for final delivery by driver ${driverName}`
+        });
+
+        transfers[index] = transfer;
+        localStorage.setItem(this.STORAGE_KEY, JSON.stringify(transfers));
+        
+        return transfer;
     },
 
     // Get statistics
@@ -356,8 +439,19 @@ function renderCreateTransfer() {
 
 // Render Transfer List Page
 function renderTransferList() {
-    const transfers = InterTransferService.getTransfers();
+    const allTransfers = InterTransferService.getTransfers();
     const stats = InterTransferService.getStatistics();
+    
+    // Filter transfers based on user role and outlet
+    const userOutlet = state.user?.outlet_code;
+    const userRole = state.user?.role || 'outlet';
+    
+    // Outlet users see only transfers where they are sender or receiver
+    // Warehouse/admin users see all transfers
+    const isOutletUser = !['admin', 'warehouse', 'warehouse_supervisor', 'warehouse_staff', 'driver'].includes(userRole);
+    const transfers = isOutletUser && userOutlet
+        ? allTransfers.filter(t => t.sender_outlet === userOutlet || t.receiver_outlet === userOutlet)
+        : allTransfers;
     
     return `
         <div class="h-full overflow-y-auto">
@@ -404,6 +498,22 @@ function renderTransferList() {
                 </div>
             </div>
 
+            <!-- Outlet User Filter Info -->
+            ${isOutletUser && userOutlet ? `
+                <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+                    <div class="flex items-start">
+                        <i class="fas fa-info-circle text-blue-600 mr-3 mt-1"></i>
+                        <div class="text-sm text-blue-800">
+                            <strong>Filtered View:</strong> Showing only transfers where your outlet (${userOutlet}) is sender or receiver.
+                            <div class="mt-1">
+                                📥 <strong>Green border</strong> = Incoming transfers to your outlet<br/>
+                                📤 <strong>Blue border</strong> = Outgoing transfers from your outlet
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            ` : ''}
+
             <!-- Search -->
             <div class="bg-white rounded-lg shadow p-4 mb-4">
                 <input type="text" id="transferSearch" placeholder="Search by transfer number or container..."
@@ -436,6 +546,11 @@ function renderTransferItems(transfers) {
         const sender = outlets.find(o => o.outlet_code === t.sender_outlet);
         const receiver = outlets.find(o => o.outlet_code === t.receiver_outlet);
         
+        // Determine if this is incoming or outgoing for outlet users
+        const userOutlet = state.user?.outlet_code;
+        const isIncoming = userOutlet && t.receiver_outlet === userOutlet;
+        const isOutgoing = userOutlet && t.sender_outlet === userOutlet;
+        
         const statusColors = {
             created: 'bg-gray-100 text-gray-700',
             loaded: 'bg-blue-100 text-blue-700',
@@ -446,9 +561,13 @@ function renderTransferItems(transfers) {
         };
 
         return `
-            <div class="bg-white rounded-lg shadow p-4">
+            <div class="bg-white rounded-lg shadow p-4 ${isIncoming ? 'border-l-4 border-green-500' : isOutgoing ? 'border-l-4 border-blue-500' : ''}">
                 <div class="flex justify-between items-start mb-3">
                     <div>
+                        <div class="flex items-center gap-2 mb-1">
+                            ${isIncoming ? '<span class="text-xs px-2 py-1 bg-green-100 text-green-700 rounded font-semibold">📥 INCOMING</span>' : ''}
+                            ${isOutgoing ? '<span class="text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded font-semibold">📤 OUTGOING</span>' : ''}
+                        </div>
                         <div class="font-bold text-lg">${t.transfer_number}</div>
                         <div class="text-sm text-gray-600">
                             ${sender?.outlet_name || t.sender_outlet} → ${receiver?.outlet_name || t.receiver_outlet}
@@ -555,6 +674,57 @@ function viewTransferDetails(transferId) {
                             ${transfer.loaded_at ? `<br/>Loaded: ${new Date(transfer.loaded_at).toLocaleString()}` : ''}
                             ${transfer.unloaded_at ? `<br/>Unloaded: ${new Date(transfer.unloaded_at).toLocaleString()}` : ''}
                         </div>
+
+                        ${transfer.tracking_log && transfer.tracking_log.length > 0 ? `
+                            <div>
+                                <div class="text-sm font-semibold text-gray-700 mb-2 flex items-center">
+                                    <i class="fas fa-history mr-2"></i>Tracking Log
+                                </div>
+                                <div class="border rounded-lg overflow-hidden">
+                                    ${transfer.tracking_log.map((log, idx) => {
+                                        const outlets = InterTransferService.getOutlets();
+                                        const outlet = outlets.find(o => o.outlet_code === log.outlet);
+                                        
+                                        return `
+                                            <div class="p-3 ${idx % 2 === 0 ? 'bg-gray-50' : 'bg-white'}">
+                                                <div class="flex justify-between items-start mb-1">
+                                                    <span class="text-xs font-semibold text-blue-600">
+                                                        ${log.action.toUpperCase().replace(/_/g, ' ')}
+                                                    </span>
+                                                    <span class="text-xs text-gray-500">
+                                                        ${new Date(log.timestamp).toLocaleString()}
+                                                    </span>
+                                                </div>
+                                                <div class="text-xs text-gray-700">
+                                                    ${log.details}
+                                                </div>
+                                                <div class="flex items-center gap-2 mt-1 text-xs text-gray-600">
+                                                    <span>
+                                                        <i class="fas fa-user mr-1"></i>${log.user}
+                                                    </span>
+                                                    <span class="text-gray-400">•</span>
+                                                    <span>
+                                                        <i class="fas fa-map-marker-alt mr-1"></i>${outlet?.outlet_name || log.outlet}
+                                                    </span>
+                                                    ${log.driver ? `
+                                                        <span class="text-gray-400">•</span>
+                                                        <span>
+                                                            <i class="fas fa-truck mr-1"></i>${log.driver}
+                                                        </span>
+                                                    ` : ''}
+                                                    ${log.receiver ? `
+                                                        <span class="text-gray-400">•</span>
+                                                        <span>
+                                                            <i class="fas fa-user-check mr-1"></i>${log.receiver}
+                                                        </span>
+                                                    ` : ''}
+                                                </div>
+                                            </div>
+                                        `;
+                                    }).join('')}
+                                </div>
+                            </div>
+                        ` : ''}
                     </div>
 
                     <div class="mt-6 flex gap-2">
@@ -830,7 +1000,7 @@ function handleLoadScan(event) {
     }
 }
 
-// Load transfer
+// Load transfer with driver confirmation
 function loadTransferById(transferId) {
     const transfer = InterTransferService.getTransferById(transferId);
     if (!transfer) return;
@@ -843,15 +1013,92 @@ function loadTransferById(transferId) {
         return;
     }
     
-    const updated = InterTransferService.loadTransfer(
-        transferId,
-        state.user?.username || 'driver',
-        containerNumbers
-    );
+    // Show driver confirmation dialog
+    showDriverConfirmation(transfer, (driverName) => {
+        const updated = InterTransferService.loadTransfer(
+            transferId,
+            state.user?.username || 'driver',
+            state.user?.outlet_code || transfer.sender_outlet,
+            driverName,
+            containerNumbers
+        );
+        
+        if (updated) {
+            playBeep(true);
+            showToast(`✅ Transfer ${updated.transfer_number} loaded by ${driverName}`, 'success');
+            render();
+        }
+    });
+}
+
+// Show driver confirmation dialog
+function showDriverConfirmation(transfer, callback) {
+    const dialog = document.createElement('div');
+    dialog.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50';
+    dialog.innerHTML = `
+        <div class="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+            <h3 class="text-xl font-bold mb-4">
+                <i class="fas fa-user-check mr-2 text-green-600"></i>Driver Confirmation
+            </h3>
+            
+            <div class="mb-4 p-4 bg-gray-50 rounded">
+                <p class="text-sm text-gray-600 mb-1">Transfer Number</p>
+                <p class="font-mono font-bold text-lg">${transfer.transfer_number}</p>
+            </div>
+            
+            <div class="mb-6">
+                <label class="block text-sm font-medium mb-2">Driver Name *</label>
+                <input type="text" id="driverNameInput" 
+                    placeholder="Enter driver name..."
+                    class="w-full px-4 py-3 border-2 rounded text-lg focus:ring-2 focus:ring-green-500"
+                    required
+                />
+            </div>
+            
+            <div class="flex space-x-3">
+                <button onclick="closeDriverConfirmation()" 
+                    class="flex-1 px-4 py-3 border border-gray-300 rounded hover:bg-gray-50">
+                    Cancel
+                </button>
+                <button onclick="confirmDriverLoading()" 
+                    class="flex-1 px-4 py-3 bg-green-600 text-white rounded hover:bg-green-700">
+                    <i class="fas fa-check mr-2"></i>Confirm Loading
+                </button>
+            </div>
+        </div>
+    `;
     
-    if (updated) {
-        alert(`✅ Transfer ${updated.transfer_number} loaded successfully!\nStatus: ${updated.status.toUpperCase()}`);
-        render();
+    document.body.appendChild(dialog);
+    
+    // Focus on input
+    setTimeout(() => {
+        const input = document.getElementById('driverNameInput');
+        if (input) input.focus();
+    }, 100);
+    
+    // Store callback globally for the confirm button
+    window.driverConfirmCallback = callback;
+}
+
+// Close driver confirmation dialog
+function closeDriverConfirmation() {
+    const dialogs = document.querySelectorAll('.fixed.inset-0');
+    dialogs.forEach(d => d.remove());
+    window.driverConfirmCallback = null;
+}
+
+// Confirm driver loading
+function confirmDriverLoading() {
+    const driverName = document.getElementById('driverNameInput')?.value.trim();
+    
+    if (!driverName) {
+        alert('Please enter driver name');
+        return;
+    }
+    
+    if (window.driverConfirmCallback) {
+        window.driverConfirmCallback(driverName);
+        closeDriverConfirmation();
     }
 }
 
@@ -944,12 +1191,11 @@ function handleUnloadScan(event) {
     }
 }
 
-// Unload transfer
+// Unload transfer - show dialog with two options
 function unloadTransferById(transferId) {
     const transfer = InterTransferService.getTransferById(transferId);
     if (!transfer) return;
     
-    const userOutlet = state.user?.outlet_code || 'APDWHS1';
     const loadedItems = transfer.items.filter(i => i.status === 'loaded' || i.status === 'in_transit');
     const containerNumbers = loadedItems.map(i => i.container_number);
     
@@ -958,23 +1204,187 @@ function unloadTransferById(transferId) {
         return;
     }
     
+    // Show unload options dialog
+    showUnloadOptionsDialog(transfer);
+}
+
+// Show unload options dialog
+function showUnloadOptionsDialog(transfer) {
+    const dialog = document.createElement('div');
+    dialog.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50';
+    
+    const outlets = InterTransferService.getOutlets();
+    const receiver = outlets.find(o => o.outlet_code === transfer.receiver_outlet);
+    
+    dialog.innerHTML = `
+        <div class="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+            <h3 class="text-xl font-bold mb-4">
+                <i class="fas fa-truck-loading mr-2 text-purple-600"></i>Unload Transfer
+            </h3>
+            
+            <div class="mb-6 p-4 bg-gray-50 rounded">
+                <p class="text-sm text-gray-600 mb-1">Transfer Number</p>
+                <p class="font-mono font-bold text-lg mb-3">${transfer.transfer_number}</p>
+                <p class="text-sm text-gray-600 mb-1">Final Destination</p>
+                <p class="font-semibold">${receiver?.outlet_name || transfer.receiver_outlet}</p>
+            </div>
+            
+            <p class="text-sm text-gray-700 mb-4">Choose unload type:</p>
+            
+            <div class="space-y-3 mb-6">
+                <button onclick="unloadForCrossdock('${transfer.id}')" 
+                    class="w-full px-4 py-4 border-2 border-orange-300 bg-orange-50 text-orange-800 rounded hover:bg-orange-100 text-left">
+                    <div class="flex items-center">
+                        <i class="fas fa-exchange-alt text-2xl mr-3"></i>
+                        <div>
+                            <div class="font-bold">Unload for Crossdock</div>
+                            <div class="text-sm">Temporary storage at warehouse</div>
+                        </div>
+                    </div>
+                </button>
+                
+                <button onclick="unloadForDestination('${transfer.id}')" 
+                    class="w-full px-4 py-4 border-2 border-green-300 bg-green-50 text-green-800 rounded hover:bg-green-100 text-left">
+                    <div class="flex items-center">
+                        <i class="fas fa-check-circle text-2xl mr-3"></i>
+                        <div>
+                            <div class="font-bold">Unload for Destination</div>
+                            <div class="text-sm">Final delivery - mark completed</div>
+                        </div>
+                    </div>
+                </button>
+            </div>
+            
+            <button onclick="closeUnloadDialog()" 
+                class="w-full px-4 py-2 border border-gray-300 rounded hover:bg-gray-50">
+                Cancel
+            </button>
+        </div>
+    `;
+    
+    document.body.appendChild(dialog);
+}
+
+// Close unload dialog
+function closeUnloadDialog() {
+    const dialogs = document.querySelectorAll('.fixed.inset-0');
+    dialogs.forEach(d => d.remove());
+}
+
+// Unload for crossdock
+function unloadForCrossdock(transferId) {
+    closeUnloadDialog();
+    showReceiverConfirmation(transferId, 'crossdock');
+}
+
+// Unload for destination
+function unloadForDestination(transferId) {
+    closeUnloadDialog();
+    showReceiverConfirmation(transferId, 'destination');
+}
+
+// Show receiver confirmation
+function showReceiverConfirmation(transferId, unloadType) {
+    const transfer = InterTransferService.getTransferById(transferId);
+    if (!transfer) return;
+    
+    const dialog = document.createElement('div');
+    dialog.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50';
+    
+    const isCrossdock = unloadType === 'crossdock';
+    const bgColor = isCrossdock ? 'orange' : 'green';
+    
+    dialog.innerHTML = `
+        <div class="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+            <h3 class="text-xl font-bold mb-4">
+                <i class="fas fa-user-check mr-2 text-${bgColor}-600"></i>Receiver Confirmation
+            </h3>
+            
+            <div class="mb-4 p-4 bg-${bgColor}-50 border border-${bgColor}-200 rounded">
+                <p class="text-sm text-gray-600 mb-1">Unload Type</p>
+                <p class="font-bold text-${bgColor}-800">
+                    ${isCrossdock ? '📦 Crossdock Storage' : '✅ Final Delivery'}
+                </p>
+            </div>
+            
+            <div class="mb-4 p-4 bg-gray-50 rounded">
+                <p class="text-sm text-gray-600 mb-1">Transfer Number</p>
+                <p class="font-mono font-bold">${transfer.transfer_number}</p>
+            </div>
+            
+            <div class="mb-6">
+                <label class="block text-sm font-medium mb-2">Receiver Name *</label>
+                <input type="text" id="receiverNameInput" 
+                    placeholder="Enter receiver name..."
+                    class="w-full px-4 py-3 border-2 rounded text-lg focus:ring-2 focus:ring-${bgColor}-500"
+                    required
+                />
+            </div>
+            
+            <div class="flex space-x-3">
+                <button onclick="closeReceiverConfirmation()" 
+                    class="flex-1 px-4 py-3 border border-gray-300 rounded hover:bg-gray-50">
+                    Cancel
+                </button>
+                <button onclick="confirmUnloading('${transferId}', '${unloadType}')" 
+                    class="flex-1 px-4 py-3 bg-${bgColor}-600 text-white rounded hover:bg-${bgColor}-700">
+                    <i class="fas fa-check mr-2"></i>Confirm
+                </button>
+            </div>
+        </div>
+    `;
+    
+    document.body.appendChild(dialog);
+    
+    setTimeout(() => {
+        const input = document.getElementById('receiverNameInput');
+        if (input) input.focus();
+    }, 100);
+}
+
+// Close receiver confirmation
+function closeReceiverConfirmation() {
+    const dialogs = document.querySelectorAll('.fixed.inset-0');
+    dialogs.forEach(d => d.remove());
+}
+
+// Confirm unloading
+function confirmUnloading(transferId, unloadType) {
+    const receiverName = document.getElementById('receiverNameInput')?.value.trim();
+    
+    if (!receiverName) {
+        alert('Please enter receiver name');
+        return;
+    }
+    
+    const transfer = InterTransferService.getTransferById(transferId);
+    if (!transfer) return;
+    
+    const userOutlet = state.user?.outlet_code || 'APDWHS1';
+    const containerNumbers = transfer.items.map(i => i.container_number);
+    
     const updated = InterTransferService.unloadTransfer(
         transferId,
-        state.user?.username || 'driver',
+        state.user?.username || 'warehouse',
         userOutlet,
-        containerNumbers
+        userOutlet,
+        receiverName,
+        containerNumbers,
+        unloadType
     );
     
     if (updated) {
-        let message = `✅ Transfer ${updated.transfer_number} unloaded!\n`;
-        message += `Status: ${updated.status.toUpperCase()}\n`;
+        closeReceiverConfirmation();
         
-        if (updated.is_crossdock) {
-            message += '\n⚠️ CROSSDOCK DETECTED!\n';
-            message += 'This transfer has been added to the crossdock queue for reloading.';
+        const isCrossdock = unloadType === 'crossdock';
+        playBeep(true);
+        
+        if (isCrossdock) {
+            showToast(`📦 Transfer ${updated.transfer_number} unloaded for crossdock. Received by ${receiverName}`, 'warning');
+        } else {
+            showToast(`✅ Transfer ${updated.transfer_number} delivered! Received by ${receiverName}`, 'success');
         }
         
-        alert(message);
         render();
     }
 }
@@ -1157,28 +1567,113 @@ function showCrossdockReloadConfirmation(transfer) {
     document.body.insertAdjacentHTML('beforeend', confirmHTML);
 }
 
-// Confirm crossdock reload
+// Confirm crossdock reload - requires driver confirmation
 function confirmCrossdockReload(transferId) {
     const transfer = InterTransferService.getTransferById(transferId);
     if (!transfer) return;
     
-    const loadedBy = state.user?.username || 'driver';
-    const containerNumbers = transfer.items.map(i => i.container_number);
+    closeModal();
     
-    // Reload the transfer (mark as in_transit again)
-    const updated = InterTransferService.loadTransfer(transferId, loadedBy, containerNumbers);
-    
-    if (updated) {
-        playBeep(true);
-        closeModal();
-        showToast(`✅ Transfer ${transfer.transfer_number} reloaded!\nStatus: IN_TRANSIT for delivery to ${transfer.receiver_outlet}\n${containerNumbers.length} containers loaded`, 'success');
+    // Show driver confirmation for reload
+    showReloadDriverConfirmation(transfer, (driverName) => {
+        const containerNumbers = transfer.items.map(i => i.container_number);
         
-        // Refocus warehouse scan input
-        const input = document.getElementById('warehouseScanInput');
-        if (input) setTimeout(() => input.focus(), 100);
-    } else {
-        playBeep(false);
-        showToast(`❌ Failed to reload transfer`, 'error');
+        // Use the new reloadCrossdock function with tracking
+        const updated = InterTransferService.reloadCrossdock(
+            transferId,
+            state.user?.username || 'warehouse',
+            state.user?.outlet_code || 'APDWHS1',
+            driverName
+        );
+        
+        if (updated) {
+            playBeep(true);
+            showToast(`✅ Transfer ${transfer.transfer_number} reloaded by ${driverName}!\nStatus: IN_TRANSIT for final delivery`, 'success');
+            
+            // Refocus warehouse scan input
+            const input = document.getElementById('warehouseScanInput');
+            if (input) setTimeout(() => input.focus(), 100);
+            
+            render();
+        } else {
+            playBeep(false);
+            showToast(`❌ Failed to reload transfer`, 'error');
+        }
+    });
+}
+
+// Show reload driver confirmation
+function showReloadDriverConfirmation(transfer, callback) {
+    const dialog = document.createElement('div');
+    dialog.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50';
+    
+    const outlets = InterTransferService.getOutlets();
+    const receiver = outlets.find(o => o.outlet_code === transfer.receiver_outlet);
+    
+    dialog.innerHTML = `
+        <div class="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+            <h3 class="text-xl font-bold mb-4">
+                <i class="fas fa-user-check mr-2 text-orange-600"></i>Driver Confirmation - Crossdock Reload
+            </h3>
+            
+            <div class="mb-4 p-4 bg-orange-50 border border-orange-200 rounded">
+                <p class="text-sm text-gray-600 mb-1">Transfer Number</p>
+                <p class="font-mono font-bold text-lg mb-2">${transfer.transfer_number}</p>
+                <p class="text-sm text-gray-600 mb-1">Final Destination</p>
+                <p class="font-semibold">${receiver?.outlet_name || transfer.receiver_outlet}</p>
+            </div>
+            
+            <div class="mb-6">
+                <label class="block text-sm font-medium mb-2">Driver Name *</label>
+                <input type="text" id="reloadDriverNameInput" 
+                    placeholder="Enter driver name..."
+                    class="w-full px-4 py-3 border-2 rounded text-lg focus:ring-2 focus:ring-orange-500"
+                    required
+                />
+            </div>
+            
+            <div class="flex space-x-3">
+                <button onclick="closeReloadDriverConfirmation()" 
+                    class="flex-1 px-4 py-3 border border-gray-300 rounded hover:bg-gray-50">
+                    Cancel
+                </button>
+                <button onclick="confirmReloadDriver()" 
+                    class="flex-1 px-4 py-3 bg-orange-600 text-white rounded hover:bg-orange-700">
+                    <i class="fas fa-truck-loading mr-2"></i>Confirm Reload
+                </button>
+            </div>
+        </div>
+    `;
+    
+    document.body.appendChild(dialog);
+    
+    setTimeout(() => {
+        const input = document.getElementById('reloadDriverNameInput');
+        if (input) input.focus();
+    }, 100);
+    
+    window.reloadDriverCallback = callback;
+}
+
+// Close reload driver confirmation
+function closeReloadDriverConfirmation() {
+    const dialogs = document.querySelectorAll('.fixed.inset-0');
+    dialogs.forEach(d => d.remove());
+    window.reloadDriverCallback = null;
+}
+
+// Confirm reload driver
+function confirmReloadDriver() {
+    const driverName = document.getElementById('reloadDriverNameInput')?.value.trim();
+    
+    if (!driverName) {
+        alert('Please enter driver name');
+        return;
+    }
+    
+    if (window.reloadDriverCallback) {
+        window.reloadDriverCallback(driverName);
+        closeReloadDriverConfirmation();
     }
 }
 
@@ -1218,43 +1713,44 @@ document.addEventListener('submit', function(e) {
             return;
         }
         
-        // First create the transfer to get the transfer number
-        const tempTransfer = {
+        // Get user outlet for audit trail
+        const userOutlet = state.user?.outlet_code || senderOutlet;
+        
+        // Create separate parcels for transfer - each gets unique TN code
+        const containers = [];
+        for (let i = 1; i <= parcelCount; i++) {
+            // Each parcel will generate its own unique TN via generateTransferNumber
+            containers.push({ 
+                container_number: '' // Will be set as TN code in createTransfer
+            });
+        }
+        
+        // Create transfers - one per parcel with unique TN codes
+        const transfers = InterTransferService.createTransfer({
             sender_outlet: senderOutlet,
             receiver_outlet: receiverOutlet,
             created_by: state.user?.username || 'user',
-            items: [],
-            notes: notes
-        };
-        
-        // Generate transfer number
-        const transferNumber = InterTransferService.generateTransferNumber(
-            tempTransfer.sender_outlet,
-            tempTransfer.receiver_outlet
-        );
-        
-        // Auto-generate container IDs based on transfer number
-        const containers = [];
-        for (let i = 1; i <= parcelCount; i++) {
-            const serial = String(i).padStart(2, '0');
-            containers.push({ container_number: `${transferNumber}-${serial}` });
-        }
-        
-        // Create transfer with auto-generated containers
-        const transfer = InterTransferService.createTransfer({
-            sender_outlet: tempTransfer.sender_outlet,
-            receiver_outlet: receiverOutlet,
-            created_by: tempTransfer.created_by,
+            created_by_outlet: userOutlet,
             items: containers,
             notes: notes
         });
         
-        if (transfer) {
-            alert(`✅ Transfer created successfully!\n\nTransfer Number: ${transfer.transfer_number}\nParcels: ${parcelCount}\nContainer IDs: ${transfer.transfer_number}-01 to ${transfer.transfer_number}-${String(parcelCount).padStart(2, '0')}\n\nYou can now print the label.`);
+        // Handle single or multiple transfers
+        const transferArray = Array.isArray(transfers) ? transfers : [transfers];
+        
+        if (transferArray.length > 0) {
+            const firstTN = transferArray[0].transfer_number;
+            const lastTN = transferArray[transferArray.length - 1].transfer_number;
             
-            // Ask if user wants to print label
-            if (confirm('Do you want to print the transfer label now?')) {
-                printTransferLabel(transfer.id);
+            const tnList = transferArray.map(t => t.transfer_number).join(', ');
+            
+            alert(`✅ Transfer created successfully!\n\nParcels: ${parcelCount}\nTransfer Numbers:\n${tnList}\n\nEach parcel has its own unique TN code.\n\nYou can now print the labels.`);
+            
+            // Ask if user wants to print labels for all transfers
+            if (confirm('Do you want to print all transfer labels now?')) {
+                transferArray.forEach(transfer => {
+                    printTransferLabel(transfer.id);
+                });
             }
             
             navigateTo('inter-transfer-list');
