@@ -459,9 +459,13 @@ function renderTransferList() {
     // Outlet users see only transfers where they are sender or receiver
     // Warehouse/admin users see all transfers
     const isOutletUser = !['admin', 'warehouse', 'warehouse_supervisor', 'warehouse_staff', 'driver'].includes(userRole);
-    const transfers = isOutletUser && userOutlet
+    let transfers = isOutletUser && userOutlet
         ? allTransfers.filter(t => t.sender_outlet === userOutlet || t.receiver_outlet === userOutlet)
         : allTransfers;
+    
+    // FIXED v4.3.1: Hide completed transfers by default on initial render
+    // Filter will be reapplied when user toggles the checkbox
+    const transfersToDisplay = transfers.filter(t => t.status !== 'completed');
     
     return `
         <div class="h-full overflow-y-auto">
@@ -564,7 +568,7 @@ function renderTransferList() {
 
             <!-- Transfer List -->
             <div id="transferListContainer" class="space-y-4" data-all-transfers='${JSON.stringify(transfers)}'>
-                ${renderTransferItems(transfers)}
+                ${renderTransferItems(transfersToDisplay)}
             </div>
             </div>
         </div>
@@ -1274,11 +1278,19 @@ function unloadTransferById(transferId) {
     const transfer = InterTransferService.getTransferById(transferId);
     if (!transfer) return;
     
-    const loadedItems = transfer.items.filter(i => i.status === 'loaded' || i.status === 'in_transit');
+    // FIXED: Items have status 'loaded' after loading, never 'in_transit'
+    // Transfer status is 'in_transit', but items remain 'loaded'
+    const loadedItems = transfer.items.filter(i => i.status === 'loaded');
     const containerNumbers = loadedItems.map(i => i.container_number);
     
     if (containerNumbers.length === 0) {
-        alert('No items to unload');
+        console.error('❌ DEBUG: No loaded items found', {
+            transferId: transfer.id,
+            transferNumber: transfer.transfer_number,
+            transferStatus: transfer.status,
+            items: transfer.items.map(i => ({ container: i.container_number, status: i.status }))
+        });
+        alert(`No items to unload. Transfer status: ${transfer.status}\nItem statuses: ${transfer.items.map(i => i.status).join(', ')}`);
         return;
     }
     
