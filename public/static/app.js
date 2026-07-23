@@ -3709,6 +3709,29 @@ async function loadOutletPallets() {
             state.availablePallets = response.data.pallets
             state.availableACodeContainers = response.data.a_code_containers || [] // NEW: Store A-code containers
             
+            // Add inter-branch transfers for this outlet
+            if (typeof InterTransferService !== 'undefined') {
+                const interTransfers = InterTransferService.getTransfers().filter(t => 
+                    t.receiver_outlet === state.selectedOutlet.code && 
+                    t.status === 'in_transit'
+                )
+                
+                // Add inter-transfers as pseudo-pallets
+                interTransfers.forEach(transfer => {
+                    state.availablePallets.push({
+                        pallet_id: transfer.transfer_number,
+                        outlet_code: state.selectedOutlet.code,
+                        outlet_code_short: state.selectedOutlet.code_short,
+                        outlet_name: state.selectedOutlet.name,
+                        transfer_count: transfer.items.length,
+                        status: 'loaded',
+                        is_inter_transfer: true, // Mark as inter-transfer
+                        inter_transfer_id: transfer.id,
+                        created_at: transfer.created_at
+                    })
+                })
+            }
+            
             // Update container counts if they changed
             if (response.data.container_count_loaded) {
                 state.selectedOutlet.container_count_loaded = response.data.container_count_loaded
@@ -3851,26 +3874,82 @@ async function handleOutletScanPallet() {
         outletScanTimeout = null
     }, 500)
     
-    // Detect code type: A code (starts with 'A') or F code (pallet ID)
+    // Detect code type: TN (inter-transfer), A code (starts with 'A') or F code (pallet ID)
+    const isTNCode = scannedCode.startsWith('TN')
     const isACode = scannedCode.startsWith('A')
     
     // Initialize tracking arrays if needed
     if (!state.outletScannedACodes) state.outletScannedACodes = []
     if (!state.outletScannedFCodes) state.outletScannedFCodes = []
+    if (!state.outletScannedTNCodes) state.outletScannedTNCodes = []
     
     // Check for duplicate scan in current session
+    const duplicateTN = isTNCode && state.outletScannedTNCodes.includes(scannedCode)
     const duplicateA = isACode && state.outletScannedACodes.includes(scannedCode)
-    const duplicateF = !isACode && state.outletScannedFCodes.includes(scannedCode)
+    const duplicateF = !isACode && !isTNCode && state.outletScannedFCodes.includes(scannedCode)
     
-    if (duplicateA || duplicateF) {
+    if (duplicateTN || duplicateA || duplicateF) {
         playBeep(false)
-        showToast(`⚠️ Duplicate scan! ${isACode ? 'Container' : 'Pallet'} ${scannedCode} already scanned`, 'error')
+        const typeLabel = isTNCode ? 'Transfer' : (isACode ? 'Container' : 'Pallet')
+        showToast(`⚠️ Duplicate scan! ${typeLabel} ${scannedCode} already scanned`, 'error')
         input.focus()
         return
     }
     
     try {
-        if (isACode) {
+        if (isTNCode) {
+            // Handle inter-branch transfer scan
+            if (typeof InterTransferService === 'undefined') {
+                playBeep(false)
+                showToast(`✗ Inter-transfer system not loaded`, 'error')
+                return
+            }
+            
+            const transfer = InterTransferService.getTransferByNumber(scannedCode)
+            
+            if (!transfer) {
+                playBeep(false)
+                showToast(`✗ Transfer ${scannedCode} not found`, 'error')
+                return
+            }
+            
+            // Check if transfer is for this outlet
+            if (transfer.receiver_outlet !== state.selectedOutlet.code) {
+                playBeep(false)
+                showToast(`✗ Transfer ${scannedCode} is not for this outlet`, 'error')
+                return
+            }
+            
+            // Check transfer status
+            if (transfer.status !== 'in_transit') {
+                playBeep(false)
+                showToast(`✗ Transfer ${scannedCode} status: ${transfer.status}`, 'error')
+                return
+            }
+            
+            // Mark as scanned
+            playBeep(true)
+            state.outletScannedTNCodes.push(scannedCode)
+            
+            // Add to scanned items list
+            state.scannedItems.push({
+                code: scannedCode,
+                type: 'inter_transfer',
+                transfer_number: scannedCode,
+                transfer_id: transfer.id,
+                container_count: transfer.items.length,
+                time: new Date().toLocaleTimeString()
+            })
+            
+            showToast(`✓ Inter-Transfer ${scannedCode} scanned (${transfer.items.length} items)`, 'success')
+            updateOutletScannedList()
+            updateOutletCompleteButton()
+            
+            // Remove from available pallets
+            state.availablePallets = state.availablePallets.filter(p => p.pallet_id !== scannedCode)
+            loadOutletPallets()
+            
+        } else if (isACode) {
             // Scan A code (container)
             const response = await axios.post('/api/outlet/scan-container', { 
                 outlet_code_short: state.selectedOutlet.code_short,
@@ -4233,15 +4312,36 @@ async function handleConfirmOutletCompletion(event) {
     }
     
     // Show double confirmation dialog
-    // CRITICAL FIX: Collect both pallet IDs (F-codes) and container IDs (A-codes)
-    // Use container_id for containers, pallet_id for pallets
+    // CRITICAL FIX: Collect pallet IDs (F-codes), container IDs (A-codes), and inter-transfer TN codes
     console.log('🔍 DEBUG: state.scannedItems:', state.scannedItems)
     const palletIds = state.scannedItems.map(item => {
-        const id = item.type === 'container' ? item.container_id : item.pallet_id
-        console.log(`🔍 Item type: ${item.type}, extracted ID: ${id}`)
-        return id
+        if (item.type === 'inter_transfer') {
+            return item.transfer_number
+        } else if (item.type === 'container') {
+            return item.container_id
+        } else {
+            return item.pallet_id
+        }
     })
     console.log('🔍 DEBUG: palletIds to send:', palletIds)
+    
+    // Handle inter-transfer completions locally
+    const interTransfers = state.scannedItems.filter(item => item.type === 'inter_transfer')
+    if (interTransfers.length > 0 && typeof InterTransferService !== 'undefined') {
+        interTransfers.forEach(item => {
+            InterTransferService.unloadTransfer(
+                item.transfer_id,
+                receiverName,
+                state.selectedOutlet.code,
+                state.selectedOutlet.code,
+                receiverName,
+                [item.transfer_number],
+                'destination' // Mark as final delivery
+            )
+        })
+        console.log(`✅ Marked ${interTransfers.length} inter-transfers as completed`)
+    }
+    
     showFinalConfirmationDialog(receiverName, boxesDelivered, containersDelivered, palletIds)
 }
 
