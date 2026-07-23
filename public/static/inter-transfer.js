@@ -286,6 +286,16 @@ const InterTransferService = {
         return transfer;
     },
 
+    // Delete transfer (admin only)
+    deleteTransfer(transferId) {
+        const transfers = this.getTransfers();
+        const filteredTransfers = transfers.filter(t => t.id !== transferId);
+        
+        localStorage.setItem(this.STORAGE_KEY, JSON.stringify(filteredTransfers));
+        
+        return true;
+    },
+
     // Get statistics
     getStatistics() {
         const transfers = this.getTransfers();
@@ -514,16 +524,36 @@ function renderTransferList() {
                 </div>
             ` : ''}
 
-            <!-- Search -->
+            <!-- Search and Filter -->
             <div class="bg-white rounded-lg shadow p-4 mb-4">
-                <input type="text" id="transferSearch" placeholder="Search by transfer number or container..."
-                    class="w-full px-4 py-2 border rounded"
-                    onkeyup="filterTransfers()"
-                />
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Search</label>
+                        <input type="text" id="transferSearch" 
+                            placeholder="Search by TN, outlet name, or outlet code..."
+                            class="w-full px-4 py-2 border rounded focus:ring-2 focus:ring-blue-500"
+                            onkeyup="filterTransfers()"
+                        />
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Status Filter</label>
+                        <select id="statusFilter" 
+                            class="w-full px-4 py-2 border rounded focus:ring-2 focus:ring-blue-500"
+                            onchange="filterTransfers()">
+                            <option value="">All Statuses</option>
+                            <option value="created">Created</option>
+                            <option value="loaded">Loaded</option>
+                            <option value="in_transit">In Transit</option>
+                            <option value="crossdock">Crossdock</option>
+                            <option value="unloaded">Unloaded</option>
+                            <option value="completed">Completed</option>
+                        </select>
+                    </div>
+                </div>
             </div>
 
             <!-- Transfer List -->
-            <div id="transferListContainer" class="space-y-4">
+            <div id="transferListContainer" class="space-y-4" data-all-transfers='${JSON.stringify(transfers)}'>
                 ${renderTransferItems(transfers)}
             </div>
             </div>
@@ -595,6 +625,12 @@ function renderTransferItems(transfers) {
                         class="bg-gray-500 hover:bg-gray-600 text-white px-3 py-2 rounded text-sm">
                         <i class="fas fa-print"></i>
                     </button>
+                    ${state.user?.role === 'admin' ? `
+                        <button onclick="deleteTransferConfirm('${t.id}', '${t.transfer_number}')"
+                            class="bg-red-500 hover:bg-red-600 text-white px-3 py-2 rounded text-sm">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    ` : ''}
                 </div>
             </div>
         `;
@@ -732,6 +768,12 @@ function viewTransferDetails(transferId) {
                             class="flex-1 bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded">
                             <i class="fas fa-print mr-2"></i>Print Label
                         </button>
+                        ${state.user?.role === 'admin' ? `
+                            <button onclick="closeModal(); deleteTransferConfirm('${transfer.id}', '${transfer.transfer_number}')"
+                                class="px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded">
+                                <i class="fas fa-trash mr-2"></i>Delete
+                            </button>
+                        ` : ''}
                         <button onclick="closeModal()"
                             class="px-4 py-2 border border-gray-300 rounded hover:bg-gray-50">
                             Close
@@ -1463,18 +1505,64 @@ function renderCrossdockQueue() {
     `;
 }
 
-// Filter transfers
+// Filter transfers with status and enhanced search
 function filterTransfers() {
     const searchInput = document.getElementById('transferSearch');
-    if (!searchInput) return;
-    
-    const query = searchInput.value.trim();
-    const transfers = query ? InterTransferService.searchTransfers(query) : InterTransferService.getTransfers();
-    
+    const statusFilter = document.getElementById('statusFilter');
     const container = document.getElementById('transferListContainer');
-    if (container) {
-        container.innerHTML = renderTransferItems(transfers);
+    
+    if (!container) return;
+    
+    // Get base transfers from container data attribute (respects outlet filtering)
+    let transfers = [];
+    try {
+        const dataAttr = container.getAttribute('data-all-transfers');
+        transfers = dataAttr ? JSON.parse(dataAttr) : InterTransferService.getTransfers();
+    } catch (e) {
+        transfers = InterTransferService.getTransfers();
     }
+    
+    // Apply outlet filtering if user is outlet user
+    const userOutlet = state.user?.outlet_code;
+    const userRole = state.user?.role || 'outlet';
+    const isOutletUser = !['admin', 'warehouse', 'warehouse_supervisor', 'warehouse_staff', 'driver'].includes(userRole);
+    
+    if (isOutletUser && userOutlet) {
+        transfers = transfers.filter(t => t.sender_outlet === userOutlet || t.receiver_outlet === userOutlet);
+    }
+    
+    // Apply status filter
+    const selectedStatus = statusFilter?.value || '';
+    if (selectedStatus) {
+        transfers = transfers.filter(t => t.status === selectedStatus);
+    }
+    
+    // Apply search filter (TN, outlet name, outlet code)
+    const query = searchInput?.value.trim().toLowerCase() || '';
+    if (query) {
+        const outlets = InterTransferService.getOutlets();
+        transfers = transfers.filter(t => {
+            // Search by transfer number
+            if (t.transfer_number.toLowerCase().includes(query)) return true;
+            
+            // Search by container number
+            if (t.items.some(item => item.container_number.toLowerCase().includes(query))) return true;
+            
+            // Search by sender outlet code or name
+            const sender = outlets.find(o => o.outlet_code === t.sender_outlet);
+            if (t.sender_outlet.toLowerCase().includes(query)) return true;
+            if (sender && sender.outlet_name.toLowerCase().includes(query)) return true;
+            
+            // Search by receiver outlet code or name
+            const receiver = outlets.find(o => o.outlet_code === t.receiver_outlet);
+            if (t.receiver_outlet.toLowerCase().includes(query)) return true;
+            if (receiver && receiver.outlet_name.toLowerCase().includes(query)) return true;
+            
+            return false;
+        });
+    }
+    
+    container.innerHTML = renderTransferItems(transfers);
 }
 
 // Close modal
@@ -1757,5 +1845,37 @@ document.addEventListener('submit', function(e) {
         }
     }
 });
+
+// Delete transfer confirmation (admin only)
+function deleteTransferConfirm(transferId, transferNumber) {
+    // Double check admin permission
+    if (state.user?.role !== 'admin') {
+        alert('⛔ Access denied. Only administrators can delete transfers.');
+        return;
+    }
+    
+    const confirmed = confirm(`⚠️ DELETE TRANSFER?\n\nTransfer Number: ${transferNumber}\n\nThis action cannot be undone!\n\n⚠️ In production, this will permanently delete the transfer from the database.\n\nAre you sure you want to delete this transfer?`);
+    
+    if (!confirmed) return;
+    
+    // Second confirmation for safety
+    const doubleConfirm = confirm(`⚠️ FINAL CONFIRMATION\n\nYou are about to permanently delete transfer:\n${transferNumber}\n\nThis is your last chance to cancel.\n\nProceed with deletion?`);
+    
+    if (!doubleConfirm) return;
+    
+    // Delete the transfer
+    const success = InterTransferService.deleteTransfer(transferId);
+    
+    if (success) {
+        playBeep(true);
+        showToast(`🗑️ Transfer ${transferNumber} deleted successfully`, 'success');
+        
+        // Refresh the list
+        render();
+    } else {
+        playBeep(false);
+        showToast(`❌ Failed to delete transfer`, 'error');
+    }
+}
 
 console.log('✅ Inter-Transfer functions loaded');
